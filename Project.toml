@@ -1,0 +1,4 @@
+name = "AdaptiveCrossApproximation"
+uuid = "ef3ffb92-1c7b-43b8-a0d7-a7e2ce4fd1e5"
+authors = ["JoshuaTetzner <joshua.tetzner@uni-rostock.de>"]
+version = "0.1.0"
