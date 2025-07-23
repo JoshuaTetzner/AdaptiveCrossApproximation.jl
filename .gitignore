@@ -1,2 +1,8 @@
-*.msh
-*.vtu
+*.jl.*.cov
+*.jl.cov
+*.jl.mem
+/Manifest.toml
+/docs/Manifest.toml
+/docs/build/
+*.cov
+*.info
