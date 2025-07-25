@@ -1,10 +1,16 @@
-struct MaximumValue <: PivStrat
+
+struct MaximumValue <: ValuePivStrat
     usedidcs::Vector{Bool}
 end
 
 MaximumValue() = MaximumValue(Bool[])
 
-(::MaximumValue)(rcp::Vector{Int}) = MaximumValue(zeros(Bool, length(rcp)))
+(::MaximumValue)(len::Int) = MaximumValue(zeros(Bool, len))
+
+function (pivstrat::MaximumValue)()
+    pivstrat.usedidcs[1] = true
+    return 1
+end
 
 function (pivstrat::MaximumValue)(rc::AbstractArray)
     nextidx = 1

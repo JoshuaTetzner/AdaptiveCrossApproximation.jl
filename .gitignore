@@ -4,5 +4,5 @@
 /Manifest.toml
 /docs/Manifest.toml
 /docs/build/
-*.cov
-*.info
+lcov.info
+*.vscode
