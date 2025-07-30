@@ -1,7 +1,5 @@
 # AdaptiveCrossApproximation
-[![Docs-stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://FastBEAST.github.io/AdaptiveCrossApproximation.jl/stable/)
-[![Docs-dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://FastBEAST.github.io/AdaptiveCrossApproximation.jl/dev/)
-[![codecov](https://codecov.io/gh/FastBEAST/AdaptiveCrossApproximation.jl/graph/badge.svg?token=RDRQTBWQS3)](https://codecov.io/gh/FastBEAST/AdaptiveCrossApproximation.jl)
+
 This package provides different flavors of the adaptive cross approximation introduced in BEBENDORF.
 Beside the standard algorithm this package allows to use several different pivoting strategies [] and convergence criteria[].
 Further more this package contains an incomplete adaptive cross approximation allowing an efficient pivoting selection for the construction of $\mathcal{H}^2$-matrices [].
