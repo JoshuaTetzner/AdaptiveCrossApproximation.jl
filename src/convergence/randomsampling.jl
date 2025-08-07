@@ -6,11 +6,18 @@ mutable struct RandomSampling{F<:Real,K} <: ConvCrit
     factor::F
     indices::Matrix{Int}
     rest::Vector{K}
+    tol::F
 end
 
-function RandomSampling(::Type{K}; factor::F=1.0, nsamples::Int=0) where {K,F<:Real}
-    return RandomSampling{F,K}(0.0, nsamples, factor, zeros(Int, 0, 0), zeros(K, 0, 0))
+function RandomSampling(
+    ::Type{K}; factor::F=1.0, nsamples::Int=0, tol::F=1e-4
+) where {K,F<:Real}
+    return RandomSampling{F,K}(
+        F(0.0), nsamples, factor, zeros(Int, 0, 0), zeros(K, 0, 0), tol
+    )
 end
+
+tolerance(cc::RandomSampling) = cc.tol
 
 function (convcrit::RandomSampling{F,K})(
     rowbuffer::AbstractMatrix{K},
@@ -18,7 +25,6 @@ function (convcrit::RandomSampling{F,K})(
     npivot::Int,
     maxrows::Int,
     maxcolumns::Int,
-    tol::F,
 ) where {F<:Real,K}
 
     # omit this to increase performance (safty measures)---
@@ -37,5 +43,6 @@ function (convcrit::RandomSampling{F,K})(
     meanrest = sum(abs.(convcrit.rest) .^ 2) / convcrit.nsamples
 
     normF!(convcrit, rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
-    return npivot, sqrt(meanrest * maxrows * maxcolumns) > tol * sqrt(convcrit.normUV²)
+    return npivot,
+    sqrt(meanrest * maxrows * maxcolumns) > convcrit.tol * sqrt(convcrit.normUV²)
 end

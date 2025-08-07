@@ -15,7 +15,7 @@ nextrc!(buf, A::AbstractArray, i, j) = (buf .= view(A, i, j))
 function ACA(;
     rowpivoting=MaximumValue(),
     columnpivoting=MaximumValue(),
-    convergence=FNormEstimator(0.0),
+    convergence=FNormEstimator(0.0, 1e-4),
 )
     return ACA(rowpivoting, columnpivoting, convergence)
 end
@@ -24,11 +24,10 @@ function (aca::ACA)(
     A,
     rowbuffer::AbstractMatrix{K},
     colbuffer::AbstractMatrix{K},
-    maxrank::Int,
-    tol::F;
+    maxrank::Int;
     rowidcs=Vector(1:size(colbuffer, 1)),
     colidcs=Vector(1:size(rowbuffer, 2)),
-) where {F<:Real,K}
+) where {K}
     rows = Int[1]
     cols = Int[]
     maxrows = size(colbuffer, 1)
@@ -54,7 +53,7 @@ function (aca::ACA)(
     )
 
     # conv is true until convergence is reached
-    npivot, conv = aca.convergence(rowbuffer, colbuffer, npivot, maxrows, maxcolumns, tol)
+    npivot, conv = aca.convergence(rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
 
     while conv && npivot < maxrank
         npivot += 1
@@ -91,9 +90,7 @@ function (aca::ACA)(
             end
         end
 
-        npivot, conv = aca.convergence(
-            rowbuffer, colbuffer, npivot, maxrows, maxcolumns, tol
-        )
+        npivot, conv = aca.convergence(rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
     end
 
     return npivot, rows, cols
@@ -101,25 +98,25 @@ end
 
 function aca(
     M::AbstractMatrix{K};
+    tol=1e-4,
     rowpivoting=MaximumValue(zeros(Bool, size(M, 1))),
     columnpivoting=MaximumValue(zeros(Bool, size(M, 1))),
-    convergence=FNormEstimator(0.0),
+    convergence=FNormEstimator(0.0, tol),
     maxrank=40,
-    tol=1e-4,
     svdrecompress=false,
 ) where {K}
     compressor = ACA(rowpivoting, columnpivoting, convergence)
     rowbuffer = zeros(K, maxrank, size(M, 2))
     colbuffer = zeros(K, size(M, 1), maxrank)
 
-    npivots, rows, cols = compressor(M, rowbuffer, colbuffer, maxrank, tol)
+    npivots, rows, cols = compressor(M, rowbuffer, colbuffer, maxrank)
     if svdrecompress
         @views Q, R = qr(colbuffer[1:size(M, 1), 1:npivots])
         @views U, s, V = svd(R * rowbuffer[1:npivots, 1:size(M, 2)])
 
         opt_r = length(s)
         for i in eachindex(s)
-            if s[i] < tol * s[1]
+            if s[i] < tolerance(convergence) * s[1]
                 opt_r = i
                 break
             end
