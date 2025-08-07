@@ -2,6 +2,7 @@ struct ACA{RowPivType,ColPivType,ConvCritType}
     rowpivoting::RowPivType
     columnpivoting::ColPivType
     convergence::ConvCritType
+    tol::Float64 = 1e-4
 
     function ACA(rowpivoting, columnpivoting, convergence)
         return new{typeof(rowpivoting),typeof(columnpivoting),typeof(convergence)}(
@@ -25,7 +26,6 @@ function (aca::ACA)(
     rowbuffer::AbstractMatrix{K},
     colbuffer::AbstractMatrix{K},
     maxrank::Int,
-    tol::F;
     rowidcs=Vector(1:size(colbuffer, 1)),
     colidcs=Vector(1:size(rowbuffer, 2)),
 ) where {F<:Real,K}
@@ -54,7 +54,7 @@ function (aca::ACA)(
     )
 
     # conv is true until convergence is reached
-    npivot, conv = aca.convergence(rowbuffer, colbuffer, npivot, maxrows, maxcolumns, tol)
+    npivot, conv = aca.convergence(rowbuffer, colbuffer, npivot, maxrows, maxcolumns, aca.tol)
 
     while conv && npivot < maxrank
         npivot += 1
@@ -92,7 +92,7 @@ function (aca::ACA)(
         end
 
         npivot, conv = aca.convergence(
-            rowbuffer, colbuffer, npivot, maxrows, maxcolumns, tol
+            rowbuffer, colbuffer, npivot, maxrows, maxcolumns, aca.tol
         )
     end
 
