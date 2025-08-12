@@ -8,7 +8,15 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
+[weakdeps]
+HMatrices = "8646bddf-ab1c-4fa7-9c51-ba187d647618"
+
+[extensions]
+ACAHMatrices = ["HMatrices"]
+
 [compat]
+HMatrices = "0.2.12"
+JuliaFormatter = "2.1.6"
 Polynomials = "4.1.0"
 StaticArrays = "1.9.13"
 

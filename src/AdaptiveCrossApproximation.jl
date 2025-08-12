@@ -19,6 +19,10 @@ include("pivoting/randomsampling.jl")
 
 include("aca.jl")
 
+if !isdefined(Base, :get_extension) # for julia version < 1.9
+    include("../ext/ACAHMatrices/ACAHMatrices.jl")
+end
+
 export ACA
 export FNormEstimator
 export FNormExtrapolator
