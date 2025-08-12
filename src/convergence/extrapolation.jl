@@ -1,13 +1,14 @@
 mutable struct FNormExtrapolator{F} <: ConvCrit
     lastnorms::Vector{F}
-    estimator::Union{FNormEstimator{F},iFNormEstimator{F}}
+    estimator::FNormEstimator{F}
 end
 
-function FNormExtrapolator(::Type{F}) where {F}
-    return FNormExtrapolator(F[], FNormEstimator(F(0.0)))
+function FNormExtrapolator(tol::F) where {F}
+    return FNormExtrapolator(F[], FNormEstimator(F(0.0), tol))
 end
 
-(::FNormExtrapolator{F})() where {F} = FNormExtrapolator(F[], FNormEstimator(0.0))
+(::FNormExtrapolator{F})() where {F} = FNormExtrapolator(F[], FNormEstimator(0.0, 1e-4))
+tolerance(cc::FNormExtrapolator) = cc.estimator.tol
 
 # ACA
 function (convcrit::FNormExtrapolator{F})(
@@ -16,11 +17,8 @@ function (convcrit::FNormExtrapolator{F})(
     npivot::Int,
     maxrows::Int,
     maxcolumns::Int,
-    tol::F,
 ) where {F<:Real,K}
-    npivot_, conv = convcrit.estimator(
-        rowbuffer, colbuffer, npivot, maxrows, maxcolumns, tol
-    )
+    npivot_, conv = convcrit.estimator(rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
     (npivot_ != npivot) && (return npivot_, conv)
     (!conv) && (f2 = fit(Vector(1:(npivot - 1)), log10.(convcrit.lastnorms), 2))
     @views push!(
@@ -30,22 +28,7 @@ function (convcrit::FNormExtrapolator{F})(
     if conv
         return npivot, true
     else
-        return npivot, f2(npivot) > log10(tol * sqrt(convcrit.estimator.normUV²))
-    end
-end
-
-# iACA
-function (convcrit::FNormExtrapolator{F})(
-    rcbuffer::AbstractVector{K}, npivot::Int, tol::F
-) where {F<:Real,K}
-    npivot_, conv = convcrit.estimator(rcbuffer, npivot, tol)
-    (npivot_ != npivot) && (return npivot_, conv)
-
-    (!conv) && (f2 = fit(Vector(1:(npivot - 1)), log10.(convcrit.lastnorms), 2))
-    @views push!(convcrit.lastnorms, norm(rcbuffer))
-    if conv
-        return npivot, true
-    else
-        return npivot, f2(npivot) > log10(tol * convcrit.estimator.normUV)
+        return npivot,
+        f2(npivot) > log10(convcrit.estimator.tol * sqrt(convcrit.estimator.normUV²))
     end
 end

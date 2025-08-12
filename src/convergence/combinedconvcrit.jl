@@ -10,11 +10,10 @@ function (convcrit::CombinedConvCrit)(
     npivot::Int,
     maxrows::Int,
     maxcolumns::Int,
-    tol::F,
-) where {F<:Real,K}
+) where {K}
     for (i, crit) in enumerate(convcrit.crits)
         npivot_, convcrit.isconverged[i] = crit(
-            rowbuffer, colbuffer, npivot, maxrows, maxcolumns, tol
+            rowbuffer, colbuffer, npivot, maxrows, maxcolumns
         )
         npivot_ != npivot && return npivot_, convcrit.isconverged[i]
     end

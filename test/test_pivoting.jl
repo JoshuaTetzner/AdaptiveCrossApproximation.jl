@@ -40,17 +40,17 @@ end
 # combinedpivstrat
 for tol in [1e-2, 1e-4, 1e-6, 1e-8, 1e-10]#, 1e-12, 1e-14]
     Random.seed!(1)
-    cc1 = AdaptiveCrossApproximation.FNormEstimator(Float64)
+    cc1 = AdaptiveCrossApproximation.FNormEstimator(tol)
     indices = hcat(rand(1:100, 100), rand(1:110, 100))
     rest = [K[rc[1], rc[2]] for rc in eachrow(indices)]
-    cc2 = AdaptiveCrossApproximation.RandomSampling(0.0, 100, 1.0, indices, rest)
+    cc2 = AdaptiveCrossApproximation.RandomSampling(0.0, 100, 1.0, indices, rest, tol)
     convergence = AdaptiveCrossApproximation.CombinedConvCrit([cc1, cc2], zeros(Bool, 2))
 
     ps1 = MaximumValue(zeros(Bool, 100))
     ps2 = AdaptiveCrossApproximation.RandomSamplingPivoting(cc2, 1)
     rp = AdaptiveCrossApproximation.CombinedPivStrat(convergence, [ps1, ps2])
     local U, V = AdaptiveCrossApproximation.aca(
-        K; tol=tol, rowpivoting=rp, convergence=convergence, maxrank=100
+        K; rowpivoting=rp, convergence=convergence, maxrank=100
     )
     @test norm(U * V - K) / norm(K) < 4tol
 end

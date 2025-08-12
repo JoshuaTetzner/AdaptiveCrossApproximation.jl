@@ -1,12 +1,14 @@
 mutable struct FNormEstimator{F} <: ConvCrit
     normUV²::F
+    tol::F
 end
 
-function FNormEstimator(::Type{F}) where {F}
-    return FNormEstimator(F(0.0))
+function FNormEstimator(tolerance::F) where {F}
+    return FNormEstimator(F(0.0), tolerance)
 end
 
-(::FNormEstimator{F})() where {F} = FNormEstimator(0.0)
+(::FNormEstimator{F})() where {F} = FNormEstimator(0.0, 1e-4)
+tolerance(cc::FNormEstimator) = cc.tol
 
 function (convcrit::FNormEstimator{F})(
     rowbuffer::AbstractMatrix{K},
@@ -14,7 +16,6 @@ function (convcrit::FNormEstimator{F})(
     npivot::Int,
     maxrows::Int,
     maxcolumns::Int,
-    tol::F,
 ) where {F<:Real,K}
     @views rnorm = norm(rowbuffer[npivot, 1:maxcolumns])
     @views cnorm = norm(colbuffer[1:maxrows, npivot])
@@ -24,24 +25,5 @@ function (convcrit::FNormEstimator{F})(
         (npivot == 1) ? (return npivot - 1, true) : (return npivot - 1, false)
     end
     normF!(convcrit, rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
-    return npivot, rnorm * cnorm > tol * sqrt(convcrit.normUV²)
-end
-
-# iACA
-mutable struct iFNormEstimator{F} <: ConvCrit
-    normUV::F
-end
-
-function iFNormEstimator(::Type{F}) where {F}
-    return iFNormEstimator(F(0.0))
-end
-
-function (convcrit::iFNormEstimator{F})(
-    rcbuffer::AbstractVector{K}, npivot::Int, tol::F
-) where {F<:Real,K}
-    @views rcnorm = norm(rcbuffer)
-
-    isapprox(rcnorm, 0.0) && (return npivot - 1, true)
-
-    return npivot, rcnorm > tol * convcrit.normUV
+    return npivot, rnorm * cnorm > convcrit.tol * sqrt(convcrit.normUV²)
 end
