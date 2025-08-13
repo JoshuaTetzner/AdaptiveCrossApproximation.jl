@@ -12,9 +12,7 @@ end
 function RandomSampling(
     ::Type{K}; factor::F=1.0, nsamples::Int=0, tol::F=1e-4
 ) where {K,F<:Real}
-    return RandomSampling{F,K}(
-        F(0.0), nsamples, factor, zeros(Int, 0, 0), zeros(K, 0, 0), tol
-    )
+    return RandomSampling{F,K}(F(0.0), nsamples, factor, zeros(Int, 0, 0), zeros(K, 0), tol)
 end
 
 tolerance(cc::RandomSampling) = cc.tol

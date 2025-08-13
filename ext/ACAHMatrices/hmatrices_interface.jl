@@ -18,18 +18,69 @@ function (aca::ACA)(
     colBuffer = reshape(
         bufs.B.data[1:(length(irange) * maxrank)], (length(irange), maxrank)
     )
-
+    update_conv_idcs!(aca.convergence, K, irange, jrange)
     cur_aca = AdaptiveCrossApproximation.ACA(;
-        rowpivoting=AdaptiveCrossApproximation.MaximumValue(zeros(Bool, length(irange))),
-        columnpivoting=AdaptiveCrossApproximation.MaximumValue(zeros(Bool, length(jrange))),
+        rowpivoting=update_pivot_idcs(K, aca.rowpivoting, irange, jrange, true),
+        columnpivoting=update_pivot_idcs(K, aca.columnpivoting, irange, jrange, false),
         convergence=aca.convergence,
     )
+
     npivots, U, V = cur_aca(
         K, rowBuffer, colBuffer, maxrank; rowidcs=irange, colidcs=jrange
     )
     return HMatrices.RkMatrix(
         colBuffer[:, 1:npivots], Matrix(transpose(rowBuffer[1:npivots, :]))
     )
+end
+
+function update_pivot_idcs(
+    _::HMatrices.PermutedMatrix{TT,T},
+    pivoting::AdaptiveCrossApproximation.ValuePivStrat,
+    rowidcs::UnitRange{Int},
+    colidcs::UnitRange{Int},
+    is_row::Bool,
+) where {TT<:HMatrices.KernelMatrix,T}
+    len = is_row ? length(rowidcs) : length(colidcs)
+    return pivoting(len)
+end
+
+function update_pivot_idcs(
+    _::HMatrices.PermutedMatrix{TT,T},
+    pivoting::AdaptiveCrossApproximation.GeoPivStrat,
+    rowidcs::UnitRange{Int},
+    colidcs::UnitRange{Int},
+    is_row::Bool,
+) where {TT<:HMatrices.KernelMatrix,T}
+    idcsvec = is_row ? Vector(rowidcs) : Vector(colidcs)
+    return pivoting(idcsvec)
+end
+
+function update_pivot_idcs(
+    K::HMatrices.PermutedMatrix{TT,T},
+    pivoting::AdaptiveCrossApproximation.ConvPivStrat,
+    rowidcs::UnitRange{Int},
+    colidcs::UnitRange{Int},
+    _::Bool,
+) where {TT<:HMatrices.KernelMatrix,T}
+    update_conv_idcs!(pivoting.convcrit, K, rowidcs, colidcs)
+    return typeof(pivoting)(pivoting.convcrit, pivoting.rc)
+end
+
+function update_pivot_idcs(
+    K::HMatrices.PermutedMatrix{TT,T},
+    pivoting::AdaptiveCrossApproximation.CombinedPivStrat,
+    rowidcs::UnitRange{Int},
+    colidcs::UnitRange{Int},
+    is_row::Bool,
+) where {TT<:HMatrices.KernelMatrix,T}
+    curr_strats = Vector{AdaptiveCrossApproximation.PivStrat}(
+        undef, length(pivoting.strats)
+    )
+    for (i, strat) in enumerate(pivoting.strats)
+        curr_strats[i] = update_pivot_idcs(K, strat, rowidcs, colidcs, is_row)
+    end
+    update_conv_idcs!(pivoting.convcrit, K, rowidcs, colidcs)
+    return AdaptiveCrossApproximation.CombinedPivStrat(pivoting.convcrit, curr_strats)
 end
 
 function Base.resize!(A::HMatrices.VectorOfVectors, m::Int, n::Int)
@@ -39,6 +90,36 @@ function Base.resize!(A::HMatrices.VectorOfVectors, m::Int, n::Int)
         resize!(A.data, ie)
     end
     return A.k = n
+end
+
+function update_conv_idcs!(
+    convcrit::AdaptiveCrossApproximation.CombinedConvCrit,
+    K::HMatrices.PermutedMatrix{TT,T},
+    irange::UnitRange{Int},
+    jrange::UnitRange{Int},
+) where {TT<:HMatrices.KernelMatrix,T}
+    for crit in convcrit.crits
+        update_conv_idcs!(crit, K, irange, jrange)
+    end
+end
+
+update_conv_idcs!(
+    convcrit::AdaptiveCrossApproximation.ConvCrit,
+    K::HMatrices.PermutedMatrix{TT,T},
+    irange::UnitRange{Int},
+    jrange::UnitRange{Int},
+) where {TT<:HMatrices.KernelMatrix,T} = nothing
+
+function update_conv_idcs!(
+    convcrit::AdaptiveCrossApproximation.RandomSampling{F,G},
+    K::HMatrices.PermutedMatrix{TT,T},
+    irange::UnitRange{Int},
+    jrange::UnitRange{Int},
+) where {F<:Real,G,TT<:HMatrices.KernelMatrix,T}
+    convcrit.indices = hcat(
+        rand(1:length(irange), convcrit.nsamples), rand(1:length(jrange), convcrit.nsamples)
+    )
+    return convcrit.rest = [K.data[rc[1], rc[2]][1] for rc in eachrow(convcrit.indices)]
 end
 
 Base.size(K::HMatrices.VectorOfVectors) = K.m, K.k
