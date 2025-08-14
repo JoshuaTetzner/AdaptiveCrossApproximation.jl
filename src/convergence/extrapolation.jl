@@ -7,7 +7,9 @@ function FNormExtrapolator(tol::F) where {F}
     return FNormExtrapolator(F[], FNormEstimator(F(0.0), tol))
 end
 
-(::FNormExtrapolator{F})() where {F} = FNormExtrapolator(F[], FNormEstimator(0.0, 1e-4))
+function (cc::FNormExtrapolator{F})() where {F}
+    return FNormExtrapolator(F[], FNormEstimator(0.0, cc.estimator.tol))
+end
 tolerance(cc::FNormExtrapolator) = cc.estimator.tol
 
 # ACA

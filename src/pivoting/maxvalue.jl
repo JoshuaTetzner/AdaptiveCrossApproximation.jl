@@ -6,6 +6,7 @@ end
 MaximumValue() = MaximumValue(Bool[])
 
 (::MaximumValue)(len::Int) = MaximumValue(zeros(Bool, len))
+(::MaximumValue)(ivec::Vector{Int}) = MaximumValue(zeros(Bool, length(ivec)))
 
 function (pivstrat::MaximumValue)()
     pivstrat.usedidcs[1] = true
