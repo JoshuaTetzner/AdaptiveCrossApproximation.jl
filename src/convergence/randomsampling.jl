@@ -14,9 +14,13 @@ function RandomSampling(
 ) where {K,F<:Real}
     return RandomSampling{F,K}(F(0.0), nsamples, factor, zeros(Int, 0, 0), zeros(K, 0), tol)
 end
-function (cc::RandomSampling)(K::AbstractMatrix, ivec::Vector{Int}, jvec::Vector{Int})
-    nsamples = cc.nsamples == 0 ? cc.factor * (length(ivec) + length(jvec)) : cc.nsamples
-    indices = hcat(rand(1:length(ivec), nsamples), rand(1:length(jvec), nsamples))
+function (cc::RandomSampling)(
+    K::AbstractMatrix, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
+)
+    rowlen = length(rowidcs)
+    collen = length(colidcs)
+    nsamples = cc.nsamples == 0 ? cc.factor * (rowlen + collen) : cc.nsamples
+    indices = hcat(rand(1:rowlen, nsamples), rand(1:collen, nsamples))
     rest = [K[rc[1], rc[2]][1] for rc in eachrow(indices)]
     return RandomSampling(0.0, nsamples, cc.factor, indices, rest, cc.tol)
 end

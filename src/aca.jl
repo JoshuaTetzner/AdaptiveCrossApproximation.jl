@@ -20,41 +20,43 @@ function ACA(;
     return ACA(rowpivoting, columnpivoting, convergence)
 end
 
-function (aca::ACA)(K::AbstractMatrix, ivec::Vector{Int}, jvec::Vector{Int})
-    return ACA(aca.rowpivoting(ivec), aca.columnpivoting(jvec), aca.convergence())
+function (aca::ACA)(
+    K::AbstractMatrix, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
+)
+    return ACA(aca.rowpivoting(rowidcs), aca.columnpivoting(colidcs), aca.convergence())
 end
 
 function (aca::ACA{PS,PS,CC})(
-    K::AbstractMatrix, ivec::Vector{Int}, jvec::Vector{Int}
+    K::AbstractMatrix, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
 ) where {PS<:PivStrat,CC<:RandomSampling}
-    convergence = aca.convergence(K, ivec, jvec)
+    convergence = aca.convergence(K, rowidcs, colidcs)
     rowpivoting = if aca.rowpivoting isa RandomSamplingPivoting
         aca.rowpivoting(convergence)
     else
-        aca.rowpivoting(ivec)
+        aca.rowpivoting(rowidcs)
     end
     columnpivoting = if aca.columnpivoting isa RandomSamplingPivoting
         aca.columnpivoting(convergence)
     else
-        aca.columnpivoting(jvec)
+        aca.columnpivoting(colidcs)
     end
 
     return ACA(rowpivoting, columnpivoting, convergence)
 end
 
 function (aca::ACA{RP,CP,CC})(
-    K::AbstractMatrix, ivec::Vector{Int}, jvec::Vector{Int}
+    K::AbstractMatrix, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
 ) where {RP,CP,CC<:CombinedConvCrit}
-    convergence = aca.convergence(K, ivec, jvec)
+    convergence = aca.convergence(K, rowidcs, colidcs)
     rowpivoting = if aca.rowpivoting isa CombinedPivStrat
-        aca.rowpivoting(convergence, ivec)
+        aca.rowpivoting(convergence, rowidcs)
     else
-        aca.rowpivoting(ivec)
+        aca.rowpivoting(rowidcs)
     end
     columnpivoting = if aca.columnpivoting isa CombinedPivStrat
-        aca.columnpivoting(convergence, jvec)
+        aca.columnpivoting(convergence, colidcs)
     else
-        aca.columnpivoting(jvec)
+        aca.columnpivoting(colidcs)
     end
 
     return ACA(rowpivoting, columnpivoting, convergence)

@@ -19,7 +19,7 @@ function (aca::ACA)(
         bufs.B.data[1:(length(irange) * maxrank)], (length(irange), maxrank)
     )
 
-    aca = aca(K, Vector(irange), Vector(jrange))
+    aca = aca(K, irange, jrange)
     npivots, U, V = aca(K, rowBuffer, colBuffer, maxrank; rowidcs=irange, colidcs=jrange)
     return HMatrices.RkMatrix(
         colBuffer[:, 1:npivots], Matrix(transpose(rowBuffer[1:npivots, :]))

@@ -18,7 +18,9 @@ function (pivstrat::CombinedPivStrat)(rc::AbstractArray)
     end
 end
 
-function (pivstrat::CombinedPivStrat)(convergence::CombinedConvCrit, idcs::Vector{Int})
+function (pivstrat::CombinedPivStrat)(
+    convergence::CombinedConvCrit, idcs::AbstractArray{Int}
+)
     curr_strats = Vector{PivStrat}(undef, length(pivstrat.strats))
     for (i, strat) in enumerate(pivstrat.strats)
         if isa(strat, RandomSamplingPivoting)

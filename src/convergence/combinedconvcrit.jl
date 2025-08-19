@@ -21,12 +21,12 @@ function (convcrit::CombinedConvCrit)(
 end
 
 function (convcrit::CombinedConvCrit)(
-    K::AbstractMatrix, ivec::Vector{Int}, jvec::Vector{Int}
+    K::AbstractMatrix, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
 )
     curr_crits = Vector{ConvCrit}(undef, length(convcrit.crits))
     for (i, crit) in enumerate(convcrit.crits)
         if isa(crit, RandomSampling)
-            curr_crits[i] = crit(K, ivec, jvec)
+            curr_crits[i] = crit(K, rowidcs, colidcs)
         else
             curr_crits[i] = crit()
         end
