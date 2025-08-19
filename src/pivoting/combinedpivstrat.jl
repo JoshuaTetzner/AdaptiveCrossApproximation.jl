@@ -9,7 +9,6 @@ function (pivstrat::CombinedPivStrat)()
 end
 
 function (pivstrat::CombinedPivStrat)(rc::AbstractArray)
-    #println(pivstrat.convcrit.isconverged)
     length(pivstrat.strats) > length(pivstrat.convcrit.isconverged) &&
         push!(pivstrat.convcrit.isconverged, false)
     for (i, conv) in enumerate(pivstrat.convcrit.isconverged)

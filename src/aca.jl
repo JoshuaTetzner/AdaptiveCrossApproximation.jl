@@ -24,56 +24,40 @@ function (aca::ACA)(K::AbstractMatrix, ivec::Vector{Int}, jvec::Vector{Int})
     return ACA(aca.rowpivoting(ivec), aca.columnpivoting(jvec), aca.convergence())
 end
 
-function (aca::ACA{RP,CP,CC})(
+function (aca::ACA{PS,PS,CC})(
     K::AbstractMatrix, ivec::Vector{Int}, jvec::Vector{Int}
-) where {RP<:PivStrat,CP<:PivStrat,CC<:RandomSampling}
-    return ACA(aca.rowpivoting(ivec), aca.columnpivoting(jvec), aca.convergence(ivec, jvec))
+) where {PS<:PivStrat,CC<:RandomSampling}
+    convergence = aca.convergence(K, ivec, jvec)
+    rowpivoting = if aca.rowpivoting isa RandomSamplingPivoting
+        aca.rowpivoting(convergence)
+    else
+        aca.rowpivoting(ivec)
+    end
+    columnpivoting = if aca.columnpivoting isa RandomSamplingPivoting
+        aca.columnpivoting(convergence)
+    else
+        aca.columnpivoting(jvec)
+    end
+
+    return ACA(rowpivoting, columnpivoting, convergence)
 end
 
 function (aca::ACA{RP,CP,CC})(
     K::AbstractMatrix, ivec::Vector{Int}, jvec::Vector{Int}
-) where {RP<:RandomSamplingPivoting,CP<:PivStrat,CC<:RandomSampling}
+) where {RP,CP,CC<:CombinedConvCrit}
     convergence = aca.convergence(K, ivec, jvec)
-    return ACA(aca.rowpivoting(convergence), aca.columnpivoting(jvec), convergence)
-end
+    rowpivoting = if aca.rowpivoting isa CombinedPivStrat
+        aca.rowpivoting(convergence, ivec)
+    else
+        aca.rowpivoting(ivec)
+    end
+    columnpivoting = if aca.columnpivoting isa CombinedPivStrat
+        aca.columnpivoting(convergence, jvec)
+    else
+        aca.columnpivoting(jvec)
+    end
 
-function (aca::ACA{RP,CP,CC})(
-    K::AbstractMatrix, ivec::Vector{Int}, jvec::Vector{Int}
-) where {RP<:PivStrat,CP<:RandomSamplingPivoting,CC<:RandomSampling}
-    convergence = aca.convergence(K, ivec, jvec)
-    return ACA(aca.rowpivoting(ivec), aca.columnpivoting(convergence), convergence)
-end
-
-function (aca::ACA{RP,CP,CC})(
-    K::AbstractMatrix, ivec::Vector{Int}, jvec::Vector{Int}
-) where {RP<:RandomSamplingPivoting,CP<:RandomSamplingPivoting,CC<:RandomSampling}
-    convergence = aca.convergence(K, ivec, jvec)
-    return ACA(aca.rowpivoting(convergence), aca.columnpivoting(convergence), convergence)
-end
-
-function (aca::ACA{RP,CP,CC})(
-    K::AbstractMatrix, ivec::Vector{Int}, jvec::Vector{Int}
-) where {RP<:PivStrat,CP<:CombinedPivStrat,CC<:CombinedConvCrit}
-    convergence = aca.convergence(K, ivec, jvec)
-    return ACA(aca.rowpivoting(ivec), aca.columnpivoting(convergence, jvec), convergence)
-end
-
-function (aca::ACA{RP,CP,CC})(
-    K::AbstractMatrix, ivec::Vector{Int}, jvec::Vector{Int}
-) where {RP<:CombinedPivStrat,CP,CC<:CombinedConvCrit}
-    convergence = aca.convergence(K, ivec, jvec)
-    return ACA(aca.rowpivoting(convergence, ivec), aca.columnpivoting(jvec), convergence)
-end
-
-function (aca::ACA{RP,CP,CC})(
-    K::AbstractMatrix, ivec::Vector{Int}, jvec::Vector{Int}
-) where {RP<:CombinedPivStrat,CP<:CombinedPivStrat,CC<:CombinedConvCrit}
-    convergence = aca.convergence(K, ivec, jvec)
-    return ACA(
-        aca.rowpivoting(convergence, ivec),
-        aca.columnpivoting(convergence, jvec),
-        convergence,
-    )
+    return ACA(rowpivoting, columnpivoting, convergence)
 end
 
 function (aca::ACA)(
