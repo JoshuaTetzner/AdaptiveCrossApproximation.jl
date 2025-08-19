@@ -7,7 +7,10 @@ function FNormEstimator(tolerance::F) where {F}
     return FNormEstimator(F(0.0), tolerance)
 end
 
-(::FNormEstimator{F})() where {F} = FNormEstimator(0.0, 1e-4)
+function (cc::FNormEstimator{F})() where {F}
+    return FNormEstimator(0.0, cc.tol)
+end
+
 tolerance(cc::FNormEstimator) = cc.tol
 
 function (convcrit::FNormEstimator{F})(

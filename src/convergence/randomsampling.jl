@@ -12,9 +12,17 @@ end
 function RandomSampling(
     ::Type{K}; factor::F=1.0, nsamples::Int=0, tol::F=1e-4
 ) where {K,F<:Real}
-    return RandomSampling{F,K}(
-        F(0.0), nsamples, factor, zeros(Int, 0, 0), zeros(K, 0, 0), tol
-    )
+    return RandomSampling{F,K}(F(0.0), nsamples, factor, zeros(Int, 0, 0), zeros(K, 0), tol)
+end
+function (cc::RandomSampling)(
+    K::AbstractMatrix, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
+)
+    rowlen = length(rowidcs)
+    collen = length(colidcs)
+    nsamples = cc.nsamples == 0 ? cc.factor * (rowlen + collen) : cc.nsamples
+    indices = hcat(rand(1:rowlen, nsamples), rand(1:collen, nsamples))
+    rest = [K[rc[1], rc[2]][1] for rc in eachrow(indices)]
+    return RandomSampling(0.0, nsamples, cc.factor, indices, rest, cc.tol)
 end
 
 tolerance(cc::RandomSampling) = cc.tol

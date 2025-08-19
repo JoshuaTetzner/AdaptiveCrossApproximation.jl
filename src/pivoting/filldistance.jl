@@ -8,7 +8,7 @@ function FillDistance(pos::Vector{SVector{D,F}}) where {D,F<:Real}
     return FillDistance{D,F}(F[], pos)
 end
 
-function (pivstrat::FillDistance{D,F})(idcs::Vector{Int}) where {D,F}
+function (pivstrat::FillDistance{D,F})(idcs::AbstractArray{Int}) where {D,F}
     return FillDistance{D,F}(zeros(F, length(idcs)), pivstrat.pos[idcs])
 end
 
