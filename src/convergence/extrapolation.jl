@@ -1,3 +1,5 @@
+using Polynomials
+
 mutable struct FNormExtrapolator{F} <: ConvCrit
     lastnorms::Vector{F}
     estimator::FNormEstimator{F}

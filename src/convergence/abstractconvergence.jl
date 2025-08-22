@@ -1,5 +1,3 @@
-using Polynomials
-
 abstract type ConvCrit end
 
 # ACA

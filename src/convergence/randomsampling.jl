@@ -1,5 +1,4 @@
 # RandomSampling convergence does need an inizializer
-
 mutable struct RandomSampling{F<:Real,K} <: ConvCrit
     normUV²::F
     nsamples::Int

@@ -84,4 +84,3 @@ for rtol in [1e-2, 1e-4, 1e-6, 1e-8, 1e-10]#, 1e-12, 1e-14]
     @test size(hmat, 2) == size(K, 2)
     @test norm(hmat * tst_vec - trueResult) / norm(trueResult) ≈ 0 atol = rtol
 end
-
