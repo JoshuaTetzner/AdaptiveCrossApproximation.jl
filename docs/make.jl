@@ -26,7 +26,7 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/FastBEAST/AdaptiveCrossApproximation.jl.git",
+    repo="github.com/JoshuaTetzner/AdaptiveCrossApproximation.jl.git",
     target="build",
     devbranch="dev",
     versions=["stable" => "v^", "dev" => "dev"],
