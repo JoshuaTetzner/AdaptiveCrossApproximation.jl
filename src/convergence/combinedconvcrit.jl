@@ -19,3 +19,17 @@ function (convcrit::CombinedConvCrit)(
     end
     return npivot, any(convcrit.isconverged)
 end
+
+function (convcrit::CombinedConvCrit)(
+    K::AbstractMatrix, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
+)
+    curr_crits = Vector{ConvCrit}(undef, length(convcrit.crits))
+    for (i, crit) in enumerate(convcrit.crits)
+        if isa(crit, RandomSampling)
+            curr_crits[i] = crit(K, rowidcs, colidcs)
+        else
+            curr_crits[i] = crit()
+        end
+    end
+    return CombinedConvCrit(curr_crits, zeros(Bool, length(curr_crits)))
+end

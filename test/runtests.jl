@@ -5,6 +5,7 @@ using AdaptiveCrossApproximation
     include("test_aca.jl")
     include("test_convergence.jl")
     include("test_pivoting.jl")
+    include("test_ACAHMatrices.jl")
 end
 
 @testitem "Code quality (Aqua.jl)" begin

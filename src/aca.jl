@@ -21,12 +21,54 @@ function ACA(;
 end
 
 function (aca::ACA)(
+    K::AbstractMatrix, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
+)
+    return ACA(aca.rowpivoting(rowidcs), aca.columnpivoting(colidcs), aca.convergence())
+end
+
+function (aca::ACA{PS,PS,CC})(
+    K::AbstractMatrix, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
+) where {PS<:PivStrat,CC<:RandomSampling}
+    convergence = aca.convergence(K, rowidcs, colidcs)
+    rowpivoting = if aca.rowpivoting isa RandomSamplingPivoting
+        aca.rowpivoting(convergence)
+    else
+        aca.rowpivoting(rowidcs)
+    end
+    columnpivoting = if aca.columnpivoting isa RandomSamplingPivoting
+        aca.columnpivoting(convergence)
+    else
+        aca.columnpivoting(colidcs)
+    end
+
+    return ACA(rowpivoting, columnpivoting, convergence)
+end
+
+function (aca::ACA{RP,CP,CC})(
+    K::AbstractMatrix, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
+) where {RP,CP,CC<:CombinedConvCrit}
+    convergence = aca.convergence(K, rowidcs, colidcs)
+    rowpivoting = if aca.rowpivoting isa CombinedPivStrat
+        aca.rowpivoting(convergence, rowidcs)
+    else
+        aca.rowpivoting(rowidcs)
+    end
+    columnpivoting = if aca.columnpivoting isa CombinedPivStrat
+        aca.columnpivoting(convergence, colidcs)
+    else
+        aca.columnpivoting(colidcs)
+    end
+
+    return ACA(rowpivoting, columnpivoting, convergence)
+end
+
+function (aca::ACA)(
     A,
     rowbuffer::AbstractMatrix{K},
     colbuffer::AbstractMatrix{K},
     maxrank::Int;
-    rowidcs=Vector(1:size(colbuffer, 1)),
-    colidcs=Vector(1:size(rowbuffer, 2)),
+    rowidcs = Vector(1:size(colbuffer, 1)),
+    colidcs = Vector(1:size(rowbuffer, 2)),
 ) where {K}
     rows = Int[1]
     cols = Int[]

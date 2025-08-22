@@ -19,14 +19,8 @@ function (aca::ACA)(
         bufs.B.data[1:(length(irange) * maxrank)], (length(irange), maxrank)
     )
 
-    cur_aca = AdaptiveCrossApproximation.ACA(;
-        rowpivoting=AdaptiveCrossApproximation.MaximumValue(zeros(Bool, length(irange))),
-        columnpivoting=AdaptiveCrossApproximation.MaximumValue(zeros(Bool, length(jrange))),
-        convergence=aca.convergence,
-    )
-    npivots, U, V = cur_aca(
-        K, rowBuffer, colBuffer, maxrank; rowidcs=irange, colidcs=jrange
-    )
+    aca = aca(K, irange, jrange)
+    npivots, U, V = aca(K, rowBuffer, colBuffer, maxrank; rowidcs=irange, colidcs=jrange)
     return HMatrices.RkMatrix(
         colBuffer[:, 1:npivots], Matrix(transpose(rowBuffer[1:npivots, :]))
     )

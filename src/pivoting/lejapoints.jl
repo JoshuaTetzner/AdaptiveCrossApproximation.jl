@@ -16,7 +16,7 @@ function Leja2(pos::Vector{SVector{D,F}}) where {D,F}
     return Leja2{D,F}(F[], pos)
 end
 
-function (pivstrat::Leja2{D,F})(idcs::Vector{Int}) where {D,F}
+function (pivstrat::Leja2{D,F})(idcs::AbstractArray{Int}) where {D,F}
     return Leja2{D,F}(zeros(F, length(idcs)), pivstrat.pos[idcs])
 end
 
