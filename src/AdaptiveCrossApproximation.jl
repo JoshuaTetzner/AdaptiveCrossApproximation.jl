@@ -23,7 +23,6 @@ include("aca.jl")
 include("iaca.jl")
 
 if !isdefined(Base, :get_extension) # for julia version < 1.9
-    include("../ext/ACAHMatrices/ACAHMatrices.jl")
     include("../ext/ACAH2Trees/ACAH2Trees.jl")
 end
 
