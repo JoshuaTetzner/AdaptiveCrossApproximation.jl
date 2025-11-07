@@ -1,4 +1,15 @@
-# ACA starting with a column
+"""
+    ACAᵀ{RowPivType,ColPivType,ConvCritType}
+
+Column-first variant of adaptive cross approximation.
+Starts by selecting columns first, then rows. Dual of standard ACA.
+
+# Fields
+
+  - `rowpivoting::RowPivType`: Strategy for selecting row pivots
+  - `columnpivoting::ColPivType`: Strategy for selecting column pivots
+  - `convergence::ConvCritType`: Convergence criterion
+"""
 struct ACAᵀ{RowPivType,ColPivType,ConvCritType}
     rowpivoting::RowPivType
     columnpivoting::ColPivType
@@ -11,6 +22,17 @@ struct ACAᵀ{RowPivType,ColPivType,ConvCritType}
     end
 end
 
+"""
+    ACAᵀ(; rowpivoting=MaximumValue(), columnpivoting=MaximumValue(), convergence=FNormEstimator(0.0, 1e-4))
+
+Construct column-first ACA compressor with specified strategies.
+
+# Arguments
+
+  - `rowpivoting`: Row pivoting strategy (default: `MaximumValue()`)
+  - `columnpivoting`: Column pivoting strategy (default: `MaximumValue()`)
+  - `convergence`: Convergence criterion (default: `FNormEstimator(0.0, 1e-4)`)
+"""
 function ACAᵀ(;
     rowpivoting=MaximumValue(),
     columnpivoting=MaximumValue(),
@@ -19,10 +41,42 @@ function ACAᵀ(;
     return ACAᵀ(rowpivoting, columnpivoting, convergence)
 end
 
+"""
+    (aca::ACAᵀ)(rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int})
+
+Initialize ACAᵀ functor with index sets.
+Creates functors for pivoting strategies bound to specific index ranges.
+
+# Arguments
+
+  - `rowidcs::AbstractArray{Int}`: Row indices for this compression
+  - `colidcs::AbstractArray{Int}`: Column indices for this compression
+"""
 function (aca::ACAᵀ)(rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int})
     return ACAᵀ(aca.rowpivoting(rowidcs), aca.columnpivoting(colidcs), aca.convergence())
 end
 
+"""
+    (aca::ACAᵀ)(A, rowbuffer, colbuffer, maxrank; rows, cols, rowidcs, colidcs)
+
+Perform column-first ACA compression.
+Computes low-rank approximation A ≈ colbuffer * rowbuffer by iteratively selecting columns then rows.
+
+# Arguments
+
+  - `A`: Matrix to compress
+  - `rowbuffer::AbstractMatrix{K}`: Pre-allocated row storage (maxrank × ncols)
+  - `colbuffer::AbstractMatrix{K}`: Pre-allocated column storage (nrows × maxrank)
+  - `maxrank::Int`: Maximum number of pivots
+  - `rows`: Selected row indices (optional, pre-allocated)
+  - `cols`: Selected column indices (optional, pre-allocated)
+  - `rowidcs`: Active row index range (optional)
+  - `colidcs`: Active column index range (optional)
+
+# Returns
+
+  - `npivot::Int`: Number of pivots computed
+"""
 function (aca::ACAᵀ)(
     A,
     rowbuffer::AbstractMatrix{K},
@@ -96,6 +150,26 @@ function (aca::ACAᵀ)(
     return npivot
 end
 
+"""
+    acaᵀ(M; tol=1e-4, rowpivoting, columnpivoting, convergence, maxrank=40)
+
+Convenience function for column-first ACA compression.
+Automatically allocates buffers and performs compression.
+
+# Arguments
+
+  - `M::AbstractMatrix{K}`: Matrix to compress
+  - `tol`: Convergence tolerance (default: `1e-4`)
+  - `rowpivoting`: Row pivoting strategy (default: `MaximumValueFunctor`)
+  - `columnpivoting`: Column pivoting strategy (default: `MaximumValueFunctor`)
+  - `convergence`: Convergence criterion (default: `FNormEstimator(0.0, tol)`)
+  - `maxrank`: Maximum rank (default: `40`)
+
+# Returns
+
+  - `colbuffer`: Column factor (nrows × npivots)
+  - `rowbuffer`: Row factor (npivots × ncols)
+"""
 function acaᵀ(
     M::AbstractMatrix{K};
     tol=1e-4,

@@ -1,7 +1,34 @@
+"""
+    ConvCrit
+
+Abstract base type for convergence criteria.
+Convergence criteria determine when to stop the ACA iteration based on approximation quality.
+"""
 abstract type ConvCrit end
+
+"""
+    ConvCritFunctor
+
+Abstract base type for stateful convergence criterion functors.
+Used during compression to track convergence state across iterations.
+"""
 abstract type ConvCritFunctor end
 
-# ACA
+"""
+    normF!(convcrit::ConvCritFunctor, rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
+
+Update Frobenius norm estimate for standard ACA.
+Incrementally computes squared norm of UV factorization using current pivot and all previous pivots.
+
+# Arguments
+
+  - `convcrit::ConvCritFunctor`: Convergence criterion functor to update
+  - `rowbuffer::AbstractMatrix{K}`: Row factor buffer
+  - `colbuffer::AbstractMatrix{K}`: Column factor buffer
+  - `npivot::Int`: Current pivot index
+  - `maxrows::Int`: Number of active rows
+  - `maxcolumns::Int`: Number of active columns
+"""
 function normF!(
     convcrit::ConvCritFunctor,
     rowbuffer::AbstractMatrix{K},
@@ -23,7 +50,18 @@ function normF!(
     end
 end
 
-# iACA
+"""
+    normF!(convcrit::ConvCritFunctor, rcbuffer::AbstractVector{K}, npivot::Int)
+
+Update running norm estimate for incomplete ACA (iACA).
+Computes moving average of row/column norms across pivots.
+
+# Arguments
+
+  - `convcrit::ConvCritFunctor`: Convergence criterion functor to update
+  - `rcbuffer::AbstractVector{K}`: Current row or column buffer
+  - `npivot::Int`: Current pivot index
+"""
 function normF!(
     convcrit::ConvCritFunctor, rcbuffer::AbstractVector{K}, npivot::Int
 ) where {K}

@@ -18,8 +18,12 @@ makedocs(;
             "General Usage" => "./manual/manual.md",
             "Application Examples" => "./manual/examples.md",
         ],
-        "Further Details" =>
-            Any["ACA" => "./details/aca.md", "iACA" => "./details/iaca.md"],
+        "Further Details" => Any[
+            "ACA" => "./details/aca.md",
+            "iACA" => "./details/iaca.md",
+            "Pivoting Strategies" => "./details/pivoting.md",
+            "Convergence Criteria" => "./details/convergence.md",
+        ],
         "Contributing" => "contributing.md",
         "API Reference" => "apiref.md",
     ],

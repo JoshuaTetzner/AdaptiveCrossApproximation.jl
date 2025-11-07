@@ -1,3 +1,19 @@
+"""
+    iACA{RowPivType,ColPivType,ConvCritType}
+
+Incomplete Adaptive Cross Approximation (iACA) compressor.
+
+Unlike standard ACA, iACA computes only half of the factorization.
+It uses geometric pivoting strategies (e.g., mimicry or tree mimicry) to select row or column
+pivots based solely on spatial information, making it super efficient for hierarchical matrix
+construction where only row or column samples are requiered.
+
+# Fields
+
+  - `rowpivoting::RowPivType`: Strategy for selecting row pivots (geometric)
+  - `columnpivoting::ColPivType`: Strategy for selecting column pivots
+  - `convergence::ConvCritType`: Convergence criterion
+"""
 mutable struct iACA{RowPivType,ColPivType,ConvCritType}
     rowpivoting::RowPivType
     columnpivoting::ColPivType
@@ -10,6 +26,20 @@ mutable struct iACA{RowPivType,ColPivType,ConvCritType}
     end
 end
 
+"""
+    iACA(tpos::Vector{SVector{D,F}}, spos::Vector{SVector{D,F}})
+
+Construct an iACA compressor with default settings for geometric pivoting.
+
+Creates an iACA using maximum value for row pivoting, mimicry pivoting for columns
+(mimicking the spatial distribution of a fully pivoting when selecting from `spos`), and Frobenius
+norm extrapolation for convergence.
+
+# Arguments
+
+  - `tpos`: Test/target point positions (reference distribution)
+  - `spos`: Source point positions (candidates for selection)
+"""
 function iACA(tpos::Vector{SVector{D,F}}, spos::Vector{SVector{D,F}}) where {D,F<:Real}
     return iACA(
         MaximumValue(),
@@ -18,12 +48,35 @@ function iACA(tpos::Vector{SVector{D,F}}, spos::Vector{SVector{D,F}}) where {D,F
     )
 end
 
+"""
+    (iaca::iACA{GeoPivStrat,ValuePivStrat,ConvCrit})(rows, cols)
+
+Initialize iACA functor for row matrix compression with geometric row pivoting.
+Creates functors for geometric row pivoting and value-based column pivoting.
+
+# Arguments
+
+  - `rows::AbstractVector{Int}`: Row indices for geometric pivoting
+  - `cols::AbstractVector{Int}`: Column indices for geometric pivoting
+"""
 function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     rows::AbstractVector{Int}, cols::AbstractVector{Int}
 ) where {RowPivType<:GeoPivStrat,ColPivType<:ValuePivStrat,ConvCritType<:ConvCrit}
     return iACA(iaca.rowpivoting(cols, rows), iaca.columnpivoting(cols), iaca.convergence())
 end
 
+"""
+    (iaca::iACA{TreeMimicryPivoting,ValuePivStrat,ConvCrit})(Ft, cols, maxrank)
+
+Initialize iACA functor for tree-based row pivoting.
+For hierarchical matrices where row selection uses tree-aware mimicry.
+
+# Arguments
+
+  - `Ft::AbstractVector{Int}`: Tree structure for row pivoting
+  - `cols::AbstractVector{Int}`: Column indices
+  - `maxrank::Int`: Maximum rank for approximation
+"""
 function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     Fs::AbstractVector{Int}, cols::AbstractVector{Int}, maxrank::Int
 ) where {RowPivType<:TreeMimicryPivoting,ColPivType<:ValuePivStrat,ConvCritType<:ConvCrit}
@@ -32,6 +85,22 @@ function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     )
 end
 
+"""
+    (iaca::iACA{MimicryPivoting,ValuePivStrat,ConvCrit})(A, colbuffer, rowbuffer, maxrank; kwargs...)
+
+Convenience method delegating to main computational routine for mimicry-based row pivoting.
+
+# Arguments
+
+  - `A`: Matrix to compress
+  - `colbuffer::AbstractMatrix{K}`: Buffer for column data
+  - `rowbuffer::AbstractMatrix{K}`: Buffer for row data
+  - `maxrank::Int`: Maximum rank
+  - `rows`: Row indices (optional keyword)
+  - `cols`: Column indices (optional keyword)
+  - `rowidcs`: Row index range (optional keyword)
+  - `colidcs`: Column index range (optional keyword)
+"""
 function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     A,
     rowbuffer::AbstractMatrix{K},
@@ -45,6 +114,22 @@ function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     return iaca(rowidcs, colidcs)(A, rowbuffer, colbuffer, maxrank, rows, cols, colidcs)
 end
 
+"""
+    (iaca::iACA{TreeMimicryPivoting,ValuePivStrat,ConvCrit})(A, colbuffer, rowbuffer, maxrank; kwargs...)
+
+Convenience method delegating to main computational routine for tree-based row pivoting.
+
+# Arguments
+
+  - `A`: Matrix to compress
+  - `colbuffer::AbstractMatrix{K}`: Buffer for column data
+  - `rowbuffer::AbstractMatrix{K}`: Buffer for row data
+  - `maxrank::Int`: Maximum rank
+  - `rows`: Row indices (optional keyword)
+  - `cols`: Column indices (optional keyword)
+  - `rowidcs`: Row index range (optional keyword)
+  - `colidcs`: Column index range (optional keyword)
+"""
 function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     A,
     rowbuffer::AbstractMatrix{K},
@@ -60,6 +145,28 @@ function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     )
 end
 
+"""
+    (iaca::iACA{GeoPivStratFunctor,ValuePivStratFunctor,ConvCritFunctor})(A, colbuffer, rowbuffer, maxrank, rows, cols, colidcs)
+
+Main computational routine for row matrix iACA (geometric row pivoting, value-based column pivoting).
+Performs incomplete ACA compression where rows are selected geometrically and columns by maximum value.
+
+# Arguments
+
+  - `A`: Matrix to compress
+  - `colbuffer::AbstractMatrix{K}`: Buffer for column data
+  - `rowbuffer::AbstractMatrix{K}`: Buffer for row data
+  - `maxrank::Int`: Maximum rank
+  - `rows::Vector{Int}`: Row indices storage
+  - `cols::Vector{Int}`: Column indices storage
+  - `colidcs::Vector{Int}`: Column index range
+
+# Returns
+
+  - `npivot::Int`: Number of pivots computed
+  - `rows::Vector{Int}`: Selected row indices
+  - `cols::Vector{Int}`: Selected column indices (global)
+"""
 function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     A,
     colbuffer::AbstractMatrix{K},
@@ -123,12 +230,35 @@ end
 
 # ColumnMatrix
 
+"""
+    (iaca::iACA{ValuePivStrat,GeoPivStrat,ConvCrit})(rows, cols)
+
+Initialize iACA functor for column matrix compression with geometric column pivoting.
+Creates functors for value-based row pivoting and geometric column pivoting.
+
+# Arguments
+
+  - `rows::AbstractVector{Int}`: Row indices
+  - `cols::AbstractVector{Int}`: Column indices for geometric pivoting
+"""
 function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     rows::AbstractVector{Int}, cols::AbstractVector{Int}
 ) where {RowPivType<:ValuePivStrat,ColPivType<:GeoPivStrat,ConvCritType<:ConvCrit}
     return iACA(iaca.rowpivoting(rows), iaca.columnpivoting(rows, cols), iaca.convergence())
 end
 
+"""
+    (iaca::iACA{ValuePivStrat,TreeMimicryPivoting,ConvCrit})(rows, Ft, maxrank)
+
+Initialize iACA functor for tree-based column pivoting.
+For hierarchical matrices where column selection uses tree-aware mimicry.
+
+# Arguments
+
+  - `rows::AbstractVector{Int}`: Row indices
+  - `Ft::AbstractVector{Int}`: Tree structure for column pivoting
+  - `maxrank::Int`: Maximum rank for approximation
+"""
 function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     rows::AbstractVector{Int}, Ft::AbstractVector{Int}, maxrank::Int
 ) where {RowPivType<:ValuePivStrat,ColPivType<:TreeMimicryPivoting,ConvCritType<:ConvCrit}
@@ -137,6 +267,22 @@ function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     )
 end
 
+"""
+    (iaca::iACA{ValuePivStrat,MimicryPivoting,ConvCrit})(A, rowbuffer, colbuffer, maxrank; kwargs...)
+
+Convenience method delegating to main computational routine for mimicry-based column pivoting.
+
+# Arguments
+
+  - `A`: Matrix to compress
+  - `rowbuffer::AbstractArray{K}`: Buffer for row data
+  - `colbuffer::AbstractArray{K}`: Buffer for column data
+  - `maxrank::Int`: Maximum rank
+  - `rows`: Row indices (optional keyword)
+  - `cols`: Column indices (optional keyword)
+  - `rowidcs`: Row index range (optional keyword)
+  - `colidcs`: Column index range (optional keyword)
+"""
 function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     A,
     rowbuffer::AbstractArray{K},
@@ -150,6 +296,22 @@ function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     return iaca(rowidcs, colidcs)(A, rowbuffer, colbuffer, maxrank, rows, cols, rowidcs)
 end
 
+"""
+    (iaca::iACA{ValuePivStrat,TreeMimicryPivoting,ConvCrit})(A, rowbuffer, colbuffer, maxrank; kwargs...)
+
+Convenience method delegating to main computational routine for tree-based column pivoting.
+
+# Arguments
+
+  - `A`: Matrix to compress
+  - `rowbuffer::AbstractArray{K}`: Buffer for row data
+  - `colbuffer::AbstractArray{K}`: Buffer for column data
+  - `maxrank::Int`: Maximum rank
+  - `rows`: Row indices (optional keyword)
+  - `cols`: Column indices (optional keyword)
+  - `rowidcs`: Row index range (optional keyword)
+  - `colidcs`: Column index range (optional keyword)
+"""
 function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     A,
     rowbuffer::AbstractArray{K},
@@ -165,6 +327,28 @@ function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     )
 end
 
+"""
+    (iaca::iACA{ValuePivStratFunctor,GeoPivStratFunctor,ConvCritFunctor})(A, colbuffer, rowbuffer, maxrank, rows, cols, rowidcs)
+
+Main computational routine for column matrix iACA (value-based row pivoting, geometric column pivoting).
+Performs incomplete ACA compression where columns are selected geometrically and rows by maximum value.
+
+# Arguments
+
+  - `A`: Matrix to compress
+  - `colbuffer::AbstractArray{K}`: Buffer for column data
+  - `rowbuffer::AbstractArray{K}`: Buffer for row data
+  - `maxrank::Int`: Maximum rank
+  - `rows::Vector{Int}`: Row indices storage
+  - `cols::Vector{Int}`: Column indices storage
+  - `rowidcs::Vector{Int}`: Row index range
+
+# Returns
+
+  - `npivot::Int`: Number of pivots computed
+  - `rows::Vector{Int}`: Selected row indices (global)
+  - `cols::Vector{Int}`: Selected column indices
+"""
 function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     A,
     colbuffer::AbstractArray{K},
