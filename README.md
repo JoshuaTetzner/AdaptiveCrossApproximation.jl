@@ -24,7 +24,7 @@ Installing AdaptiveCrossApproximation is done by entering the package manager (e
 pkg> add https://github.com/JoshuaTetzner/AdaptiveCrossApproximation.jl.git
 ```
 
-## [References](@id refs)
+## References
 The implementation is based on
 - [1] Bebendorf, Mario. *Adaptive Cross Approximation of Multidimensional Arrays*. Computing 70, no. 1 (January 2003): 1–24. [https://doi.org/10.1007/s00607-002-0019-1](https://doi.org/10.1007/s00607-002-0019-1).
 - [2] Bauer, M., M. Bebendorf, and B. Feist. *Kernel-Independent Adaptive Construction of H²-Matrix Approximations.* Numerische Mathematik 150, no. 1 (January 2022): 1–32. [https://doi.org/10.1007/s00211-021-01255-y](https://doi.org/10.1007/s00211-021-01255-y).
