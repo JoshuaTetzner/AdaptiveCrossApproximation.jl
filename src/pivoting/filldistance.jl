@@ -8,12 +8,12 @@ Selects pivots to minimize the fill distance, promoting well-distributed samplin
 
 # Fields
 
-    - `pos::Vector{SVector{D,F}}`: Geometric positions of all points (D-dimensional)
+  - `pos::Vector{SVector{D,F}}`: Geometric positions of all points (D-dimensional)
 
 # Type Parameters
 
-    - `D`: Spatial dimension
-    - `F`: Floating point type for coordinates
+  - `D`: Spatial dimension
+  - `F`: Floating point type for coordinates
 """
 struct FillDistance{D,F<:Real} <: GeoPivStrat
     pos::Vector{SVector{D,F}}
@@ -29,8 +29,8 @@ as new pivots are chosen.
 
 # Fields
 
-    - `h::Vector{F}`: Current minimum distance from each point to selected points
-    - `pos::Vector{SVector{D,F}}`: Geometric positions corresponding to indices
+  - `h::Vector{F}`: Current minimum distance from each point to selected points
+  - `pos::Vector{SVector{D,F}}`: Geometric positions corresponding to indices
 """
 struct FillDistanceFunctor{D,F<:Real} <: PivStratFunctor
     h::Vector{F}
@@ -47,11 +47,11 @@ pivot selection within the submatrix.
 
 # Arguments
 
-    - `idcs::AbstractArray{Int}`: Indices of points to consider
+  - `idcs::AbstractArray{Int}`: Indices of points to consider
 
 # Returns
 
-    - `FillDistanceFunctor`: Initialized functor with distance tracking
+  - `FillDistanceFunctor`: Initialized functor with distance tracking
 """
 function (pivstrat::FillDistance{D,F})(idcs::AbstractArray{Int}) where {D,F}
     return FillDistanceFunctor(zeros(F, length(idcs)), pivstrat.pos[idcs])
@@ -78,11 +78,11 @@ updates the distance vector `h` for subsequent iterations.
 
 # Arguments
 
-    - `::AbstractArray`: Row/column data (unused, selection is purely geometric)
+  - `::AbstractArray`: Row/column data (unused, selection is purely geometric)
 
 # Returns
 
-    - `nextidx::Int`: Index of the point maximizing fill distance
+  - `nextidx::Int`: Index of the point maximizing fill distance
 """
 function (pivstrat::FillDistanceFunctor{D,F})(::AbstractArray) where {D,F}
     nextidx = argmax(pivstrat.h)

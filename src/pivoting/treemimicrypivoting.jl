@@ -87,12 +87,8 @@ function (pivstrat::TreeMimicryPivoting{D,T})(
     return TreeMimicryPivotingFunctor{D,T}(F, c, pivstrat.tree, pivstrat.pos, usedidcs)
 end
 
-"""
-Tree adapter interface placeholders
-
-The package expects the `tree` object to implement these functions. Adaptors
-for concrete tree types should provide implementations in user code.
-"""
+#The package expects the `tree` object to implement these functions. Adaptors
+#for concrete tree types should provide implementations in user code.
 center(tree::T, node::Int) where {T} = error("Not implemented for type $T")
 values(tree::T, node::Int) where {T} = error("Not implemented for type $T")
 children(tree::T, node::Int) where {T} = error("Not implemented for type $T")

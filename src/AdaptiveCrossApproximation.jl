@@ -20,6 +20,7 @@ include("pivoting/combinedpivstrat.jl")
 include("pivoting/randomsampling.jl")
 
 include("aca.jl")
+include("acaT.jl")
 include("iaca.jl")
 
 if !isdefined(Base, :get_extension) # for julia version < 1.9

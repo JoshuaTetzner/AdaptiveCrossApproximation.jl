@@ -1,95 +1,71 @@
 # API Reference
 
-## Core Types
-
-### Cross Approximation
-
-```@docs
-CrossApproximation
-ACA
-ACAᵀ
-iACA
-```
-
+## Types
 ### Abstract Types
 
 ```@docs
-PivStrat
-PivStratFunctor
-ValuePivStrat
-GeoPivStrat
-ConvPivStrat
-ConvCrit
-ConvCritFunctor
+AdaptiveCrossApproximation.PivStrat
+AdaptiveCrossApproximation.PivStratFunctor
+AdaptiveCrossApproximation.ValuePivStrat
+AdaptiveCrossApproximation.ValuePivStratFunctor
+AdaptiveCrossApproximation.GeoPivStrat
+AdaptiveCrossApproximation.GeoPivStratFunctor
+AdaptiveCrossApproximation.ConvPivStrat
+AdaptiveCrossApproximation.ConvPivStratFunctor
+AdaptiveCrossApproximation.ConvCrit
+AdaptiveCrossApproximation.ConvCritFunctor
 ```
-
-## Pivoting Strategies
-
-### Value-Based
-
+### Concrete Types
+#### Cross Approximation Methods
+```@docs
+ACA
+AdaptiveCrossApproximation.ACAᵀ
+iACA
+```
+#### Pivoting Strategies
 ```@docs
 MaximumValue
-MaximumValueFunctor
-RandomSamplingPivoting
-RandomSamplingPivotingFunctor
-```
-
-### Geometry-Based
-
-```@docs
+AdaptiveCrossApproximation.MaximumValueFunctor
+AdaptiveCrossApproximation.RandomSamplingPivoting
+AdaptiveCrossApproximation.RandomSamplingPivotingFunctor
 FillDistance
-FillDistanceFunctor
+AdaptiveCrossApproximation.FillDistanceFunctor
 Leja2
-Leja2Functor
+AdaptiveCrossApproximation.Leja2Functor
 MimicryPivoting
-MimicryPivotingFunctor
+AdaptiveCrossApproximation.MimicryPivotingFunctor
 TreeMimicryPivoting
-TreeMimicryPivotingFunctor
+AdaptiveCrossApproximation.TreeMimicryPivotingFunctor
+AdaptiveCrossApproximation.CombinedPivStrat
+
 ```
-
-### Combined
-
-```@docs
-CombinedPivStrat
-CombinedPivStratFunctor
-```
-
-## Convergence Criteria
-
-### Norm Estimation
-
+#### Convergence Criteria
 ```@docs
 FNormEstimator
-FNormEstimatorFunctor
+AdaptiveCrossApproximation.FNormEstimatorFunctor
 iFNormEstimator
-iFNormEstimatorFunctor
-```
-
-### Other Criteria
-
-```@docs
-Extrapolation
-ExtrapolationFunctor
-RandomSamplingConv
-RandomSamplingConvFunctor
-CombinedConvCrit
-CombinedConvCritFunctor
+AdaptiveCrossApproximation.iFNormEstimatorFunctor
+AdaptiveCrossApproximation.FNormExtrapolator
+AdaptiveCrossApproximation.FNormExtrapolatorFunctor
+AdaptiveCrossApproximation.RandomSampling
+AdaptiveCrossApproximation.RandomSamplingFunctor
+AdaptiveCrossApproximation.CombinedConvCrit
 ```
 
 ## Functions
-
-### Main Functions
-
 ```@docs
-aca
-acaᵀ
-nextrc!
+AdaptiveCrossApproximation.aca
+AdaptiveCrossApproximation.acaᵀ
+AdaptiveCrossApproximation.nextrc!
 ```
 
-### Helper Functions
+### Pivoting Functions
 
 ```@docs
-leja2!
-normF!
-tolerance
+AdaptiveCrossApproximation.leja2!
+AdaptiveCrossApproximation.normF!
+AdaptiveCrossApproximation.findcluster
+AdaptiveCrossApproximation.center
+
+AdaptiveCrossApproximation.tolerance
 ```
