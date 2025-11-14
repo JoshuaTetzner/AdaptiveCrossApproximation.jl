@@ -3,9 +3,10 @@ using AdaptiveCrossApproximation
 
 @testitem "AdaptiveCrossApproximation" begin
     include("test_aca.jl")
+    include("test_iaca.jl")
     include("test_convergence.jl")
     include("test_pivoting.jl")
-    include("test_ACAHMatrices.jl")
+    include("test_ACAH2trees.jl")
 end
 
 @testitem "Code quality (Aqua.jl)" begin
@@ -20,7 +21,7 @@ end
 @testitem "Code formatting (JuliaFormatter.jl)" begin
     using JuliaFormatter
     pkgpath = pkgdir(AdaptiveCrossApproximation)
-    @test JuliaFormatter.format(pkgpath, overwrite=false)
+    @test JuliaFormatter.format(pkgpath, overwrite=true)
 end
 
 @run_package_tests verbose = true

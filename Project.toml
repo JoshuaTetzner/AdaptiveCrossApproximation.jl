@@ -9,20 +9,18 @@ Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [weakdeps]
-HMatrices = "8646bddf-ab1c-4fa7-9c51-ba187d647618"
+H2Trees = "9db26ae3-82ff-4374-85e9-9ed87405fd16"
 
 [extensions]
-ACAHMatrices = ["HMatrices"]
+ACAH2Trees = ["H2Trees"]
 
 [compat]
-HMatrices = "0.2.12"
-JuliaFormatter = "2.1.6"
 Polynomials = "4.1.0"
 StaticArrays = "1.9.13"
 
 [extras]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
-HMatrices = "8646bddf-ab1c-4fa7-9c51-ba187d647618"
+H2Trees = "9db26ae3-82ff-4374-85e9-9ed87405fd16"
 JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
 JuliaFormatter = "98e50ef6-434e-11e9-1051-2b60c6c9e899"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
@@ -31,4 +29,4 @@ TestItemRunner = "f8b46487-2199-4994-9208-9a1283c18c0a"
 TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
 
 [targets]
-test = ["Aqua", "JET", "JuliaFormatter", "Test", "TestItemRunner", "TestItems", "Random", "HMatrices"]
+test = ["Aqua", "JET", "JuliaFormatter", "Test", "TestItemRunner", "TestItems", "Random", "H2Trees"]

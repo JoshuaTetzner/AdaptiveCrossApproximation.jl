@@ -1,12 +1,5 @@
 # API Reference
 
-## Types
-```@docs
-
-```
-
-## Functions
-
-```@docs
-
+```@autodocs
+Modules = [AdaptiveCrossApproximation]
 ```
