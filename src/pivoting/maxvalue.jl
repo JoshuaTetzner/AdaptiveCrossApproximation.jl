@@ -1,19 +1,19 @@
 
-struct MaximumValue <: ValuePivStrat
+struct MaximumValue <: ValuePivStrat end
+
+struct MaximumValueFunctor <: ValuePivStratFunctor
     usedidcs::Vector{Bool}
 end
 
-MaximumValue() = MaximumValue(Bool[])
+(::MaximumValue)(len::Int) = MaximumValueFunctor(zeros(Bool, len))
+(::MaximumValue)(idcs::AbstractArray{Int}) = MaximumValueFunctor(zeros(Bool, length(idcs)))
 
-(::MaximumValue)(len::Int) = MaximumValue(zeros(Bool, len))
-(::MaximumValue)(idcs::AbstractArray{Int}) = MaximumValue(zeros(Bool, length(idcs)))
-
-function (pivstrat::MaximumValue)()
+function (pivstrat::MaximumValueFunctor)()
     pivstrat.usedidcs[1] = true
     return 1
 end
 
-function (pivstrat::MaximumValue)(rc::AbstractArray)
+function (pivstrat::MaximumValueFunctor)(rc::AbstractArray)
     nextidx = 1
     maxval = 0.0
     for i in eachindex(pivstrat.usedidcs)

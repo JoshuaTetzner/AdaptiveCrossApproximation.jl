@@ -1,32 +1,34 @@
-# RandomSampling convergence does need an inizializer
-mutable struct RandomSampling{F<:Real,K} <: ConvCrit
-    normUV²::F
+struct RandomSampling{F<:Real} <: ConvCrit
     nsamples::Int
     factor::F
+    tol::F
+end
+
+mutable struct RandomSamplingFunctor{F<:Real,K} <: ConvCritFunctor
+    normUV²::F
     indices::Matrix{Int}
     rest::Vector{K}
     tol::F
 end
 
-function RandomSampling(
-    ::Type{K}; factor::F=1.0, nsamples::Int=0, tol::F=1e-4
-) where {K,F<:Real}
-    return RandomSampling{F,K}(F(0.0), nsamples, factor, zeros(Int, 0, 0), zeros(K, 0), tol)
+function RandomSampling(; factor::F=1.0, nsamples::Int=0, tol::F=1e-4) where {F<:Real}
+    return RandomSampling(nsamples, factor, tol)
 end
+
 function (cc::RandomSampling)(
-    K::AbstractMatrix, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
-)
+    K::AbstractMatrix{T}, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
+) where {T}
     rowlen = length(rowidcs)
     collen = length(colidcs)
     nsamples = cc.nsamples == 0 ? cc.factor * (rowlen + collen) : cc.nsamples
     indices = hcat(rand(1:rowlen, nsamples), rand(1:collen, nsamples))
     rest = [K[rc[1], rc[2]][1] for rc in eachrow(indices)]
-    return RandomSampling(0.0, nsamples, cc.factor, indices, rest, cc.tol)
+    return RandomSamplingFunctor(0.0, indices, rest, cc.tol)
 end
 
-tolerance(cc::RandomSampling) = cc.tol
+tolerance(cc::RandomSamplingFunctor) = cc.tol
 
-function (convcrit::RandomSampling{F,K})(
+function (convcrit::RandomSamplingFunctor{F,K})(
     rowbuffer::AbstractMatrix{K},
     colbuffer::AbstractMatrix{K},
     npivot::Int,

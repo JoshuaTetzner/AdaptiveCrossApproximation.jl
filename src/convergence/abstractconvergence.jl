@@ -1,8 +1,9 @@
 abstract type ConvCrit end
+abstract type ConvCritFunctor end
 
 # ACA
 function normF!(
-    convcrit::ConvCrit,
+    convcrit::ConvCritFunctor,
     rowbuffer::AbstractMatrix{K},
     colbuffer::AbstractMatrix{K},
     npivot::Int,
@@ -14,7 +15,8 @@ function normF!(
 
     for j in 1:(npivot - 1)
         @views convcrit.normUV² +=
-            2 * real.(
+            2 *
+            real.(
                 dot(colbuffer[1:maxrows, npivot], colbuffer[1:maxrows, j]) *
                 dot(rowbuffer[npivot, 1:maxcolumns], rowbuffer[j, 1:maxcolumns]),
             )
@@ -22,6 +24,8 @@ function normF!(
 end
 
 # iACA
-function normF!(convcrit::ConvCrit, rcbuffer::AbstractVector{K}, npivot::Int) where {K}
+function normF!(
+    convcrit::ConvCritFunctor, rcbuffer::AbstractVector{K}, npivot::Int
+) where {K}
     return convcrit.normUV = ((npivot - 1) * convcrit.normUV + norm(rcbuffer)) / npivot
 end

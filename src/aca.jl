@@ -10,70 +10,48 @@ struct ACA{RowPivType,ColPivType,ConvCritType}
     end
 end
 
-nextrc!(buf, A::AbstractArray, i, j) = (buf .= view(A, i, j))
-
 function ACA(;
     rowpivoting=MaximumValue(),
     columnpivoting=MaximumValue(),
-    convergence=FNormEstimator(0.0, 1e-4),
+    convergence=FNormEstimator(1e-4),
 )
     return ACA(rowpivoting, columnpivoting, convergence)
 end
 
-function (aca::ACA)(
-    K::AbstractMatrix, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
-)
+function (aca::ACA)(rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int})
     return ACA(aca.rowpivoting(rowidcs), aca.columnpivoting(colidcs), aca.convergence())
 end
 
-function (aca::ACA{PS,PS,CC})(
-    K::AbstractMatrix, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
-) where {PS<:PivStrat,CC<:RandomSampling}
-    convergence = aca.convergence(K, rowidcs, colidcs)
-    rowpivoting = if aca.rowpivoting isa RandomSamplingPivoting
-        aca.rowpivoting(convergence)
-    else
-        aca.rowpivoting(rowidcs)
-    end
-    columnpivoting = if aca.columnpivoting isa RandomSamplingPivoting
-        aca.columnpivoting(convergence)
-    else
-        aca.columnpivoting(colidcs)
-    end
+nextrc!(buf, A::AbstractArray, i, j) = (buf .= view(A, i, j))
 
-    return ACA(rowpivoting, columnpivoting, convergence)
-end
-
-function (aca::ACA{RP,CP,CC})(
-    K::AbstractMatrix, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
-) where {RP,CP,CC<:CombinedConvCrit}
-    convergence = aca.convergence(K, rowidcs, colidcs)
-    rowpivoting = if aca.rowpivoting isa CombinedPivStrat
-        aca.rowpivoting(convergence, rowidcs)
-    else
-        aca.rowpivoting(rowidcs)
-    end
-    columnpivoting = if aca.columnpivoting isa CombinedPivStrat
-        aca.columnpivoting(convergence, colidcs)
-    else
-        aca.columnpivoting(colidcs)
-    end
-
-    return ACA(rowpivoting, columnpivoting, convergence)
+function (aca::ACA{P,P,C})(
+    A,
+    colbuffer::AbstractMatrix{K},
+    rowbuffer::AbstractMatrix{K},
+    maxrank::Int;
+    rows=zeros(Int, maxrank),
+    cols=zeros(Int, maxrank),
+    rowidcs=Vector(1:size(colbuffer, 1)),
+    colidcs=Vector(1:size(rowbuffer, 2)),
+) where {K,P<:PivStrat,C<:ConvCrit}
+    return aca(rowidcs, colidcs)(
+        A, colbuffer, rowbuffer, rows, cols, rowidcs, colidcs, maxrank
+    )
 end
 
 function (aca::ACA)(
     A,
-    rowbuffer::AbstractMatrix{K},
     colbuffer::AbstractMatrix{K},
-    maxrank::Int;
-    rowidcs = Vector(1:size(colbuffer, 1)),
-    colidcs = Vector(1:size(rowbuffer, 2)),
-) where {K}
-    rows = Int[1]
-    cols = Int[]
-    maxrows = size(colbuffer, 1)
-    maxcolumns = size(rowbuffer, 2)
+    rowbuffer::AbstractMatrix{K},
+    rows::T,
+    cols::T,
+    rowidcs::T,
+    colidcs::T,
+    maxrank::Int,
+) where {K,T<:Vector{Int}}
+    rows[1] = rowidcs[1]
+    maxrows = length(rowidcs)
+    maxcolumns = length(colidcs)
     npivot = 1
     nextrow = aca.rowpivoting()
     nextrc!(
@@ -83,7 +61,7 @@ function (aca::ACA)(
         view(colidcs, 1:maxcolumns),
     )
     @views nextcolumn = aca.columnpivoting(rowbuffer[npivot, 1:maxcolumns])
-    push!(cols, nextcolumn)
+    cols[npivot] = colidcs[nextcolumn]
     if rowbuffer[npivot, nextcolumn] != 0.0
         view(rowbuffer, npivot, 1:maxcolumns) ./= view(rowbuffer, npivot, nextcolumn)
     end
@@ -100,7 +78,7 @@ function (aca::ACA)(
     while conv && npivot < maxrank
         npivot += 1
         @views nextrow = aca.rowpivoting(colbuffer[1:maxrows, max(1, npivot - 1)])
-        length(rows) < npivot ? push!(rows, nextrow) : rows[npivot] = nextrow
+        rows[npivot] = rowidcs[nextrow]
         nextrc!(
             view(rowbuffer, npivot:npivot, 1:maxcolumns),
             A,
@@ -115,7 +93,7 @@ function (aca::ACA)(
         end
 
         @views nextcolumn = aca.columnpivoting(rowbuffer[npivot, 1:maxcolumns])
-        length(cols) < npivot ? push!(cols, nextcolumn) : cols[npivot] = nextcolumn
+        cols[npivot] = colidcs[nextcolumn]
         if rowbuffer[npivot, nextcolumn] != 0.0
             view(rowbuffer, npivot, 1:maxcolumns) ./= view(rowbuffer, npivot, nextcolumn)
             nextrc!(
@@ -135,15 +113,15 @@ function (aca::ACA)(
         npivot, conv = aca.convergence(rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
     end
 
-    return npivot, rows, cols
+    return npivot
 end
 
 function aca(
     M::AbstractMatrix{K};
     tol=1e-4,
-    rowpivoting=MaximumValue(zeros(Bool, size(M, 1))),
-    columnpivoting=MaximumValue(zeros(Bool, size(M, 1))),
-    convergence=FNormEstimator(0.0, tol),
+    rowpivoting=MaximumValue(),
+    columnpivoting=MaximumValue(),
+    convergence=FNormEstimator(tol),
     maxrank=40,
     svdrecompress=false,
 ) where {K}
@@ -151,7 +129,7 @@ function aca(
     rowbuffer = zeros(K, maxrank, size(M, 2))
     colbuffer = zeros(K, size(M, 1), maxrank)
 
-    npivots, rows, cols = compressor(M, rowbuffer, colbuffer, maxrank)
+    npivots = compressor(M, colbuffer, rowbuffer, maxrank)
     if svdrecompress
         @views Q, R = qr(colbuffer[1:size(M, 1), 1:npivots])
         @views U, s, V = svd(R * rowbuffer[1:npivots, 1:size(M, 2)])

@@ -1,24 +1,24 @@
 
 struct FillDistance{D,F<:Real} <: GeoPivStrat
+    pos::Vector{SVector{D,F}}
+end
+
+struct FillDistanceFunctor{D,F<:Real} <: PivStratFunctor
     h::Vector{F}
     pos::Vector{SVector{D,F}}
 end
 
-function FillDistance(pos::Vector{SVector{D,F}}) where {D,F<:Real}
-    return FillDistance{D,F}(F[], pos)
-end
-
 function (pivstrat::FillDistance{D,F})(idcs::AbstractArray{Int}) where {D,F}
-    return FillDistance{D,F}(zeros(F, length(idcs)), pivstrat.pos[idcs])
+    return FillDistanceFunctor(zeros(F, length(idcs)), pivstrat.pos[idcs])
 end
 
-function (pivstrat::Union{Leja2{D,F},FillDistance{D,F}})() where {D,F}
+function (pivstrat::Union{Leja2Functor{D,F},FillDistanceFunctor{D,F}})() where {D,F}
     @views pivstrat.h .= norm.(pivstrat.pos .- Scalar(pivstrat.pos[1]))
 
     return 1
 end
 
-function (pivstrat::FillDistance{D,F})(::AbstractArray) where {D,F}
+function (pivstrat::FillDistanceFunctor{D,F})(::AbstractArray) where {D,F}
     nextidx = argmax(pivstrat.h)
     maxval = pivstrat.h[nextidx]
 
@@ -31,7 +31,7 @@ function (pivstrat::FillDistance{D,F})(::AbstractArray) where {D,F}
                 newfd < pivstrat.h[ind] && (newfd = pivstrat.h[ind])
             end
         end
-        newfd < maxval && (nextidx=k; maxval=newfd)
+        newfd < maxval && (nextidx = k; maxval = newfd)
     end
 
     AdaptiveCrossApproximation.leja2!(pivstrat, nextidx)

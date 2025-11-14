@@ -3,6 +3,7 @@ using AdaptiveCrossApproximation
 
 @testitem "AdaptiveCrossApproximation" begin
     include("test_aca.jl")
+    include("test_iaca.jl")
     include("test_convergence.jl")
     include("test_pivoting.jl")
     include("test_ACAHMatrices.jl")
