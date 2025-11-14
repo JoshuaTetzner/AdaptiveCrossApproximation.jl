@@ -28,15 +28,6 @@ struct MaximumValueFunctor <: ValuePivStratFunctor
 end
 
 """
-    (::MaximumValue)(len::Int)
-
-Create a `MaximumValueFunctor` for `len` indices.
-
-Returns a functor with all indices initially unmarked (available for selection).
-"""
-(::MaximumValue)(len::Int) = MaximumValueFunctor(zeros(Bool, len))
-
-"""
     (::MaximumValue)(idcs::AbstractArray{Int})
 
 Create a `MaximumValueFunctor` for the given index array.

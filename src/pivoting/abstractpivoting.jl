@@ -52,7 +52,7 @@ matrix values. Useful when geometric information about rows/columns is available
 # Concrete Types
 
   - [`FillDistance`](@ref): Maximizes minimum distance to already selected points
-  - [`LejaPoints`](@ref): Maximizes product of distances to selected points
+  - [`Leja2`](@ref): Maximizes product of distances to selected points
 """
 abstract type GeoPivStrat <: PivStrat end
 

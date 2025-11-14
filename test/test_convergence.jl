@@ -14,28 +14,26 @@ for tol in [1e-2, 1e-4, 1e-6, 1e-8, 1e-10, 1e-12, 1e-14]
     )
     @test norm(U * V - K) / norm(K) < tol
 end
-
+##
 # RandomSampling
 for tol in [1e-2, 1e-4, 1e-6, 1e-8, 1e-10, 1e-12, 1e-14]
     Random.seed!(1)
-    indices = hcat(rand(1:100, 100), rand(1:110, 100))
-    rest = [K[rc[1], rc[2]] for rc in eachrow(indices)]
-    convergence = AdaptiveCrossApproximation.RandomSampling(
-        0.0, 100, 1.0, indices, rest, tol
+    convergence = AdaptiveCrossApproximation.RandomSampling(; tol=tol)
+    local U, V = AdaptiveCrossApproximation.aca(
+        K; convergence=AdaptiveCrossApproximation.FNormExtrapolator(tol)
     )
-    local U, V = AdaptiveCrossApproximation.aca(K; convergence=convergence)
     @test norm(U * V - K) / norm(K) < tol
 end
-
+##
 # CombinedConvCrit
 for tol in [1e-2, 1e-4, 1e-6, 1e-8, 1e-10, 1e-12, 1e-14]
     Random.seed!(1)
     cc1 = AdaptiveCrossApproximation.FNormEstimator(tol)
     indices = hcat(rand(1:100, 100), rand(1:110, 100))
     rest = [K[rc[1], rc[2]] for rc in eachrow(indices)]
-    cc2 = AdaptiveCrossApproximation.RandomSampling(0.0, 100, 1.0, indices, rest, 1e-4)
+    cc2 = AdaptiveCrossApproximation.RandomSampling(; tol=tol)
 
-    convergence = AdaptiveCrossApproximation.CombinedConvCrit([cc1, cc2], zeros(Bool, 2))
+    convergence = AdaptiveCrossApproximation.CombinedConvCrit([cc1, cc2])
 
     local U, V = AdaptiveCrossApproximation.aca(K; convergence=convergence)
 

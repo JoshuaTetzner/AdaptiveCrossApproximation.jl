@@ -35,6 +35,14 @@ struct RandomSamplingPivotingFunctor{F,K} <: ConvPivStratFunctor
     rc::Int
 end
 
+function (piv::RandomSamplingPivoting)(convcrit::CombinedConvCritFunctor)
+    rscrit = findfirst(x -> x isa RandomSamplingFunctor, convcrit.crits)
+    if rscrit === nothing
+        throw(ArgumentError("No RandomSamplingFunctor found in CombinedConvCritFunctor"))
+    end
+    return RandomSamplingPivotingFunctor(convcrit.crits[rscrit], piv.rc)
+end
+
 """
     (pivstrat::RandomSamplingPivotingFunctor{F,K})(::AbstractArray)
 

@@ -33,10 +33,12 @@ updated incrementally as new pivots are chosen.
 # Fields
 
   - `h::Vector{F}`: Current minimum distance from each point to selected points
+  - `idcs::Vector{Int}`: Indices of points being considered for selection
   - `pos::Vector{SVector{D,F}}`: Geometric positions corresponding to indices
 """
-struct Leja2Functor{D,F<:Real} <: PivStratFunctor
+struct Leja2Functor{D,F<:Real} <: GeoPivStratFunctor
     h::Vector{F}
+    idcs::Vector{Int}
     pos::Vector{SVector{D,F}}
 end
 
@@ -57,7 +59,7 @@ pivot selection within the submatrix.
   - `Leja2Functor`: Initialized functor with distance tracking
 """
 function (pivstrat::Leja2{D,F})(idcs::AbstractArray{Int}) where {D,F}
-    return Leja2Functor{D,F}(zeros(F, length(idcs)), pivstrat.pos[idcs])
+    return Leja2Functor{D,F}(zeros(F, length(idcs)), idcs, pivstrat.pos)
 end
 
 """
@@ -75,7 +77,7 @@ This shared helper is used by both Leja2 and fill distance strategies.
   - `nextidx::Int`: Index of newly selected pivot
 """
 function leja2!(pivstrat::GeoPivStratFunctor, nextidx::Int)
-    newh = norm.(pivstrat.pos .- Scalar(pivstrat.pos[nextidx]))
+    newh = norm.(pivstrat.pos[pivstrat.idcs] .- Scalar(pivstrat.pos[nextidx]))
     all(==(0.0), pivstrat.h) && (pivstrat.h .= newh)
     for idx in eachindex(pivstrat.h)
         pivstrat.h[idx] > newh[idx] && (pivstrat.h[idx] = newh[idx])
@@ -100,7 +102,7 @@ then updates the distance vector for subsequent iterations.
 """
 function (pivstrat::Leja2Functor{D,F})(::AbstractArray) where {D,F}
     nextidx = argmax(pivstrat.h)
-    leja2!(pivstrat, nextidx)
+    leja2!(pivstrat, pivstrat.idcs[nextidx])
 
     return nextidx
 end

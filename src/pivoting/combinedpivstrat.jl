@@ -11,16 +11,34 @@ once a certain accuracy is reached.
 
 # Fields
 
-  - `convcrit::CombinedConvCrit`: Combined convergence criterion tracking which sub-criteria are met
   - `strats::Vector{PivStrat}`: Ordered list of pivoting strategies to use
 """
-struct CombinedPivStrat
-    convcrit::CombinedConvCrit
+struct CombinedPivStrat <: PivStrat
     strats::Vector{PivStrat}
 end
 
 """
-    (pivstrat::CombinedPivStrat)()
+    CombinedPivStratFunctor
+
+Staeful functor of composite pivoting strategy that switches between multiple strategies based on convergence.
+
+Combines multiple pivoting strategies with a combined convergence criterion, allowing
+the pivot selection method to change as different convergence criteria are satisfied.
+For example, can start with geometric pivoting and switch to value-based pivoting
+once a certain accuracy is reached.
+
+# Fields
+
+  - `convcrit::CombinedConvCritFunctor`: Combined convergence criterion tracking which sub-criteria are met
+  - `strats::Vector{PivStratFunctor}`: Ordered list of pivoting strategies to use
+"""
+struct CombinedPivStratFunctor <: PivStratFunctor
+    convcrit::CombinedConvCritFunctor
+    strats::Vector{PivStratFunctor}
+end
+
+"""
+    (pivstrat::CombinedPivStratFunctor)()
 
 Select initial pivot using the first strategy.
 
@@ -31,12 +49,12 @@ data is available yet.
 
   - Initial pivot index from the first strategy
 """
-function (pivstrat::CombinedPivStrat)()
+function (pivstrat::CombinedPivStratFunctor)()
     return pivstrat.strats[1]()
 end
 
 """
-    (pivstrat::CombinedPivStrat)(rc::AbstractArray)
+    (pivstrat::CombinedPivStratFunctor)(rc::AbstractArray)
 
 Select next pivot using the first strategy whose convergence criterion is met.
 
@@ -52,7 +70,7 @@ Automatically updates the convergence tracking state.
 
   - Pivot index selected by the active strategy
 """
-function (pivstrat::CombinedPivStrat)(rc::AbstractArray)
+function (pivstrat::CombinedPivStratFunctor)(rc::AbstractArray)
     length(pivstrat.strats) > length(pivstrat.convcrit.isconverged) &&
         push!(pivstrat.convcrit.isconverged, false)
     for (i, conv) in enumerate(pivstrat.convcrit.isconverged)
@@ -63,7 +81,7 @@ function (pivstrat::CombinedPivStrat)(rc::AbstractArray)
 end
 
 """
-    (pivstrat::CombinedPivStrat)(convergence::CombinedConvCrit, idcs::AbstractArray{Int})
+    (pivstrat::CombinedPivStrat)(convergence::CombinedConvCritFunctor, idcs::AbstractArray{Int})
 
 Create a combined pivoting functor for the given index subset.
 
@@ -73,23 +91,28 @@ which requires the convergence criterion functor rather than indices.
 
 # Arguments
 
-  - `convergence::CombinedConvCrit`: Combined convergence criterion
+  - `convergence::CombinedConvCritFunctor`: Combined convergence criterion
   - `idcs::AbstractArray{Int}`: Indices for the submatrix
 
 # Returns
 
-  - `CombinedPivStrat`: Initialized combined strategy with functors for all sub-strategies
+  - `CombinedPivStratFunctor`: Initialized combined strategy with functors for all sub-strategies
 """
 function (pivstrat::CombinedPivStrat)(
-    convergence::CombinedConvCrit, idcs::AbstractArray{Int}
+    convergence::CombinedConvCritFunctor, idcs::AbstractArray{Int}
 )
-    curr_strats = Vector{PivStrat}(undef, length(pivstrat.strats))
+    curr_strats = Vector{PivStratFunctor}(undef, length(pivstrat.strats))
     for (i, strat) in enumerate(pivstrat.strats)
         if isa(strat, RandomSamplingPivoting)
-            curr_strats[i] = strat(convergence.crits[i])
+            curr_strats[i] = strat(convergence)
         else
             curr_strats[i] = strat(idcs)
         end
     end
-    return CombinedPivStrat(convergence, curr_strats)
+
+    return CombinedPivStratFunctor(convergence, curr_strats)
+end
+
+function (pivstrat::CombinedPivStrat)(_::ConvCritFunctor, _::AbstractArray{Int})
+    throw(ArgumentError("CombinedPivStrat requires a CombinedConvCritFunctor"))
 end

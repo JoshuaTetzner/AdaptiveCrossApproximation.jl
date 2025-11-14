@@ -1,142 +1,66 @@
 # Convergence Criteria
 
-Convergence criteria determine when to stop the ACA iteration, balancing approximation accuracy against computational cost. The choice of convergence criterion affects both the quality and efficiency of the compression.
-
-## Overview
-
-During ACA compression, we build a low-rank approximation iteratively:
-
-$$A \approx UV^T = \sum_{k=1}^r u_k v_k^T$$
-
-After each iteration $k$, we must decide whether to continue or terminate. This decision is based on estimating the approximation error:
-
-$$\|A - UV^T\|$$
-
-Since computing the exact error requires accessing the full matrix (defeating the purpose of compression), we rely on computable error estimates.
+Convergence criteria determine when to stop the ACA iteration.
 
 ## Frobenius Norm Estimation
 
-The most common approach estimates the Frobenius norm of the approximation error. The key insight is that we can track:
+The Frobenius norm estimator is the standard convergence criterion for ACA algorithms [[1, 2]](@ref refs). It estimates the Frobenius norm of the residual matrix as well as the full matrix using only the entries evaluated during the ACA process.
 
-$$\|UV^T\|_F^2 = \sum_{i=1}^r \sum_{j=1}^r \langle u_i, u_j \rangle \langle v_i, v_j \rangle$$
+### ACA
+For ACA, the squared Frobenius norm of the full matrix is tracked incrementally by
 
-This can be computed incrementally as new pivots are added, without accessing the original matrix.
+$$\| A^{m\times n}  \|_\text{F}^2 \approx \|\bm U \bm V^T\|_\text{F}^2 = \sum_{k=1}^r |\bm u_k|^2|\bm v_k|^2 + 2\sum_{i<j} \langle \bm u_i, \bm u_j \rangle \langle \bm v_i, \bm v_j \rangle\,.$$
 
-### Standard ACA
+At iteration $r$, the algorithm checks if
 
-For standard ACA with full matrix access, we track the squared Frobenius norm:
+$$|\bm u_r| |\bm v_r| < \varepsilon \cdot \|\bm U \bm V^T\|_F\,.$$
 
-$$\|UV^T\|_F^2 = \sum_{k=1}^r \|u_k\|^2 \|v_k\|^2 + 2\sum_{i<j} \langle u_i, u_j \rangle \langle v_i, v_j \rangle$$
 
-At iteration $k$, we check if:
 
-$$\|u_k\| \|v_k\| < \text{tol} \cdot \|UV^T\|_F$$
-
-This provides a relative error estimate. The computation is incremental, adding $O(k)$ work per iteration.
+API: [`FNormEstimator`](@ref)
 
 ### Incomplete ACA (iACA)
 
-For incomplete ACA with geometric pivoting, we cannot compute full inner products. Instead, we use a moving average:
+For incomplete ACA less entries of the matrix are sampled, therefore, in the case of the the Frobenius norm of the full matrix is estimated following [[7]](@ref refs) by
 
-$$\bar{n}_k = \frac{1}{k} \sum_{i=1}^k \|u_i\| \|v_i\|$$
+$$\|A^{m\times n} \|_F^2 \approx \sqrt{\frac{n}{r}} \|A^{m\times r}\|_\text{F}$$
 
-and check if:
+and at iteration $r$ the algorithm checks if
 
-$$\|u_k\| \|v_k\| < \text{tol} \cdot \bar{n}_k$$
+$$|a| < \varepsilon \frac{ \|A^{m\times r}\|_\text{F}}{\sqrt{r}} .$$
 
 This simpler criterion requires only current pivot norms, not historical inner products.
 
-## Extrapolation-Based Criteria
-
-Extrapolation methods attempt to predict the asymptotic behavior of the approximation error by fitting the sequence of pivot norms to a model and extrapolating to estimate future decay rates.
-
-The basic idea is to observe that for well-approximable matrices, the pivot contribution $\|u_k\| \|v_k\|$ often decays exponentially or algebraically:
-
-$$\|u_k\| \|v_k\| \sim C \rho^k \quad \text{or} \quad \|u_k\| \|v_k\| \sim C k^{-\alpha}$$
-
-By fitting such a model to recent pivots, we can estimate when the error will drop below the tolerance without computing all pivots.
-
-**Advantages:**
-- Can terminate earlier than norm estimation
-- Exploits decay structure of the approximation
-- Useful for smooth kernel matrices
-
-**Disadvantages:**
-- Requires fitting procedure
-- May be unreliable for irregular decay patterns
-- Additional computational overhead
+API: [`iFNormEstimator`](@ref)
 
 ## Random Sampling
 
-Random sampling convergence criteria periodically sample matrix entries to estimate the actual error. This provides direct error feedback but requires matrix access.
+Random sampling convergence criteria estimates the residual error by computing the true error for a set of randomly selected matrix entries, following [[4, 6]](@ref refs), and checks at iteration $r$ if
 
-The algorithm:
-1. Select random matrix entries $(i,j)$
-2. Compute approximation error $|A_{ij} - (UV^T)_{ij}|$
-3. Estimate global error from samples
-4. Terminate when estimated error < tolerance
+$$\sqrt{\text{mean}(|\bm e_{r}²|)mn} < \varepsilon \|\bm U \bm V^T\|_\text{F}$$
 
-**Use cases:**
-- When matrix access is acceptable
-- Need reliable error estimates
-- Other criteria may be unreliable
+
+API: [`AdaptiveCrossApproximation.RandomSampling`](@ref)
+
+## Extrapolation-Based Criteria
+
+Extrapolation criteria enhances the Frobenius norm estimation by predicting the residual norm decay based on previous iterations, following [[7]](@ref refs). 
+This criterion can be used to smooth out fluctuations in the estimated error and prevent premature convergence. 
+At iteration $r$, if the Frobenius norm estimation is satisfied, the algorithm fits the logarithm of the residual norms of the previous iterations to a quadratic polynomial and extrapolates to the rth iteration and checks if 
+$$P²(r) < \log(\varepsilon \|\bm U \bm V^T\|_F)$$
+
+API: [`FNormExtrapolator`](@ref)
 
 ## Combined Criteria
 
-The `CombinedConvCrit` allows using multiple convergence checks simultaneously:
+The combined convergence criterion allows to combine multiple convergence criteria which all have to be satisfied to terminate the ACA process.
+This criterion can be used to control the operating pivoting strategy. 
 
-- Require all criteria to be satisfied (AND logic)
-- Terminate when any criterion is met (OR logic)
-- Use different criteria for different phases
-
-This enables sophisticated stopping strategies, such as:
-- Use norm estimation as primary criterion
-- Add extrapolation for early termination
-- Include maximum rank as safety cutoff
+API: [`AdaptiveCrossApproximation.CombinedConvCrit`](@ref)
 
 ## Choosing a Criterion
 
-**Use Frobenius norm estimation when:**
-- Standard and well-tested behavior is desired
-- Working with general matrices
-- Incremental cost is acceptable
+The choice of convergence criterion should be guided by the specific characteristics of the problem and computational constraints.
+The standard Frobenius norm estimation is in the case of the ACA suitable for most applications.
+For the IACA the Extrapolation based criterion is recommended.
 
-**Use extrapolation when:**
-- Matrix has smooth decay properties
-- Early termination is important
-- Willing to accept fitting overhead
-
-**Use random sampling when:**
-- Need direct error estimates
-- Matrix access is cheap
-- Other estimates may be unreliable
-
-**Use combined criteria when:**
-- Need robust stopping conditions
-- Different phases require different checks
-- Want safety bounds with optimistic early termination
-
-## Practical Considerations
-
-### Tolerance Selection
-
-The tolerance parameter controls the accuracy-rank tradeoff:
-- Smaller tolerance → higher accuracy, larger rank
-- Typical values: $10^{-4}$ to $10^{-8}$
-- Should match application requirements
-
-### Numerical Stability
-
-Very small tolerances may encounter numerical issues:
-- Floating-point precision limits
-- Ill-conditioned pivot rows/columns
-- Consider using combined criteria with maximum rank cutoff
-
-### Performance
-
-Convergence checking adds overhead:
-- Norm estimation: $O(k)$ per iteration
-- Extrapolation: $O(k \log k)$ fitting cost
-- Random sampling: depends on sample size
-
-For large problems, the overhead is typically negligible compared to matrix access and linear algebra operations.

@@ -2,110 +2,96 @@
 
 Pivoting strategies determine how rows and columns are selected during ACA compression. The choice of pivoting strategy significantly affects both the accuracy and computational cost of the approximation.
 
-## Overview
-
-The Adaptive Cross Approximation algorithm requires selecting a sequence of row and column indices (pivots) to build the low-rank approximation:
-
-$$A \approx \sum_{k=1}^r u_k v_k^T$$
-
-where $u_k$ is a column of $A$ and $v_k$ is a row of $A$. The quality of the approximation depends critically on the pivot selection strategy.
-
 ## Value-Based Strategies
 
 Value-based strategies select pivots by examining matrix entries to find the most significant components.
 
 ### Maximum Value Pivoting
 
-The maximum value strategy selects the pivot with the largest absolute value in the current residual. For row selection with a known column $j$:
+The maximum value strategy, also referred to as partial pivoting [[1, 2]](@ref refs), selects the pivot with the largest absolute value in the current residual. 
+In the standard ACA when starting with the first row, all following columns are selected as
 
-$$i_k = \arg\max_i |A_{ij} - \sum_{\ell=1}^{k-1} u_{\ell,i} v_{\ell,j}|$$
+$$\argmax_{j} |\bm v_{r, j}|$$
 
-This greedy approach often yields good approximations but requires access to individual matrix entries, which may be expensive for kernel matrices or hierarchical applications.
+and all rows for $r > 1$ are selected as
 
-**Advantages:**
-- Simple and intuitive
-- Often produces good approximations
-- Well-established in the literature
+$$\argmax_{i} |\bm u_{r-1, i}|\,.$$
 
-**Disadvantages:**
-- Requires full access to matrix entries
-- May be expensive for kernel evaluations
-- Cannot exploit geometric structure
+**API:** [`MaximumValue`](@ref)
 
 ### Random Sampling
 
-Random sampling selects pivots uniformly at random from the remaining indices. While less accurate than maximum value pivoting, it provides several benefits:
+Random sampling pivoting is typically combined with the random sampling convergence criterion or a combined convergence criterion.
+It selects the next row or column leveraging the randomly sampled entries of the underlying matrix used in the convergence criterion, choosing row or column of the sample with the maximum absolute error after the $r$-th iteration, following 
 
-- No matrix access needed for pivot selection
-- Can be combined with other strategies
-- Useful for stochastic algorithms
+$$\argmax_{k} |\bm e_{r, k}|\,, $$
+
+where $\bm e_r$ contains the error of the sampled entries after the $r$-th iteration.
+
+In the random sampling convergence criterion, the mean error of the random samples is used to estimate the overall residual error.
+
+
+API: [`RandomSamplingPivoting`](@ref)
 
 ## Geometry-Based Strategies
 
-Geometry-based strategies exploit spatial information about the underlying point sets, making them ideal for kernel matrices and hierarchical matrix compression where geometric structure is available.
+Geometry-based strategies exploit spatial information about the underlying point sets or basis functions.
 
 ### Fill Distance
+The fill distance strategy, following [[3]](@ref refs) selects the row or column associated with geometrical positions $\bm x \in X$ that minimize the fill distance
 
-The fill distance strategy selects points that are maximally separated from already selected points. Given positions $X = \{x_1, \ldots, x_n\}$ and already selected points $S_k$, the next point is:
+$$\bm h\coloneqq \sup_{\bm x \in X}\text{dist}(\bm x, X_r)\,,$$
 
-$$x_{k+1} = \arg\max_{x \in X \setminus S_k} \min_{y \in S_k} \|x - y\|$$
+where $\text{dist}(\bm x, X_r) = \min_{\bm y \in X_r} |\bm x - \bm y|$ and $X_r$ is the set of already selected points associated with rows or columns after $r$ iterations, from one step to the next.
+This strategy aims to cover the domain uniformly, ensuring that no region is left unrepresented.
 
-This greedy algorithm approximates an optimal coverage of the point set.
+*Note: this strategy should be used only either for the rows or the columns, not both simultaneously and be combined with partial pivoting.*
 
-**Properties:**
-- No matrix access required
-- Provides good geometric coverage
-- Natural for kernel matrices where $A_{ij} = K(x_i, y_j)$
 
-### Leja Points
+API: [`FillDistance`](@ref)
 
-Leja points are selected to maximize a certain product criterion. Starting from an initial point $x_1$, subsequent points are chosen as:
+### Modified Leja Points
+Modified Leja points, following [[5]](@ref refs), follow a similar idea to the fill distance strategy but instead of minimizing the fill distance in each iteration selects the node furthest away from the already selected points $X_r$:
 
-$$x_{k+1} = \arg\max_{x \in X \setminus S_k} \prod_{i=1}^k \|x - x_i\|$$
+$$\argmax_i (\bm h_i)$$
 
-This strategy produces well-distributed points that are particularly effective for interpolation problems.
+This approach results in a similar geometrical distribution as the fill distance strategy, however, it is significantly more efficient.
 
-**Advantages:**
-- Strong theoretical foundation
-- Excellent distribution properties
-- No matrix evaluations needed
+*Note: this strategy should be used only either for the rows or the columns, not both simultaneously and be combined with partial pivoting.*
+
+
+API: [`Leja2`](@ref)
 
 ### Mimicry Pivoting
+Mimicry pivoting, following [[7]](@ref refs), selects rows or columns based on geometric information to mimic the geometric distribution of the positions associated with the rows or columns picked by the partial pivoting. 
+This is achieved by solving in each the maximization problem
 
-Mimicry pivoting reuses pivot patterns from previous compressions, making it highly efficient for hierarchical matrix structures. When compressing similar matrix blocks, the algorithm:
+$$\argmax_{j:\bm x_j \in X} \biggr[ \big(\text{dist}(\bm x_j, X_r)\big)\biggr(\prod_{\bm x_i \in X_r}|\bm x_i-\bm x_j|\biggr)^{1/r}\big(|\bm x_j-\bm c|\big)^{-4}\biggr]\,,$$
 
-1. Stores pivot sequences from completed compressions
-2. Reuses these sequences for new blocks with similar structure
-3. Avoids redundant pivot selection computations
+where $\bm c$ is the geometric center of the positions associated with the rows when columns are selected and the other way around.
 
-This is particularly powerful for hierarchical matrices where many blocks share similar geometric properties.
+This strategy is designed for the incomplete ACA (iACA).
+
+
+*Note: this strategy should be used only either for the rows or the columns, not both simultaneously and be combined with partial pivoting.*
+
+API: [`MimicryPivoting`](@ref)
 
 ### Tree Mimicry Pivoting
+Tree mimicry pivoting extends the mimicry pivoting strategy by leveraging a hierarchical clustering of the geometric positions associated with the rows and columns. 
+The hierarchical clustering of the positions hast to be passed to the pivoting strategy.
+For details see [[7]](@ref refs).
 
-Tree mimicry pivoting extends the mimicry concept by incorporating hierarchical tree structures. It navigates through a spatial tree (quadtree, octree) to efficiently find and reuse pivot patterns, making it especially efficient for hierarchical matrix compression in multiple dimensions.
+API: [`TreeMimicryPivoting`](@ref)
 
 ## Combined Strategies
 
-The `CombinedPivStrat` allows mixing different pivoting strategies, enabling hybrid approaches such as:
+The combined pivoting strategy allows mixing different pivoting strategies combined with multiple convergence criteria, that decide which strategy to use at each step, enabling hybrid approaches.
 
-- Start with geometric pivoting for initial coverage
-- Switch to value-based pivoting for refinement
-- Use random sampling to break ties or add robustness
+API: [`AdaptiveCrossApproximation.CombinedPivStrat`](@ref)
 
 ## Choosing a Strategy
+The choice of pivoting strategy should be guided by the specific characteristics of the problem at hand, including the nature of the matrix, desired accuracy, and computational resources.
+In general the solid results are obtained using the maximum value pivoting strategy.
 
-**Use value-based strategies when:**
-- Matrix entries are cheap to compute
-- Maximum accuracy is required
-- Geometric information is unavailable
-
-**Use geometry-based strategies when:**
-- Matrix entries are expensive (kernel evaluations)
-- Working with hierarchical matrices
-- Geometric structure is naturally available
-- Need to avoid redundant computations
-
-**Use combined strategies when:**
-- Different phases of compression need different approaches
-- Want to balance accuracy and efficiency
-- Exploiting multiple sources of information
+For spatial problems where the zeros blocks arise in the matrix structure, geometry-based strategies or random sampling pivoting can provide better performance. For details see [[6]](@ref refs).

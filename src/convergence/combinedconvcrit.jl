@@ -9,13 +9,28 @@ Converges when any constituent criterion is satisfied.
   - `crits::Vector{ConvCrit}`: Vector of convergence criteria to combine
   - `isconverged::Vector{Bool}`: Convergence status for each criterion
 """
-mutable struct CombinedConvCrit
+mutable struct CombinedConvCrit <: ConvCrit
     crits::Vector{ConvCrit}
+end
+
+"""
+    CombinedConvCritFunctor
+
+Stateful convergence criterion combining multiple criteria.
+Converges when all criteria are satisfied.
+
+# Fields
+
+  - `crits::Vector{ConvCritFunctor}`: Vector of convergence criteria to combine
+  - `isconverged::Vector{Bool}`: Convergence status for each criterion
+"""
+mutable struct CombinedConvCritFunctor <: ConvCritFunctor
+    crits::Vector{ConvCritFunctor}
     isconverged::Vector{Bool}
 end
 
 """
-    (convcrit::CombinedConvCrit)(rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
+    (convcrit::CombinedConvCritFunctor)(rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
 
 Check convergence using all combined criteria.
 Returns when any criterion signals convergence.
@@ -33,7 +48,7 @@ Returns when any criterion signals convergence.
   - `npivot::Int`: Final pivot count
   - `continue::Bool`: Whether to continue iteration (true if any criterion satisfied)
 """
-function (convcrit::CombinedConvCrit)(
+function (convcrit::CombinedConvCritFunctor)(
     rowbuffer::AbstractMatrix{K},
     colbuffer::AbstractMatrix{K},
     npivot::Int,
@@ -64,7 +79,7 @@ Handles special initialization for sampling-based criteria.
 function (convcrit::CombinedConvCrit)(
     K::AbstractMatrix, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
 )
-    curr_crits = Vector{ConvCrit}(undef, length(convcrit.crits))
+    curr_crits = Vector{ConvCritFunctor}(undef, length(convcrit.crits))
     for (i, crit) in enumerate(convcrit.crits)
         if isa(crit, RandomSampling)
             curr_crits[i] = crit(K, rowidcs, colidcs)
@@ -72,5 +87,5 @@ function (convcrit::CombinedConvCrit)(
             curr_crits[i] = crit()
         end
     end
-    return CombinedConvCrit(curr_crits, zeros(Bool, length(curr_crits)))
+    return CombinedConvCritFunctor(curr_crits, ones(Bool, length(curr_crits)))
 end

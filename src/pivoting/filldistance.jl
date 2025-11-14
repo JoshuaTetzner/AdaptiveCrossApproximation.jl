@@ -32,8 +32,9 @@ as new pivots are chosen.
   - `h::Vector{F}`: Current minimum distance from each point to selected points
   - `pos::Vector{SVector{D,F}}`: Geometric positions corresponding to indices
 """
-struct FillDistanceFunctor{D,F<:Real} <: PivStratFunctor
+struct FillDistanceFunctor{D,F<:Real} <: GeoPivStratFunctor
     h::Vector{F}
+    idcs::Vector{Int}
     pos::Vector{SVector{D,F}}
 end
 
@@ -54,7 +55,7 @@ pivot selection within the submatrix.
   - `FillDistanceFunctor`: Initialized functor with distance tracking
 """
 function (pivstrat::FillDistance{D,F})(idcs::AbstractArray{Int}) where {D,F}
-    return FillDistanceFunctor(zeros(F, length(idcs)), pivstrat.pos[idcs])
+    return FillDistanceFunctor(zeros(F, length(idcs)), idcs, pivstrat.pos)
 end
 
 """
@@ -65,7 +66,9 @@ Select the first point as the initial pivot.
 Computes distances from all points to the first point and returns index 1.
 """
 function (pivstrat::Union{Leja2Functor{D,F},FillDistanceFunctor{D,F}})() where {D,F}
-    @views pivstrat.h .= norm.(pivstrat.pos .- Scalar(pivstrat.pos[1]))
+    @views pivstrat.h .= norm.(
+        pivstrat.pos[pivstrat.idcs] .- Scalar(pivstrat.pos[pivstrat.idcs[1]])
+    )
 
     return 1
 end
@@ -90,14 +93,15 @@ function (pivstrat::FillDistanceFunctor{D,F})(::AbstractArray) where {D,F}
 
     for k in eachindex(pivstrat.h)
         newfd = 0.0
-        for (ind, pos) in enumerate(pivstrat.pos)
-            if pivstrat.h[ind] > norm(pivstrat.pos[k] - pos)
-                newfd < norm(pivstrat.pos[k] - pos) && (newfd = norm(pivstrat.pos[k] - pos))
+        for (ind, pos) in enumerate(pivstrat.pos[pivstrat.idcs])
+            if pivstrat.h[ind] > norm(pivstrat.pos[pivstrat.idcs[k]] - pos)
+                newfd < norm(pivstrat.pos[pivstrat.idcs[k]] - pos) &&
+                    (newfd = norm(pivstrat.pos[pivstrat.idcs[k]] - pos))
             else
                 newfd < pivstrat.h[ind] && (newfd = pivstrat.h[ind])
             end
         end
-        newfd < maxval && (nextidx = k; maxval = newfd)
+        newfd < maxval && (nextidx=k; maxval=newfd)
     end
 
     AdaptiveCrossApproximation.leja2!(pivstrat, nextidx)

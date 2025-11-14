@@ -2,7 +2,6 @@
     FNormEstimator{F} <: ConvCrit
 
 Frobenius norm-based convergence criterion for standard ACA.
-Stops iteration when relative error estimate falls below tolerance.
 
 # Fields
 
@@ -16,7 +15,7 @@ end
     FNormEstimatorFunctor{F} <: ConvCritFunctor
 
 Stateful Frobenius norm estimator for ACA compression.
-Tracks squared norm of UV factorization across iterations.
+Tracks squared norm of UV factorization across iterations and stops iteration when relative error estimate falls below tolerance.
 
 # Fields
 

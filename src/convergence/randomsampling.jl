@@ -67,7 +67,7 @@ function (cc::RandomSampling)(
 ) where {T}
     rowlen = length(rowidcs)
     collen = length(colidcs)
-    nsamples = cc.nsamples == 0 ? cc.factor * (rowlen + collen) : cc.nsamples
+    nsamples = cc.nsamples == 0 ? Int(round(cc.factor * (rowlen + collen))) : cc.nsamples
     indices = hcat(rand(1:rowlen, nsamples), rand(1:collen, nsamples))
     rest = [K[rc[1], rc[2]][1] for rc in eachrow(indices)]
     return RandomSamplingFunctor(0.0, indices, rest, cc.tol)
@@ -120,9 +120,9 @@ function (convcrit::RandomSamplingFunctor{F,K})(
             colbuffer[convcrit.indices[i, 1], npivot] *
             rowbuffer[npivot, convcrit.indices[i, 2]]
     end
-    meanrest = sum(abs.(convcrit.rest) .^ 2) / convcrit.nsamples
+    meanrest = sum(abs.(convcrit.rest) .^ 2) / length(convcrit.rest)
 
     normF!(convcrit, rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
     return npivot,
-    sqrt(meanrest * maxrows * maxcolumns) > convcrit.tol * sqrt(convcrit.normUV²)
+    sqrt(meanrest * maxrows * maxcolumns) > tolerance(convcrit) * sqrt(convcrit.normUV²)
 end

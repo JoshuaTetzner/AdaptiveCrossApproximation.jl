@@ -88,10 +88,10 @@ function (convcrit::FNormExtrapolatorFunctor{F})(
     npivot_, conv = convcrit.estimator(rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
     (npivot_ != npivot) && (return npivot_, conv)
     (!conv) && (f2 = fit(Vector(1:(npivot - 1)), log10.(convcrit.lastnorms), 2))
-    @views push!(
+    conv && (@views push!(
         convcrit.lastnorms,
         norm(rowbuffer[npivot, 1:maxcolumns]) * norm(colbuffer[1:maxrows, npivot]),
-    )
+    ))
     if conv
         return npivot, true
     else
@@ -122,8 +122,9 @@ function (convcrit::FNormExtrapolatorFunctor{F})(
     npivot_, conv = convcrit.estimator(rcbuffer, npivot)
     (npivot_ != npivot) && (return npivot_, conv)
 
-    (!conv) && (f2 = fit(Vector(1:(npivot - 1)), log10.(convcrit.lastnorms), 2))
-    @views push!(convcrit.lastnorms, norm(rcbuffer))
+    (!conv) &&
+        (f2 = fit(Vector(1:length(convcrit.lastnorms)), log10.(convcrit.lastnorms), 3))
+    conv && (@views push!(convcrit.lastnorms, norm(rcbuffer)))
     if conv
         return npivot, true
     else
