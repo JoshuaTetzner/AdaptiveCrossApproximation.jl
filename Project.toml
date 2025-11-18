@@ -1,7 +1,7 @@
 name = "AdaptiveCrossApproximation"
 uuid = "ef3ffb92-1c7b-43b8-a0d7-a7e2ce4fd1e5"
-authors = ["JoshuaTetzner <joshua.tetzner@uni-rostock.de>"]
 version = "0.1.0"
+authors = ["JoshuaTetzner <joshua.tetzner@uni-rostock.de>"]
 
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -15,6 +15,7 @@ H2Trees = "9db26ae3-82ff-4374-85e9-9ed87405fd16"
 ACAH2Trees = ["H2Trees"]
 
 [compat]
+H2Trees = "0.1"
 Polynomials = "4.1.0"
 StaticArrays = "1.9.13"
 
