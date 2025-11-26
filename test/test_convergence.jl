@@ -14,7 +14,7 @@ for tol in [1e-2, 1e-4, 1e-6, 1e-8, 1e-10, 1e-12, 1e-14]
     )
     @test norm(U * V - K) / norm(K) < tol
 end
-
+##
 # RandomSampling
 for tol in [1e-2, 1e-4, 1e-6, 1e-8, 1e-10, 1e-12, 1e-14]
     Random.seed!(1)
@@ -24,7 +24,7 @@ for tol in [1e-2, 1e-4, 1e-6, 1e-8, 1e-10, 1e-12, 1e-14]
     )
     @test norm(U * V - K) / norm(K) < tol
 end
-
+##
 # CombinedConvCrit
 for tol in [1e-2, 1e-4, 1e-6, 1e-8, 1e-10, 1e-12, 1e-14]
     Random.seed!(1)
