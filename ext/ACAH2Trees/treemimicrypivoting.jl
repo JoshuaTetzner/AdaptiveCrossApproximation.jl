@@ -2,7 +2,9 @@ function AdaptiveCrossApproximation.center(tree::H2Trees.H2ClusterTree, node::In
     return H2Trees.center(tree, node)
 end
 
-function AdaptiveCrossApproximation.values(tree::H2Trees.H2ClusterTree, node::Int)
+function AdaptiveCrossApproximation.values(
+    tree::H2Trees.H2ClusterTree, node::Union{Int,Vector{Int}}
+)
     return H2Trees.values(tree, node)
 end
 
