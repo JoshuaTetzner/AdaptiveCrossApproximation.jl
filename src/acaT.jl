@@ -69,8 +69,8 @@ method for detailed argument documentation.
 """
 function (aca::ACAᵀ{P,P,C})(
     A,
-    colbuffer::AbstractMatrix{K},
-    rowbuffer::AbstractMatrix{K},
+    colbuffer::AbstractArray{K},
+    rowbuffer::AbstractArray{K},
     maxrank::Int;
     rows=zeros(Int, maxrank),
     cols=zeros(Int, maxrank),
@@ -91,8 +91,8 @@ Computes low-rank approximation A ≈ colbuffer * rowbuffer by iteratively selec
 # Arguments
 
   - `A`: Matrix to compress
-  - `colbuffer::AbstractMatrix{K}`: Pre-allocated column storage (nrows × maxrank)
-  - `rowbuffer::AbstractMatrix{K}`: Pre-allocated row storage (maxrank × ncols)
+  - `colbuffer::AbstractArray{K}`: Pre-allocated column storage (nrows × maxrank)
+  - `rowbuffer::AbstractArray{K}`: Pre-allocated row storage (maxrank × ncols)
   - `maxrank::Int`: Maximum number of pivots
   - `rows`: Selected row indices (optional, pre-allocated)
   - `cols`: Selected column indices (optional, pre-allocated)
@@ -105,8 +105,8 @@ Computes low-rank approximation A ≈ colbuffer * rowbuffer by iteratively selec
 """
 function (aca::ACAᵀ)(
     A,
-    colbuffer::AbstractMatrix{K},
-    rowbuffer::AbstractMatrix{K},
+    colbuffer::AbstractArray{K},
+    rowbuffer::AbstractArray{K},
     rows::T,
     cols::T,
     rowidcs::T,
@@ -206,7 +206,7 @@ function acaᵀ(
     rowpivoting=MaximumValue(),
     columnpivoting=MaximumValue(),
     convergence=FNormEstimator(tol),
-    maxrank=40,
+    maxrank::Int=40,
     svdrecompress=false,
 ) where {K}
     compressor = ACAᵀ(rowpivoting, columnpivoting, convergence)

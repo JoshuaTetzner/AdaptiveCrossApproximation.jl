@@ -94,8 +94,9 @@ end
 #The package expects the `tree` object to implement these functions. Adaptors
 #for concrete tree types should provide implementations in user code.
 center(tree::T, node::Int) where {T} = error("Not implemented for type $T")
-values(tree::T, node::Union{Int,Vector{Int}}) where {T} =
-    error("Not implemented for type $T")
+values(tree::T, node::Union{Int,Vector{Int}}) where {T} = error(
+    "Not implemented for type $T"
+)
 children(tree::T, node::Int) where {T} = error("Not implemented for type $T")
 firstchild(tree::T, node::Int) where {T} = error("Not implemented for type $T")
 

@@ -152,7 +152,7 @@ function HMatrix(
             end
             put!(rowbuffer, localrowbuffer)
             lock(lk) do
-                push!(leveldfarblocks, farblocks)
+                return push!(leveldfarblocks, farblocks)
             end
         end
         push!(farinteractions, leveldfarblocks)

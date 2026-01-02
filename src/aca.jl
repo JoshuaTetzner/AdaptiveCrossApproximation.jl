@@ -113,8 +113,8 @@ method for detailed argument documentation.
 """
 function (aca::ACA{RP,CP,C})(
     A,
-    colbuffer::AbstractMatrix{K},
-    rowbuffer::AbstractMatrix{K},
+    colbuffer::AbstractArray{K},
+    rowbuffer::AbstractArray{K},
     maxrank::Int;
     rows=zeros(Int, maxrank),
     cols=zeros(Int, maxrank),
@@ -128,8 +128,8 @@ end
 
 function (aca::ACA{RP,CP,C})(
     A,
-    colbuffer::AbstractMatrix{K},
-    rowbuffer::AbstractMatrix{K},
+    colbuffer::AbstractArray{K},
+    rowbuffer::AbstractArray{K},
     maxrank::Int;
     rows=zeros(Int, maxrank),
     cols=zeros(Int, maxrank),
@@ -152,8 +152,8 @@ Fills `colbuffer` and `rowbuffer` with low-rank factors U and V such that
 # Arguments
 
   - `A`: Matrix or matrix-like object (must support `nextrc!` interface)
-  - `colbuffer::AbstractMatrix{K}`: Buffer for U factors, size `(length(rowidcs), maxrank)`
-  - `rowbuffer::AbstractMatrix{K}`: Buffer for V factors, size `(maxrank, length(colidcs))`
+  - `colbuffer::AbstractArray{K}`: Buffer for U factors, size `(length(rowidcs), maxrank)`
+  - `rowbuffer::AbstractArray{K}`: Buffer for V factors, size `(maxrank, length(colidcs))`
   - `rows::Vector{Int}`: Storage for selected row indices
   - `cols::Vector{Int}`: Storage for selected column indices
   - `rowidcs::Vector{Int}`: Global row indices of the block to compress
@@ -167,8 +167,8 @@ Fills `colbuffer` and `rowbuffer` with low-rank factors U and V such that
 """
 function (aca::ACA)(
     A,
-    colbuffer::AbstractMatrix{K},
-    rowbuffer::AbstractMatrix{K},
+    colbuffer::AbstractArray{K},
+    rowbuffer::AbstractArray{K},
     rows::T,
     cols::T,
     rowidcs::T,
@@ -286,7 +286,7 @@ function aca(
     rowpivoting=MaximumValue(),
     columnpivoting=MaximumValue(),
     convergence=FNormEstimator(tol),
-    maxrank=40,
+    maxrank::Int=40,
     svdrecompress=false,
 ) where {K}
     compressor = ACA(rowpivoting, columnpivoting, convergence)
