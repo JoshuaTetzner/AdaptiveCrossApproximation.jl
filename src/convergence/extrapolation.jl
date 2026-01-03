@@ -123,8 +123,8 @@ function (convcrit::FNormExtrapolatorFunctor{F})(
     (npivot_ != npivot) && (return npivot_, conv)
 
     (!conv) &&
-        (f2 = fit(Vector(1:length(convcrit.lastnorms)), log10.(convcrit.lastnorms), 3))
-    conv && (@views push!(convcrit.lastnorms, norm(rcbuffer)))
+        (f2 = fit(Vector(1:length(convcrit.lastnorms)), log10.(convcrit.lastnorms), 2))
+    @views push!(convcrit.lastnorms, norm(rcbuffer))
     if conv
         return npivot, true
     else
