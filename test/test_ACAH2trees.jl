@@ -1,3 +1,4 @@
+#using ParallelKMeans
 using H2Trees
 using AdaptiveCrossApproximation
 using StaticArrays
@@ -64,3 +65,35 @@ npiv, rows, cols = iaca(
 )
 @test norm(K[rowidcs, colidcs] - K[rowidcs, cols] * K[rows, cols]^-1 * K[rows, colidcs]) /
       norm(K[rowidcs, colidcs]) < 1e-3
+
+##
+#=
+tpos = [@SVector rand(3) for i in 1:50]
+spos = vcat(
+    [@SVector rand(3) for i in 1:10] .+ Scalar(SVector(2.0, 0.0, 0.0)),
+    [@SVector rand(3) for i in 1:100] .+ Scalar(SVector(5.0, 0.0, 0.0)),
+)
+
+using Random
+Random.seed!(1)
+tree = KMeansTree(spos, 2; minvalues=3)
+iaca = AdaptiveCrossApproximation.iACA(
+    AdaptiveCrossApproximation.MaximumValue(),
+    AdaptiveCrossApproximation.TreeMimicryPivoting(tpos, spos, tree),
+    AdaptiveCrossApproximation.FNormExtrapolator(
+        AdaptiveCrossApproximation.iFNormEstimator(1e-3)
+    ),
+)
+
+A = rand(50, 110)
+
+npivots = iaca(
+    A,
+    zeros(Float64, 50, 50),
+    zeros(Float64, 50, 110),
+    50;
+    rowidcs=Vector(1:50),
+    colidcs=collect(H2Trees.LevelIterator(tree, 3)),
+)
+colidcs
+=#

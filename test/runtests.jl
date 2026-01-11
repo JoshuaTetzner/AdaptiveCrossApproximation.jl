@@ -21,7 +21,7 @@ end
 @testitem "Code formatting (JuliaFormatter.jl)" begin
     using JuliaFormatter
     pkgpath = pkgdir(AdaptiveCrossApproximation)
-    @test JuliaFormatter.format(pkgpath, overwrite=false)
+    @test JuliaFormatter.format(pkgpath, overwrite=true)
 end
 
 @run_package_tests verbose = true

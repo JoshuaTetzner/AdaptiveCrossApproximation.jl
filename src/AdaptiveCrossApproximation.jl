@@ -28,6 +28,8 @@ if !isdefined(Base, :get_extension) # for julia version < 1.9
     include("../ext/ACAH2Trees/ACAH2Trees.jl")
 end
 
+#include("hmatrix/abstracthmatrix.jl")
+
 export ACA
 export iACA
 export FNormEstimator, iFNormEstimator
