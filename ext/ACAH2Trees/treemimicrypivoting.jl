@@ -12,6 +12,10 @@ function AdaptiveCrossApproximation.children(tree::H2Trees.H2ClusterTree, node::
     return H2Trees.children(tree, node)
 end
 
+function AdaptiveCrossApproximation.parent(tree::H2Trees.H2ClusterTree, node::Int)
+    return H2Trees.parent(tree, node)
+end
+
 function AdaptiveCrossApproximation.firstchild(tree::H2Trees.H2ClusterTree, node::Int)
     return H2Trees.firstchild(tree, node)
 end
