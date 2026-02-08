@@ -3,10 +3,9 @@ struct HMatrix{K,NearInteractionType,FarInteractionType} <: LinearMaps.LinearMap
     nearinteractions::NearInteractionType
     farinteractions::FarInteractionType
     dim::Tuple{Int,Int}
-    ntasks::Int
-    function HMatrix{K}(nearinteractions, farinteractions, dim, ntasks) where {K}
+    function HMatrix{K}(nearinteractions, farinteractions, dim) where {K}
         return new{K,typeof(nearinteractions),typeof(farinteractions)}(
-            nearinteractions, farinteractions, dim, ntasks
+            nearinteractions, farinteractions, dim
         )
     end
 end

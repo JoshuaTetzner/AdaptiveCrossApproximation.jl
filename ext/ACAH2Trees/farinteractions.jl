@@ -1,80 +1,44 @@
+import H2Trees: isleaf, testtree, trialtree, root, children
+
 function fars!(
-    treea, treeb, farnodes::Vector{V}, tnode::Int, snodes::V; isnear=H2Trees.isnear
-) where {V<:Vector{Int}}
+    treea,
+    treeb,
+    values::U,
+    farvalues::Vector{U},
+    tnode::Int,
+    snodes::V;
+    isnear=H2Trees.isnear,
+) where {V<:Vector{Int},U<:Vector{UnitRange{Int}}}
     childnodes = Int[]
-    localfarnodes = Int[]
+    localfarnodes = UnitRange{Int}[]
     for snode in snodes
         if !isnear(treea, treeb, tnode, snode)
-            push!(localfarnodes, snode)
+            push!(localfarnodes, range(treeb, snode))
         else
             append!(childnodes, collect(children(treeb, snode)))
         end
     end
-    farnodes[tnode] = localfarnodes
-    if childnodes != []
-        for child in children(treea, tnode)
-            fars!(treea, treeb, farnodes, child, childnodes; isnear=isnear)
-        end
+    farvalues[tnode] = localfarnodes
+    values[tnode] = range(treea, tnode)
+    for child in children(treea, tnode)
+        fars!(treea, treeb, values, farvalues, child, childnodes; isnear=isnear)
     end
 end
 
-function farinteractions(tree; isnear=H2Trees.isnear)
-    if !isnear(testtree(tree), trialtree(tree), root(testtree(tree)), root(trialtree(tree)))
-        values = H2Trees.values(testtree(tree), root(testtree(tree)))
-        lvalues = length(H2Trees.values(testtree(tree), root(testtree(tree))))
-        farvalues = H2Trees.values(trialtree(tree), root(trialtree(tree)))
-        lfarvalues = length(H2Trees.values(trialtree(tree), root(trialtree(tree))))
-        return [values], [lvalues], [farvalues], [lfarvalues]
-    end
-    farnodes = Vector{Vector{Int}}(undef, length(d.nodes))
-    fars!(
-        testtree(tree),
-        trialtree(tree),
-        farnodes,
-        root(testtree(tree)),
-        [root(trialtree(tree))];
-        isnear=isnear,
+function AdaptiveCrossApproximation.farinteractions(tree::BlockTree; isnear=H2Trees.isnear)
+    return AdaptiveCrossApproximation.farinteractions(
+        testtree(tree), trialtree(tree); isnear=isnear
     )
+end
 
-    vals = Vector{Vector{Int}}[]
-    farvals = Vector{Vector{Int}}[]
-    lvals = Vector{Vector{Int}}[]
-    lfarvals = Vector{Vector{Int}}[]
-    for level in level(testtree(tree))
-        levvals = Vector{Int}[]
-        levfarvals = Vector{Int}[]
-        levlvals = Vector{Int}[]
-        levlfarvals = Vector{Int}[]
-        for node in LevelIterator(testtree(tree), level)
-            if farnodes[node] != []
-                push!(
-                    levvals,
-                    [H2Trees.values(testtree(tree), node)[1] for _ in farnodes[node]],
-                )
-                push!(
-                    levlvals,
-                    [length(H2Trees.values(testtree(tree), node)) for _ in farnodes[node]],
-                )
-                push!(
-                    levfarvals,
-                    [
-                        H2Trees.values(trialtree(tree), farnode)[1] for
-                        farnode in farnodes[node]
-                    ],
-                )
-                push!(
-                    levlfarvals,
-                    [
-                        length(H2Trees.values(trialtree(tree), farnode)) for
-                        farnode in farnodes[node]
-                    ],
-                )
-            end
-        end
-        push!(vals, levvals)
-        push!(farvals, levfarvals)
-        push!(lvals, levlvals)
-        push!(lfarvals, levlfarvals)
+function AdaptiveCrossApproximation.farinteractions(treea, treeb; isnear=H2Trees.isnear)
+    values = Vector{UnitRange{Int}}(undef, length(treea.nodes))
+    farvalues = Vector{Vector{UnitRange{Int}}}(undef, length(treea.nodes))
+    if !isnear(treea, treeb, root(treea), root(treeb))
+        farvalues[root(treea)] = range(testtree(treea), root(treeb))
+        values[root(treea)] = range(testtree(treea), root(treea))
+        return [1; cumsum(length.(farvalues)) .+ 1], values, reduce(vcat, farvalues)
     end
-    return vals, lvals, farvals, lfarvals
+    fars!(treea, treeb, values, farvalues, root(treea), [root(treeb)]; isnear=isnear)
+    return [1; cumsum(length.(farvalues)) .+ 1], values, reduce(vcat, farvalues)
 end

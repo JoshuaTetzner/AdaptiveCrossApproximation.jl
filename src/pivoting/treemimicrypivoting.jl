@@ -94,9 +94,8 @@ end
 #The package expects the `tree` object to implement these functions. Adaptors
 #for concrete tree types should provide implementations in user code.
 center(tree::T, node::Int) where {T} = error("Not implemented for type $T")
-values(tree::T, node::Union{Int,Vector{Int}}) where {T} = error(
-    "Not implemented for type $T"
-)
+values(tree::T, node::Union{Int,Vector{Int}}) where {T} =
+    error("Not implemented for type $T")
 children(tree::T, node::Int) where {T} = error("Not implemented for type $T")
 parent(tree::T, node::Int) where {T} = error("Not implemented for type $T")
 firstchild(tree::T, node::Int) where {T} = error("Not implemented for type $T")
@@ -154,11 +153,10 @@ function findcluster(
     end
     cluster = F[argmax(leja .^ (2 / (npivot - 1)) .* h .* w .^ 4)]
 
-    #iszero(firstchild(pivstrat.tree, cluster)) && return cluster
-    # Increased rescue measure, check performance!!!!
+    #Increased rescue measure, check performance!!!!
     if iszero(firstchild(pivstrat.tree, cluster))
         if issubset(values(pivstrat.tree, cluster), pivstrat.usedidcs)
-            if length(F) == 1
+            if length(F) == 1 && !(cluster ∈ pivstrat.F)
                 pivstrat.emptyclusters[findfirst(pivstrat.emptyclusters .== 0)] = parent(
                     pivstrat.tree, cluster
                 )
@@ -168,7 +166,10 @@ function findcluster(
             else
                 pivstrat.emptyclusters[findfirst(pivstrat.emptyclusters .== 0)] = cluster
                 deleteat!(F, findfirst(F .== cluster))
-                return findcluster(pivstrat, F, npivot)
+                F != [] && return findcluster(pivstrat, F, npivot)
+                return findcluster(
+                    pivstrat, setdiff(pivstrat.F, pivstrat.emptyclusters), npivot
+                )
             end
         else
             return cluster
@@ -216,10 +217,6 @@ function (pivstrat::TreeMimicryPivotingFunctor{D,F})(npivot::Int) where {D,F<:Re
     )
     nodeidcs = values(pivstrat.tree, targetcluster)
     @assert !issubset(nodeidcs, pivstrat.usedidcs)
-    #=    println("we will never be here")
-        deleteat!(pivstrat.F, findfirst(pivstrat.F .== targetcluster))
-        return pivstrat(npivot)
-    end=#
 
     w = zeros(F, length(nodeidcs))
     h = zeros(F, length(nodeidcs))

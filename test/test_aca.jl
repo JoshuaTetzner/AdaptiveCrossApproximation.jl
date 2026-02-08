@@ -38,7 +38,7 @@ U, V = AdaptiveCrossApproximation.aca(K; tol=10^-4, maxrank=5)
 @test size(V, 1) == 3
 
 # BufferTests
-
+##
 comp = AdaptiveCrossApproximation.ACA()
 rowbuffer = zeros(Float64, 5, 10)
 colbuffer = zeros(Float64, 10, 5)
@@ -48,17 +48,10 @@ rows = zeros(Int, 5)
 cols = zeros(Int, 5)
 comp = comp(1:5, 1:5)
 npivots = comp(
-    K,
-    view(colbuffer, 2:6, 1:5),
-    view(rowbuffer, 1:5, 2:6),
-    rows,
-    cols,
-    Vector(2:6),
-    Vector(2:6),
-    5,
+    K, view(colbuffer, 2:6, 1:5), view(rowbuffer, 1:5, 2:6), rows, cols, Vector(2:6), 2:6, 5
 )
 @test isapprox(K[2:6, 2:6], colbuffer[2:6, :] * rowbuffer[:, 2:6])
-
+##
 compT = AdaptiveCrossApproximation.ACAᵀ()
 rowsT = zeros(Int, 5)
 colsT = zeros(Int, 5)
@@ -72,7 +65,7 @@ npivots = compT(
     5;
     rows=rowsT,
     cols=colsT,
-    rowidcs=Vector(2:6),
+    rowidcs=2:6,
     colidcs=Vector(2:6),
 )
 

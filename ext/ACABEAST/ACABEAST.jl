@@ -5,8 +5,25 @@ using AdaptiveCrossApproximation
 
 include("kernelmatrix.jl")
 
-function permute!(space::BEAST.RTBasis, permutation::Vector{Int})
+function AdaptiveCrossApproximation.defaultfarquadstrat(
+    operator::BEAST.IntegralOperator, testspace::BEAST.Space, trialspace::BEAST.Space
+)
+    return BEAST.DoubleNumQStrat(2, 3)
+end
+
+function AdaptiveCrossApproximation.defaultnearquadstrat(
+    operator::BEAST.IntegralOperator, testspace::BEAST.Space, trialspace::BEAST.Space
+)
+    return BEAST.defaultquadstrat(operator, testspace, trialspace)
+end
+
+function AdaptiveCrossApproximation.scalartype(operator::BEAST.IntegralOperator)
+    return BEAST.scalartype(operator)
+end
+
+function AdaptiveCrossApproximation.permute!(space::BEAST.Space, permutation::Vector{Int})
     permute!(space.fns, permutation)
-    return permute!(space.pos, permutation)
+    permute!(space.pos, permutation)
+    return nothing
 end
 end

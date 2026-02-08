@@ -107,12 +107,12 @@ function (aca::ACAᵀ)(
     A,
     colbuffer::AbstractArray{K},
     rowbuffer::AbstractArray{K},
-    rows::T,
-    cols::T,
-    rowidcs::T,
-    colidcs::T,
+    rows::AbstractVector{Int},
+    cols::AbstractVector{Int},
+    rowidcs::AbstractVector{Int},
+    colidcs::AbstractVector{Int},
     maxrank::Int,
-) where {K,T<:Vector{Int}}
+) where {K}
     maxrows = size(colbuffer, 1)
     maxcols = size(rowbuffer, 2)
     npivot = 1

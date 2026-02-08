@@ -8,46 +8,60 @@ function assemblefars(
     testspace,
     trialspace,
     tree;
-    compressor=ACA(; tol=1e-4),
+    compressor=ACA(),
     isnear=isnear(),
     quadstrat=defaultfarquadstrat(operator, testspace, trialspace),
     maxrank=50,
-    ntasks=Threads.nthreads(),
+    scheduler=SerialScheduler(),
 )
-    kernelmatrix = KernelMatrix(operator, testspace, trialspace; quadstrat=quadstrat)
-    vals, lengths, farvals, farlengths = farinteractions(tree; isnear=isnear)
+    kernelmatrix = AbstractKernelMatrix(
+        operator, testspace, trialspace; quadstrat=quadstrat
+    )
+    valptr, values, farvalues = farinteractions(tree; isnear=isnear)
 
-    colbuffer = zeros(scalartype(operator), length(testspace), maxrank)
-    farinteractionmatrix = Vector{VariableBlockCompressedRowStorage}(undef, length(fars))
-    for level in eachindex(vals)
-        blocks = Vector{Vector{LowRankBlocks{scalartype(operator)}}}(
-            undef, length(vals[level])
-        )
-        @tasks for validx in eachindex(vals[level])
-            @set ntasks = ntasks
-            @local rowbuffer = zeros(scalartype(operator), maxrank, length(trialspace))
-            localblocks = Vector{LowRankBlocks{scalartype(operator)}}(
-                undef, length(farvals[level][validx])
-            )
-            rows = fars[level][validx]:(fars[level][validx] + lengths[level][validx] - 1)
-            for (far, faridx) in enumerate(farvals[level][validx])
-                cols = far:(far + farlengths[level][validx][faridx] - 1)
+    blocks = Vector{LowRankMatrix{eltype(kernelmatrix)}}(undef, length(farvalues))
+    colbuffer = zeros(eltype(kernelmatrix), length(testspace), maxrank)
+    farinteractionmatrix = VariableBlockCompressedRowStorage[]
+
+    for level in levels(testtree(tree))
+        fnodes = collect(LevelIterator(testtree(tree), level))
+        buffersize = maximum(length.(values[fnodes]))
+        @tasks for node in fnodes
+            @set scheduler = scheduler
+            @local rowbuffer = zeros(eltype(kernelmatrix), maxrank, buffersize)
+            for faridx in valptr[node]:(valptr[node + 1] - 1)
                 npivots = compressor(
                     kernelmatrix,
-                    view(colbuffer, rows, 1:maxrank),
+                    view(colbuffer, values[node], 1:maxrank),
                     rowbuffer,
                     maxrank;
-                    rowidcs=rows,
-                    colidcs=cols,
+                    rowidcs=values[node],
+                    colidcs=farvalues[faridx],
                 )
-                localblocks[faridx] = LowRankMatrix(
-                    colbuffer[rows, 1:npivots], rowbuffer[1:npivots, 1:length(cols)]
+                blocks[faridx] = LowRankMatrix(
+                    colbuffer[values[node], 1:npivots],
+                    rowbuffer[1:npivots, 1:length(farvalues[faridx])],
                 )
+                colbuffer[values[node], 1:npivots] .= eltype(kernelmatrix)(0)
+                rowbuffer[1:npivots, 1:length(farvalues[faridx])] .= eltype(kernelmatrix)(0)
             end
-            blocks[validx] = localblocks
         end
-        farinteractionmatrix[level] = VariableBlockCompressedRowStorage(
-            blocks, vals[level], farvals[level], (length(testspace), length(trialspace))
+
+        faridcs = [i for idx in fnodes for i in valptr[idx]:(valptr[idx + 1] - 1)]
+        isempty(faridcs) && continue
+        levelrowptr = [1; cumsum([valptr[idx + 1] - valptr[idx] for idx in fnodes]) .+ 1]
+        push!(
+            farinteractionmatrix,
+            VariableBlockCompressedRowStorage{
+                eltype(kernelmatrix),eltype(blocks),Int,typeof(scheduler)
+            }(
+                blocks[faridcs],
+                levelrowptr,
+                first.(farvalues[faridcs]),
+                first.(values[fnodes]),
+                (length(testspace), length(trialspace)),
+                scheduler,
+            ),
         )
     end
 

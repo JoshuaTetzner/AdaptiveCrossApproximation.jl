@@ -38,9 +38,10 @@ Construct an ACA compressor with keyword arguments.
   - `convergence`: Convergence criterion (default: `FNormEstimator(1e-4)`)
 """
 function ACA(;
+    tol=1e-4,
     rowpivoting=MaximumValue(),
     columnpivoting=MaximumValue(),
-    convergence=FNormEstimator(1e-4),
+    convergence=FNormEstimator(tol),
 )
     return ACA(rowpivoting, columnpivoting, convergence)
 end
@@ -169,14 +170,14 @@ function (aca::ACA)(
     A,
     colbuffer::AbstractArray{K},
     rowbuffer::AbstractArray{K},
-    rows::T,
-    cols::T,
-    rowidcs::T,
-    colidcs::T,
+    rows::AbstractVector{Int},
+    cols::AbstractVector{Int},
+    rowidcs::AbstractVector{Int},
+    colidcs::AbstractVector{Int},
     maxrank::Int,
-) where {K,T<:Vector{Int}}
-    maxrows = size(colbuffer, 1)
-    maxcols = size(rowbuffer, 2)
+) where {K}
+    maxrows = length(rowidcs)
+    maxcols = length(colidcs)
     npivot = 1
     nextrow = aca.rowpivoting()
     rows[1] = rowidcs[nextrow]

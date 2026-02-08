@@ -3,7 +3,7 @@ struct IsNearFunctor{F}
 end
 
 function isnear(; η=1.0)
-    return IsNearFunctor{F}(η)
+    return IsNearFunctor{typeof(η)}(η)
 end
 
 function nearinteractions(tree; args...)
@@ -23,35 +23,41 @@ function assemblenears(
     trialspace,
     tree;
     isnear=isnear(),
-    ntasks=Threads.nthreads(),
-    quadstrat=defaultquadstrat(operator, testspace, trialspace),
+    scheduler=SerialScheduler(),
+    quadstrat=defaultnearquadstrat(operator, testspace, trialspace),
 )
     nearmatrix = AbstractKernelMatrix(operator, testspace, trialspace; quadstrat=quadstrat)
-    values, lenvalues, nearvalues, lennearvalues = nearinteractions(tree; isnear=isnear)
-    blocks = zeros.(eltype(nearmatrix), lenvalues, sum(lennearvalues))
+    values, nearvalues = nearinteractions(tree; isnear=isnear)
+    blocks =
+        zeros.(eltype(nearmatrix), length.(values), [sum(length.(n)) for n in nearvalues])
+    # There should be a prettier not hardcoded way to do this, but it works for now
     viewblocks = Vector{
         Vector{
             SubArray{
-                Float64,
+                eltype(nearmatrix),
                 2,
-                Matrix{scalartype(operator)},
-                Tuple{UnitRange{Int64},UnitRange{Int64}},
+                Matrix{eltype(nearmatrix)},
+                Tuple{UnitRange{Int},UnitRange{Int}},
                 false,
             },
         },
     }(
         undef, length(blocks)
     )
-    @time @tasks for i in eachindex(blocks)
-        @set ntasks = ntasks
-        nearmatrix(blocks[i], values[i][1], nearvalues[i])
-        viewblocks[i] = splitblock(blocks[i], lennearvalues[i])
+    @tasks for i in eachindex(blocks)
+        @set scheduler = scheduler
+        nearmatrix(blocks[i], values[i], Iterators.flatten(nearvalues[i]))
+        viewblocks[i] = splitblock(blocks[i], length.(nearvalues[i]))
     end
-
-    return VariableBlockCompressedRowStorage(
+    mat = VariableBlockCompressedRowStorage{
+        eltype(nearmatrix),eltype(Iterators.flatten(viewblocks)),Int,typeof(scheduler)
+    }(
         collect(Iterators.flatten(viewblocks)),
-        collect(Iterators.flatten(values)),
-        collect(Iterators.flatten(nearvalues)),
+        [1; cumsum(length.(nearvalues)) .+ 1],
+        first.(Iterators.flatten(nearvalues)),
+        first.(values),
         size(nearmatrix),
+        scheduler,
     )
+    return mat
 end

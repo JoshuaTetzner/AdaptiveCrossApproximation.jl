@@ -1,13 +1,22 @@
-module H
-
-using AdaptiveCrossApproximation
 using BlockSparseMatrices
-using OhMyThreads
-using LinearMaps
 using LinearAlgebra
+using LinearMaps
+using OhMyThreads
 
 defaultnearquadstrat(operator, testspace, trialspace) = error("Not implemented")
 defaultfarquadstrat(operator, testspace, trialspace) = error("Not implemented")
+scalartype(operator) = error("Not implemented for $(typeof(operator))")
+
+testtree(tree) = error("Requiers implementation for $(typeof(tree))")
+trialtree(tree) = error("Requiers implementation for $(typeof(tree))")
+levels(tree) = error("Requiers implementationfor $(typeof(tree))")
+LevelIterator(tree, level) = error("Requiers implementation for $(typeof(tree))")
+
+permutation(tree) = error("Requiers implementation for $(typeof(tree))")
+permute(space, perm) =
+    error("Requiers implementation for $(typeof(space)) and $(typeof(perm))")
+permute!(space, perm) =
+    error("Requiers implementation for $(typeof(space)) and $(typeof(perm))")
 
 include("kernelmatrix/abstractkernelmatrix.jl")
 include("kernelmatrix/beastkernelmatrix.jl")
@@ -24,17 +33,19 @@ function HMatrix(
     tree;
     isnear=isnear(),
     compressor=ACA(; tol=1e-4),
-    permutation=true,
+    perm=true,
     nearquadstrat=defaultnearquadstrat(operator, testspace, trialspace),
     farquadstrat=defaultfarquadstrat(operator, testspace, trialspace),
-    ntasks=Threads.nthreads(),
+    scheduler=DynamicScheduler(),
 )
-    if permutation
-        permute!(testspace, testtree(tree))
-        permute!(trialspace, trialtree(tree))
+    testperm = permutation(testtree(tree))
+    trialperm = permutation(trialtree(tree))
+    if perm
+        permute!(testspace, testperm)
+        permute!(trialspace, trialperm)
     else
-        (tpermutation, testspace=permute(testspace, testtree(tree)))
-        (spermutation, trialspace=permute(trialspace, trialtree(tree)))
+        testspace = permute(testspace, testperm)
+        trialspace = permute(trialspace, trialperm)
     end
 
     nears = assemblenears(
@@ -43,8 +54,8 @@ function HMatrix(
         trialspace,
         tree;
         isnear=isnear,
-        ntasks=ntasks,
         quadstrat=nearquadstrat,
+        scheduler=scheduler,
     )
 
     fars = assemblefars(
@@ -55,58 +66,28 @@ function HMatrix(
         compressor=compressor,
         isnear=isnear,
         quadstrat=farquadstrat,
-        ntasks=ntasks,
+        scheduler=scheduler,
     )
 
-    permutation && return HMatrix{scalartype(operator)}(
-        nears, fars, (length(testspace), length(trialspace)), ntasks
+    perm && return HMatrix{scalartype(operator)}(
+        nears, fars, (length(testspace), length(trialspace))
     )
     return PermutedHMatrix(
-        (tpermutation, spermutation),
-        HMatrix{scalartype(operator)}(
-            nears, fars, (length(testspace), length(trialspace)), ntasks
-        ),
+        (testperm, trialperm),
+        HMatrix{scalartype(operator)}(nears, fars, (length(testspace), length(trialspace))),
     )
 end
-#=
+
 function HMatrix(
     operator,
     space,
     tree;
-    isnear=IsNearFunctor(),
+    isnear=isnear(),
     compressor=ACA(; tol=1e-4),
     permutation=true,
     nearquadstrat=defaultnearquadstrat(operator, space, space),
     farquadstrat=defaultfarquadstrat(operator, space, space),
     ntasks=Threads.nthreads(),
 )
-    if permutation
-        permute!(space, testtree(tree))
-    else
-        (permutation, space=permute(space, testtree(tree)))
-    end
-
-    nears = assemblenears(
-        operator, space, tree; isnear=isnear, ntasks=ntasks, quadstrat=nearquadstrat
-    )
-
-    fars = assemblefars(
-        operator,
-        space,
-        tree;
-        isnear=isnear,
-        quadstrat=farquadstrat,
-        compressor=compressor,
-        ntasks=ntasks,
-    )
-
-    permutation && return HMatrix{scalartype(operator)}(
-        nears, fars, (length(space), length(space)), ntasks
-    )
-    return PermutedHMatrix(
-        (permutation, permutation),
-        HMatrix{scalartype(operator)}(nears, fars, (length(space), length(space)), ntasks),
-    )
-end
-=#
+    return error("Symmetric version not implemented yet")
 end
