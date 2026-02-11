@@ -22,10 +22,9 @@ function assemblefars(
     blocks = Vector{LowRankMatrix{eltype(kernelmatrix)}}(undef, length(farvalues))
     colbuffer = zeros(eltype(kernelmatrix), length(testspace), maxrank)
     farinteractionmatrix = VariableBlockCompressedRowStorage[]
-
+    buffersize = maximum(length.(farvalues))
     for level in levels(testtree(tree))
         fnodes = collect(LevelIterator(testtree(tree), level))
-        buffersize = maximum(length.(values[fnodes]))
         @tasks for node in fnodes
             @set scheduler = scheduler
             @local rowbuffer = zeros(eltype(kernelmatrix), maxrank, buffersize)
