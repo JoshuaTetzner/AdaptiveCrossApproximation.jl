@@ -76,7 +76,14 @@ function (pivstrat::CombinedPivStratFunctor)(rc::AbstractArray)
     for (i, conv) in enumerate(pivstrat.convcrit.isconverged)
         !conv && continue
         i > length(pivstrat.convcrit.crits) && pivstrat.convcrit.isconverged[i] == true
-        return pivstrat.strats[i](rc)
+        nextidx = pivstrat.strats[i](rc)
+
+        if !(pivstrat.strats[i] isa MaximumValueFunctor)
+            mvidx = findfirst(x -> x isa MaximumValueFunctor, pivstrat.strats)
+            mvidx !== nothing && (pivstrat.strats[mvidx].usedidcs[nextidx] = true)
+        end
+
+        return nextidx
     end
 end
 

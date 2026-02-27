@@ -3,6 +3,10 @@ module AdaptiveCrossApproximation
 using LinearAlgebra
 using StaticArrays
 
+include("hmatrix/kernelmatrix/abstractkernelmatrix.jl")
+include("hmatrix/kernelmatrix/beastkernelmatrix.jl")
+include("hmatrix/kernelmatrix/pointmatrix.jl")
+
 include("pivoting/abstractpivoting.jl")
 include("convergence/abstractconvergence.jl")
 
@@ -29,9 +33,6 @@ if !isdefined(Base, :get_extension) # for julia version < 1.9
 end
 
 include("hmatrix/abstracthmatrix.jl")
-#module H
-#    include("hmatrix/abstracthmatrix.jl")
-#end
 
 export ACA
 export iACA

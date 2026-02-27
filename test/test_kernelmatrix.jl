@@ -1,32 +1,43 @@
 using BEAST
-using H2Trees
 using CompScienceMeshes
 using AdaptiveCrossApproximation
+using Test
 
-##
+# Float64
 
-Γ = meshsphere(1.0, 0.1)
+Γ = meshicosphere(2, 1.0)
+x = lagrangec0d1(Γ)
+y = lagrangec0d1(Γ)
 op = Helmholtz3D.singlelayer()
-space = lagrangecxd0(Γ)
 
-##
-tree = TwoNTree(space, space, 1 / 2^10; minvaluestest=100, minvaluestrial=100)
+A = AdaptiveCrossApproximation.AbstractKernelMatrix(op, x, y)
+P = AdaptiveCrossApproximation.AbstractKernelMatrix(
+    (x, y) -> sum(x + y), Γ.vertices, Γ.vertices
+)
 
-permt = AdaptiveCrossApproximation.H.permutation(H2Trees.testtree(tree))
-perms = AdaptiveCrossApproximation.H.permutation(H2Trees.trialtree(tree))
-permt == perms
-AdaptiveCrossApproximation.H.permute!(space, permt)
-##
+struct myfct end
+Base.eltype(::myfct) = Float64
+PFct = AdaptiveCrossApproximation.AbstractKernelMatrix(myfct(), Γ.vertices, Γ.vertices)
 
-@time nn = AdaptiveCrossApproximation.H.nearinteractions(tree);
-@time AdaptiveCrossApproximation.H.farinteractions(tree);
+@test size(A) == size(P) == size(PFct) == (length(x), length(y))
+@test eltype(A) == eltype(P) == eltype(PFct) == scalartype(op) == Float64
 
-##
-ass = AdaptiveCrossApproximation.H.AbstractKernelMatrix(op, space, space)
-##
+# Float32
 
-mat = AdaptiveCrossApproximation.H.assemblenears(op, space, space, tree;);
+Γ = meshicosphere(2, Float32(1.0))
+x = lagrangec0d1(Γ)
+y = lagrangec0d1(Γ)
+op = Helmholtz3D.singlelayer(; gamma=Float32(1.0))
 
-##
+A = AdaptiveCrossApproximation.AbstractKernelMatrix(op, x, y)
+P = AdaptiveCrossApproximation.AbstractKernelMatrix(
+    (x, y) -> sum(x + y), Γ.vertices, Γ.vertices
+)
+struct myfct32 end
+Base.eltype(::myfct32) = Float32
+PFct = AdaptiveCrossApproximation.AbstractKernelMatrix(myfct32(), Γ.vertices, Γ.vertices)
 
-AdaptiveCrossApproximation.H.assemblefars(op, space, space, tree;)
+@test size(A) == size(P) == size(PFct) == (length(x), length(y))
+@test eltype(A) == eltype(P) == eltype(PFct) == scalartype(op) == Float32
+
+y = copy(x)

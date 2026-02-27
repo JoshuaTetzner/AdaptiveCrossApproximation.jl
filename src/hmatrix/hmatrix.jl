@@ -10,6 +10,37 @@ struct HMatrix{K,NearInteractionType,FarInteractionType} <: LinearMaps.LinearMap
     end
 end
 
+function Base.Matrix(A::HMatrix)
+    mat = Matrix(A.nearinteractions)
+    for farinteraction in A.farinteractions
+        mat += Matrix(farinteraction)
+    end
+    return mat
+end
+
+function nnz(A::HMatrix)
+    nnz = BlockSparseMatrices.nnz(A.nearinteractions)
+    println("Nearinteractions: $nnz")
+    fnnz = 0
+    for farinteraction in A.farinteractions
+        fnnz += BlockSparseMatrices.nnz(farinteraction)
+    end
+    println("Farinteractions: $fnnz")
+    return nnz + fnnz
+end
+
+function storage(A::HMatrix)
+    storage = BlockSparseMatrices.nnz(A.nearinteractions) * 8 * 1e-9
+    println("Nearinteractions: $storage MB")
+    fstorage = 0
+    for farinteraction in A.farinteractions
+        fstorage += BlockSparseMatrices.nnz(farinteraction)
+    end
+    fstorage = fstorage * 8 * 1e-9
+    println("Farinteractions: $fstorage MB")
+    return storage + fstorage
+end
+
 function Base.size(A::HMatrix, dim=nothing)
     dim === nothing && return (A.dim[1], A.dim[2])
     return A.dim[dim]

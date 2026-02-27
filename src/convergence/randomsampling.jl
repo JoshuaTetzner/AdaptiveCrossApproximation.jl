@@ -31,7 +31,7 @@ Tracks residual error at sampled matrix entries across iterations.
 """
 mutable struct RandomSamplingFunctor{F<:Real,K} <: ConvCritFunctor
     normUV²::F
-    indices::Matrix{Int}
+    indices::Vector{Tuple{Int,Int}}
     rest::Vector{K}
     tol::F
 end
@@ -68,8 +68,33 @@ function (cc::RandomSampling)(
     rowlen = length(rowidcs)
     collen = length(colidcs)
     nsamples = cc.nsamples == 0 ? Int(round(cc.factor * (rowlen + collen))) : cc.nsamples
-    indices = hcat(rand(1:rowlen, nsamples), rand(1:collen, nsamples))
-    rest = [K[rc[1], rc[2]][1] for rc in eachrow(indices)]
+    indices = collect(Set(zip(rand(1:rowlen, nsamples), rand(1:collen, nsamples))))
+    rest = [K[rowidcs[rc[1]], colidcs[rc[2]]][1] for rc in indices]
+    return RandomSamplingFunctor(0.0, indices, rest, cc.tol)
+end
+
+"""
+    (cc::RandomSampling)(K::AbstractKernelMatrix{T}, rowidcs, colidcs)
+
+Initialize random sampling functor with sampled matrix entries.
+
+# Arguments
+
+  - `K::AbstractKernelMatrix{T}`: Matrix to compress
+  - `rowidcs::AbstractArray{Int}`: Active row indices
+  - `colidcs::AbstractArray{Int}`: Active column indices
+"""
+function (cc::RandomSampling)(
+    K::AbstractKernelMatrix{T}, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
+) where {T}
+    rowlen = length(rowidcs)
+    collen = length(colidcs)
+    nsamples = cc.nsamples == 0 ? Int(round(cc.factor * (rowlen + collen))) : cc.nsamples
+    indices = collect(Set(zip(rand(1:rowlen, nsamples), rand(1:collen, nsamples))))
+    rest = zeros(eltype(K), length(indices))
+    for (i, rc) in enumerate(indices)
+        @views K(rest[i:i], rowidcs[rc[1]:rc[1]], colidcs[rc[2]:rc[2]])
+    end
     return RandomSamplingFunctor(0.0, indices, rest, cc.tol)
 end
 
@@ -111,17 +136,18 @@ function (convcrit::RandomSamplingFunctor{F,K})(
     @views rnorm = norm(rowbuffer[npivot, 1:maxcolumns])
     @views cnorm = norm(colbuffer[1:maxrows, npivot])
 
-    (isapprox(rnorm, 0.0) && isapprox(cnorm, 0.0)) && (return npivot - 1, false)
-    ((isapprox(rnorm, 0.0) || isapprox(cnorm, 0.0)) && !(npivot == 1)) &&
-        (return npivot - 1, false)
-    # -----------------------------------------------------
     for i in eachindex(convcrit.rest)
         @views convcrit.rest[i] -=
-            colbuffer[convcrit.indices[i, 1], npivot] *
-            rowbuffer[npivot, convcrit.indices[i, 2]]
+            colbuffer[convcrit.indices[i][1], npivot] *
+            rowbuffer[npivot, convcrit.indices[i][2]]
     end
     meanrest = sum(abs.(convcrit.rest) .^ 2) / length(convcrit.rest)
 
+    (meanrest == 0.0 && rnorm == 0.0 && cnorm == 0.0) && (return npivot - 1, false)
+    (rnorm == 0.0 || cnorm == 0.0) && (
+        return npivot - 1,
+        sqrt(meanrest * maxrows * maxcolumns) > tolerance(convcrit) * sqrt(convcrit.normUV²)
+    )
     normF!(convcrit, rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
     return npivot,
     sqrt(meanrest * maxrows * maxcolumns) > tolerance(convcrit) * sqrt(convcrit.normUV²)

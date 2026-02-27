@@ -3,8 +3,12 @@ using LinearAlgebra
 using LinearMaps
 using OhMyThreads
 
-defaultnearquadstrat(operator, testspace, trialspace) = error("Not implemented")
-defaultfarquadstrat(operator, testspace, trialspace) = error("Not implemented")
+function defaultmatrixdata(operator, testspace, trialspace) end
+function defaultfarmatrixdata(operator, testspace, trialspace) end
+
+function defaultcompressor(operator, testspace, trialspace)
+    return ACA(; tol=1e-4)
+end
 scalartype(operator) = error("Not implemented for $(typeof(operator))")
 
 testtree(tree) = error("Requiers implementation for $(typeof(tree))")
@@ -13,13 +17,8 @@ levels(tree) = error("Requiers implementationfor $(typeof(tree))")
 LevelIterator(tree, level) = error("Requiers implementation for $(typeof(tree))")
 
 permutation(tree) = error("Requiers implementation for $(typeof(tree))")
-permute(space, perm) =
-    error("Requiers implementation for $(typeof(space)) and $(typeof(perm))")
-permute!(space, perm) =
-    error("Requiers implementation for $(typeof(space)) and $(typeof(perm))")
+permute(space, perm) = permute!(copy(space), perm)
 
-include("kernelmatrix/abstractkernelmatrix.jl")
-include("kernelmatrix/beastkernelmatrix.jl")
 include("hmatrix.jl")
 include("permutedhmatrix.jl")
 include("nearinteractions.jl")
@@ -31,18 +30,19 @@ function HMatrix(
     testspace,
     trialspace,
     tree;
+    tol=1e-4,
+    compressor=ACA(; tol=tol),
     isnear=isnear(),
-    compressor=ACA(; tol=1e-4),
     perm=true,
-    nearquadstrat=defaultnearquadstrat(operator, testspace, trialspace),
-    farquadstrat=defaultfarquadstrat(operator, testspace, trialspace),
+    nearmatrixdata=defaultmatrixdata(operator, testspace, trialspace),
+    farmatrixdata=defaultfarmatrixdata(operator, testspace, trialspace),
     scheduler=DynamicScheduler(),
 )
     testperm = permutation(testtree(tree))
     trialperm = permutation(trialtree(tree))
     if perm
         permute!(testspace, testperm)
-        permute!(trialspace, trialperm)
+        !(testspace === trialspace) && permute!(trialspace, trialperm)
     else
         testspace = permute(testspace, testperm)
         trialspace = permute(trialspace, trialperm)
@@ -54,7 +54,7 @@ function HMatrix(
         trialspace,
         tree;
         isnear=isnear,
-        quadstrat=nearquadstrat,
+        matrixdata=nearmatrixdata,
         scheduler=scheduler,
     )
 
@@ -65,16 +65,15 @@ function HMatrix(
         tree;
         compressor=compressor,
         isnear=isnear,
-        quadstrat=farquadstrat,
+        matrixdata=farmatrixdata,
         scheduler=scheduler,
     )
 
-    perm && return HMatrix{scalartype(operator)}(
-        nears, fars, (length(testspace), length(trialspace))
-    )
+    perm &&
+        return HMatrix{eltype(nears)}(nears, fars, (length(testspace), length(trialspace)))
     return PermutedHMatrix(
         (testperm, trialperm),
-        HMatrix{scalartype(operator)}(nears, fars, (length(testspace), length(trialspace))),
+        HMatrix{eltype(nears)}(nears, fars, (length(testspace), length(trialspace))),
     )
 end
 

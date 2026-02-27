@@ -2,11 +2,14 @@ using Test, TestItems, TestItemRunner
 using AdaptiveCrossApproximation
 
 @testitem "AdaptiveCrossApproximation" begin
-    include("test_aca.jl")
-    include("test_iaca.jl")
-    include("test_convergence.jl")
     include("test_pivoting.jl")
-    include("test_ACAH2trees.jl")
+    include("test_convergence.jl")
+    include("test_aca.jl")
+    include("test_acabeast.jl")
+    include("test_iaca.jl")
+    include("test_kernelmatrix.jl")
+    include("test_hmatrix.jl")
+    include("test_hmatrixbeast.jl")
 end
 
 @testitem "Code quality (Aqua.jl)" begin

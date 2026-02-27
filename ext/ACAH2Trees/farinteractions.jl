@@ -7,7 +7,7 @@ function fars!(
     farvalues::Vector{U},
     tnode::Int,
     snodes::V;
-    isnear=H2Trees.isnear,
+    isnear=AdaptiveCrossApproximation.isnear(1.0),
 ) where {V<:Vector{Int},U<:Vector{UnitRange{Int}}}
     childnodes = Int[]
     localfarnodes = UnitRange{Int}[]
@@ -25,13 +25,17 @@ function fars!(
     end
 end
 
-function AdaptiveCrossApproximation.farinteractions(tree::BlockTree; isnear=H2Trees.isnear)
+function AdaptiveCrossApproximation.farinteractions(
+    tree::BlockTree; isnear=AdaptiveCrossApproximation.isnear(1.0)
+)
     return AdaptiveCrossApproximation.farinteractions(
         testtree(tree), trialtree(tree); isnear=isnear
     )
 end
 
-function AdaptiveCrossApproximation.farinteractions(treea, treeb; isnear=H2Trees.isnear)
+function AdaptiveCrossApproximation.farinteractions(
+    treea, treeb; isnear=AdaptiveCrossApproximation.isnear(1.0)
+)
     values = Vector{UnitRange{Int}}(undef, length(treea.nodes))
     farvalues = Vector{Vector{UnitRange{Int}}}(undef, length(treea.nodes))
     if !isnear(treea, treeb, root(treea), root(treeb))

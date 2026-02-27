@@ -239,10 +239,8 @@ function (aca::ACA)(
                 colbuffer[kk, npivot] -= colbuffer[kk, k] * rowbuffer[k, nextcolumn]
             end
         end
-
         npivot, conv = aca.convergence(rowbuffer, colbuffer, npivot, maxrows, maxcols)
     end
-
     return npivot
 end
 

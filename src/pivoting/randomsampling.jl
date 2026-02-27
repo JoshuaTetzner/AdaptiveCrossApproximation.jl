@@ -61,7 +61,7 @@ maximum residual error.
   - Index from the worst-performing random sample
 """
 function (pivstrat::RandomSamplingPivotingFunctor{F,K})(::AbstractArray) where {F<:Real,K}
-    return pivstrat.convcrit.indices[argmax(pivstrat.convcrit.rest), pivstrat.rc]
+    return pivstrat.convcrit.indices[argmax(abs.(pivstrat.convcrit.rest))][pivstrat.rc]
 end
 
 """

@@ -65,6 +65,12 @@ marks it as used, and returns its index.
   - `nextidx::Int`: Index of the maximum absolute value among unused indices
 """
 function (pivstrat::MaximumValueFunctor)(rc::AbstractArray)
+    if all(pivstrat.usedidcs)
+        @warn "Rectangular full-rank blockstructure detected."
+        absrx = abs.(rc)
+        maximum(absrx) != 0.0 && (return argmax(absrx))
+    end
+
     nextidx = 1
     maxval = 0.0
     for i in eachindex(pivstrat.usedidcs)

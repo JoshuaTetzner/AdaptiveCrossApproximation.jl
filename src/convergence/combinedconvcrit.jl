@@ -59,8 +59,14 @@ function (convcrit::CombinedConvCritFunctor)(
         npivot_, convcrit.isconverged[i] = crit(
             rowbuffer, colbuffer, npivot, maxrows, maxcolumns
         )
-        npivot_ != npivot && return npivot_, convcrit.isconverged[i]
+
+        if (npivot_ != npivot && i == length(convcrit.crits))
+            rowbuffer[npivot, :] .= K(0)
+            colbuffer[:, npivot] .= K(0)
+            return npivot_, convcrit.isconverged[i]
+        end
     end
+
     return npivot, any(convcrit.isconverged)
 end
 
@@ -77,7 +83,9 @@ Handles special initialization for sampling-based criteria.
   - `colidcs::AbstractArray{Int}`: Active column indices
 """
 function (convcrit::CombinedConvCrit)(
-    K::AbstractMatrix, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
+    K::Union{AbstractMatrix,AbstractKernelMatrix},
+    rowidcs::AbstractArray{Int},
+    colidcs::AbstractArray{Int},
 )
     curr_crits = Vector{ConvCritFunctor}(undef, length(convcrit.crits))
     for (i, crit) in enumerate(convcrit.crits)

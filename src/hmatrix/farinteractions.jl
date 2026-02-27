@@ -10,19 +10,19 @@ function assemblefars(
     tree;
     compressor=ACA(),
     isnear=isnear(),
-    quadstrat=defaultfarquadstrat(operator, testspace, trialspace),
+    matrixdata=defaultfarmatrixdata(operator, testspace, trialspace),
     maxrank=50,
     scheduler=SerialScheduler(),
 )
     kernelmatrix = AbstractKernelMatrix(
-        operator, testspace, trialspace; quadstrat=quadstrat
+        operator, testspace, trialspace; matrixdata=matrixdata
     )
     valptr, values, farvalues = farinteractions(tree; isnear=isnear)
 
     blocks = Vector{LowRankMatrix{eltype(kernelmatrix)}}(undef, length(farvalues))
     colbuffer = zeros(eltype(kernelmatrix), length(testspace), maxrank)
     farinteractionmatrix = VariableBlockCompressedRowStorage[]
-    buffersize = maximum(length.(farvalues))
+    farvalues == [] ? buffersize = 0 : buffersize = maximum(length.(farvalues))
     for level in levels(testtree(tree))
         fnodes = collect(LevelIterator(testtree(tree), level))
         @tasks for node in fnodes

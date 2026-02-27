@@ -2,7 +2,7 @@ struct IsNearFunctor{F}
     η::F
 end
 
-function isnear(; η=1.0)
+function isnear(η::Real=Float64(1.0))
     return IsNearFunctor{typeof(η)}(η)
 end
 
@@ -24,9 +24,11 @@ function assemblenears(
     tree;
     isnear=isnear(),
     scheduler=SerialScheduler(),
-    quadstrat=defaultnearquadstrat(operator, testspace, trialspace),
+    matrixdata=defaultmatrixdata(operator, testspace, trialspace),
 )
-    nearmatrix = AbstractKernelMatrix(operator, testspace, trialspace; quadstrat=quadstrat)
+    nearmatrix = AbstractKernelMatrix(
+        operator, testspace, trialspace; matrixdata=matrixdata
+    )
     values, nearvalues = nearinteractions(tree; isnear=isnear)
     blocks =
         zeros.(eltype(nearmatrix), length.(values), [sum(length.(n)) for n in nearvalues])

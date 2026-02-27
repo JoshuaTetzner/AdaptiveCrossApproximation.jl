@@ -71,7 +71,6 @@ function (convcrit::FNormEstimatorFunctor{F})(
 ) where {F<:Real,K}
     @views rnorm = norm(rowbuffer[npivot, 1:maxcolumns])
     @views cnorm = norm(colbuffer[1:maxrows, npivot])
-
     (isapprox(rnorm, 0.0) && isapprox(cnorm, 0.0)) && (return npivot - 1, false)
     if (isapprox(rnorm, 0.0) || isapprox(cnorm, 0.0))
         (npivot == 1) ? (return npivot - 1, true) : (return npivot - 1, false)
