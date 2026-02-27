@@ -30,8 +30,9 @@ function assemblenears(
         operator, testspace, trialspace; matrixdata=matrixdata
     )
     values, nearvalues = nearinteractions(tree; isnear=isnear)
-    blocks =
-        zeros.(eltype(nearmatrix), length.(values), [sum(length.(n)) for n in nearvalues])
+    blocks = zeros.(
+        eltype(nearmatrix), length.(values), [sum(length.(n)) for n in nearvalues]
+    )
     # There should be a prettier not hardcoded way to do this, but it works for now
     viewblocks = Vector{
         Vector{

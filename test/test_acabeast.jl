@@ -43,17 +43,17 @@ for mesh in meshes
         A = assemble(O, Y, X)
 
         for tol in [1e-4, 1e-6, 1e-8, 1e-10]
-            comp = AdaptiveCrossApproximation.defaultcompressor(O, Y, X; tol=tol)
+            local comp = AdaptiveCrossApproximation.defaultcompressor(O, Y, X; tol=tol)
             @test comp.rowpivoting isa AdaptiveCrossApproximation.MaximumValue
             @test comp.columnpivoting isa AdaptiveCrossApproximation.MaximumValue
             @test comp.convergence isa AdaptiveCrossApproximation.FNormEstimator
             @test comp.convergence.tol == tol
 
-            rowbuffer = zeros(scalartype(O), length(Y), length(X))
-            colbuffer = zeros(scalartype(O), length(Y), length(X))
-            K = AdaptiveCrossApproximation.AbstractKernelMatrix(O, Y, X)
+            local rowbuffer = zeros(scalartype(O), length(Y), length(X))
+            local colbuffer = zeros(scalartype(O), length(Y), length(X))
+            local K = AdaptiveCrossApproximation.AbstractKernelMatrix(O, Y, X)
 
-            npivots = comp(K, colbuffer, rowbuffer, min(length(Y), length(X)))
+            local npivots = comp(K, colbuffer, rowbuffer, min(length(Y), length(X)))
             @test norm(A - colbuffer[:, 1:npivots] * rowbuffer[1:npivots, :]) / norm(A) <
                 2tol
         end
@@ -62,7 +62,7 @@ for mesh in meshes
     for (O, Y, X) in DLOs
         A = assemble(O, Y, X)
         for tol in [1e-2, 1e-4, 1e-6, 1e-8, 1e-10]
-            comp = AdaptiveCrossApproximation.defaultcompressor(O, Y, X; tol=tol)
+            local comp = AdaptiveCrossApproximation.defaultcompressor(O, Y, X; tol=tol)
             @test comp.rowpivoting isa AdaptiveCrossApproximation.CombinedPivStrat
             @test comp.columnpivoting isa AdaptiveCrossApproximation.MaximumValue
             @test comp.convergence isa AdaptiveCrossApproximation.CombinedConvCrit
@@ -71,10 +71,10 @@ for mesh in meshes
             @test comp.convergence.crits[2] isa AdaptiveCrossApproximation.RandomSampling
             @test comp.convergence.crits[2].tol == tol
 
-            rowbuffer = zeros(scalartype(O), length(Y), length(X))
-            colbuffer = zeros(scalartype(O), length(Y), length(X))
-            K = AdaptiveCrossApproximation.AbstractKernelMatrix(O, Y, X)
-            npivots = comp(K, colbuffer, rowbuffer, min(length(Y), length(X)))
+            local rowbuffer = zeros(scalartype(O), length(Y), length(X))
+            local colbuffer = zeros(scalartype(O), length(Y), length(X))
+            local K = AdaptiveCrossApproximation.AbstractKernelMatrix(O, Y, X)
+            local npivots = comp(K, colbuffer, rowbuffer, min(length(Y), length(X)))
             @test norm(A - colbuffer[:, 1:npivots] * rowbuffer[1:npivots, :]) / norm(A) <
                 2tol
         end
@@ -106,19 +106,19 @@ for mesh in meshes
         A = assemble(O, Y, X; quadstrat=quadstrat)
 
         for tol in [1e-4, 1e-6, 1e-8, 1e-10]
-            comp = AdaptiveCrossApproximation.defaultcompressor(O, Y, X; tol=tol)
+            local comp = AdaptiveCrossApproximation.defaultcompressor(O, Y, X; tol=tol)
             @test comp.rowpivoting isa AdaptiveCrossApproximation.MaximumValue
             @test comp.columnpivoting isa AdaptiveCrossApproximation.MaximumValue
             @test comp.convergence isa AdaptiveCrossApproximation.FNormEstimator
             @test comp.convergence.tol == tol
 
-            rowbuffer = zeros(scalartype(O), length(Y), length(X))
-            colbuffer = zeros(scalartype(O), length(Y), length(X))
-            K = AdaptiveCrossApproximation.AbstractKernelMatrix(
+            local rowbuffer = zeros(scalartype(O), length(Y), length(X))
+            local colbuffer = zeros(scalartype(O), length(Y), length(X))
+            local K = AdaptiveCrossApproximation.AbstractKernelMatrix(
                 O, Y, X; matrixdata=quadstrat
             )
 
-            npivots = comp(K, colbuffer, rowbuffer, min(length(Y), length(X)))
+            local npivots = comp(K, colbuffer, rowbuffer, min(length(Y), length(X)))
             @test norm(A - colbuffer[:, 1:npivots] * rowbuffer[1:npivots, :]) / norm(A) <
                 2tol
         end
@@ -127,7 +127,7 @@ for mesh in meshes
     for (O, Y, X) in DLOs
         A = assemble(O, Y, X; quadstrat=quadstrat)
         for tol in [1e-2, 1e-4, 1e-6, 1e-8, 1e-10]
-            comp = AdaptiveCrossApproximation.defaultcompressor(O, Y, X; tol=tol)
+            local comp = AdaptiveCrossApproximation.defaultcompressor(O, Y, X; tol=tol)
             @test comp.rowpivoting isa AdaptiveCrossApproximation.CombinedPivStrat
             @test comp.columnpivoting isa AdaptiveCrossApproximation.MaximumValue
             @test comp.convergence isa AdaptiveCrossApproximation.CombinedConvCrit
@@ -136,13 +136,13 @@ for mesh in meshes
             @test comp.convergence.crits[2] isa AdaptiveCrossApproximation.RandomSampling
             @test comp.convergence.crits[2].tol == tol
 
-            rowbuffer = zeros(scalartype(O), length(Y), length(X))
-            colbuffer = zeros(scalartype(O), length(Y), length(X))
-            K = AdaptiveCrossApproximation.AbstractKernelMatrix(
+            local rowbuffer = zeros(scalartype(O), length(Y), length(X))
+            local colbuffer = zeros(scalartype(O), length(Y), length(X))
+            local K = AdaptiveCrossApproximation.AbstractKernelMatrix(
                 O, Y, X; matrixdata=quadstrat
             )
             Random.seed!(1234)
-            npivots = comp(K, colbuffer, rowbuffer, min(length(Y), length(X)))
+            local npivots = comp(K, colbuffer, rowbuffer, min(length(Y), length(X)))
             @test norm(A - colbuffer[:, 1:npivots] * rowbuffer[1:npivots, :]) / norm(A) <
                 2tol
         end

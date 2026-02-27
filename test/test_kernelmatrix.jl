@@ -39,5 +39,3 @@ PFct = AdaptiveCrossApproximation.AbstractKernelMatrix(myfct32(), Î“.vertices, Î
 
 @test size(A) == size(P) == size(PFct) == (length(x), length(y))
 @test eltype(A) == eltype(P) == eltype(PFct) == scalartype(op) == Float32
-
-y = copy(x)
