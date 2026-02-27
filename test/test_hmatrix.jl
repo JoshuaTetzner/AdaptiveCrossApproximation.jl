@@ -4,6 +4,7 @@ using H2Trees
 using ParallelKMeans
 using AdaptiveCrossApproximation
 using FastBEAST
+
 Γ = meshsphere(1.0, 0.025)
 λ = 1.0
 k = 2π / λ

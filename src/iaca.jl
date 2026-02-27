@@ -14,7 +14,7 @@ construction where only row or column samples are requiered.
   - `columnpivoting::ColPivType`: Strategy for selecting column pivots
   - `convergence::ConvCritType`: Convergence criterion
 """
-mutable struct iACA{RowPivType,ColPivType,ConvCritType}
+struct iACA{RowPivType,ColPivType,ConvCritType}
     rowpivoting::RowPivType
     columnpivoting::ColPivType
     convergence::ConvCritType
@@ -60,9 +60,11 @@ Creates functors for geometric row pivoting and value-based column pivoting.
   - `cols::AbstractVector{Int}`: Column indices for geometric pivoting
 """
 function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
-    rows::AbstractVector{Int}, cols::AbstractVector{Int}
+    rows::AbstractVector{Int}, cols::AbstractVector{Int}; maxrank::Int=40
 ) where {RowPivType<:GeoPivStrat,ColPivType<:ValuePivStrat,ConvCritType<:ConvCrit}
-    return iACA(iaca.rowpivoting(cols, rows), iaca.columnpivoting(cols), iaca.convergence())
+    return iACA(
+        iaca.rowpivoting(cols, rows), iaca.columnpivoting(cols), iaca.convergence(maxrank)
+    )
 end
 
 """
@@ -81,7 +83,9 @@ function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     Fs::AbstractVector{Int}, cols::AbstractVector{Int}, maxrank::Int
 ) where {RowPivType<:TreeMimicryPivoting,ColPivType<:ValuePivStrat,ConvCritType<:ConvCrit}
     return iACA(
-        iaca.rowpivoting(Fs, cols, maxrank), iaca.columnpivoting(cols), iaca.convergence()
+        iaca.rowpivoting(Fs, cols, maxrank),
+        iaca.columnpivoting(cols),
+        iaca.convergence(maxrank),
     )
 end
 
@@ -242,9 +246,11 @@ Creates functors for value-based row pivoting and geometric column pivoting.
   - `cols::AbstractVector{Int}`: Column indices for geometric pivoting
 """
 function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
-    rows::AbstractVector{Int}, cols::AbstractVector{Int}
+    rows::AbstractVector{Int}, cols::AbstractVector{Int}; maxrank::Int=40
 ) where {RowPivType<:ValuePivStrat,ColPivType<:GeoPivStrat,ConvCritType<:ConvCrit}
-    return iACA(iaca.rowpivoting(rows), iaca.columnpivoting(rows, cols), iaca.convergence())
+    return iACA(
+        iaca.rowpivoting(rows), iaca.columnpivoting(rows, cols), iaca.convergence(maxrank)
+    )
 end
 
 """
@@ -263,7 +269,9 @@ function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     rows::AbstractVector{Int}, Ft::AbstractVector{Int}, maxrank::Int
 ) where {RowPivType<:ValuePivStrat,ColPivType<:TreeMimicryPivoting,ConvCritType<:ConvCrit}
     return iACA(
-        iaca.rowpivoting(rows), iaca.columnpivoting(Ft, rows, maxrank), iaca.convergence()
+        iaca.rowpivoting(rows),
+        iaca.columnpivoting(Ft, rows, maxrank),
+        iaca.convergence(maxrank),
     )
 end
 

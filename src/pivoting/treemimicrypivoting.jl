@@ -56,7 +56,7 @@ Functor storing state for tree-based mimicry pivoting.
   - `pos::Vector{SVector{D,T}}`: Point coordinates
   - `usedidcs::Vector{Int}`: Selected global point indices (filled progressively)
 """
-mutable struct TreeMimicryPivotingFunctor{D,T,TreeType} <: GeoPivStratFunctor
+struct TreeMimicryPivotingFunctor{D,T,TreeType} <: GeoPivStratFunctor
     F::Vector{Int}
     c::SVector{D,T}
     tree::TreeType
