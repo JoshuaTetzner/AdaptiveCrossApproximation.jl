@@ -23,7 +23,7 @@ for mesh in [(pts, pts), (tpts, tpts), (tpts, spts)]
     for tol in [1e-2, 1e-4, 1e-6]
         tree = TwoNTree(mesh[1], mesh[2], 1 / 2^10; minvaluestest=100, minvaluestrial=100)
         @time mat = AdaptiveCrossApproximation.HMatrix(fct, mesh[1], mesh[2], tree; tol=tol)
-        A = [fct(x, y) for x in mesh[1], y in mesh[2]]
+        local A = [fct(x, y) for x in mesh[1], y in mesh[2]]
         @test norm(Matrix(mat) - A) / norm(A) < tol
     end
 end
