@@ -14,6 +14,14 @@ Used during compression to track convergence state across iterations.
 """
 abstract type ConvCritFunctor end
 
+function reset!(convcrit::ConvCritFunctor, args...)
+    throw(ArgumentError("reset! is not implemented for $(typeof(convcrit))."))
+end
+
+function Base.resize!(convcrit::ConvCritFunctor, args...)
+    throw(ArgumentError("resize! is not implemented for $(typeof(convcrit))."))
+end
+
 """
     normF!(convcrit::ConvCritFunctor, rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
 
@@ -42,7 +50,8 @@ function normF!(
 
     for j in 1:(npivot - 1)
         @views convcrit.normUV² +=
-            2 * real.(
+            2 *
+            real.(
                 dot(colbuffer[1:maxrows, npivot], colbuffer[1:maxrows, j]) *
                 dot(rowbuffer[npivot, 1:maxcolumns], rowbuffer[j, 1:maxcolumns]),
             )

@@ -32,8 +32,17 @@ end
 
 Initialize FNormEstimator functor with zero accumulated norm.
 """
-function (cc::FNormEstimator{F})() where {F}
+function (cc::FNormEstimator{F})(args...) where {F}
     return FNormEstimatorFunctor(F(0.0), cc.tol)
+end
+
+function reset!(convcrit::FNormEstimatorFunctor)
+    convcrit.normUV² = zero(convcrit.normUV²)
+    return nothing
+end
+
+function Base.resize!(::FNormEstimatorFunctor, args...)
+    return nothing
 end
 
 """
@@ -116,6 +125,15 @@ Initialize iFNormEstimator functor with zero accumulated norm.
 """
 function (cc::iFNormEstimator{F})() where {F}
     return iFNormEstimatorFunctor(F(0.0), cc.tol)
+end
+
+function reset!(convcrit::iFNormEstimatorFunctor)
+    convcrit.normUV = zero(convcrit.normUV)
+    return nothing
+end
+
+function Base.resize!(::iFNormEstimatorFunctor, args...)
+    return nothing
 end
 
 """

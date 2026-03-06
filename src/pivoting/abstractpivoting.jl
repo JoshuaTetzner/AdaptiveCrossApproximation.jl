@@ -105,3 +105,21 @@ abstract type ConvPivStratFunctor <: PivStratFunctor end
 Abstract type for stateful value-based pivoting functors.
 """
 abstract type ValuePivStratFunctor <: PivStratFunctor end
+
+function reset!(functor::PivStratFunctor, args...)
+    throw(ArgumentError("reset! is not implemented for $(typeof(functor))."))
+end
+
+function Base.resize!(functor::PivStratFunctor, args...)
+    throw(ArgumentError("resize! is not implemented for $(typeof(functor))."))
+end
+
+@inline function _centroid(
+    refpos::Vector{SVector{D,F}}, refidcs::AbstractVector{<:Integer}
+) where {D,F<:Real}
+    c = zero(SVector{D,F})
+    @inbounds for i in eachindex(refidcs)
+        c += refpos[Int(refidcs[i])]
+    end
+    return c / length(refidcs)
+end

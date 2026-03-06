@@ -35,6 +35,14 @@ struct RandomSamplingPivotingFunctor{F,K} <: ConvPivStratFunctor
     rc::Int
 end
 
+function Base.resize!(pivstrat::RandomSamplingPivotingFunctor, args...)
+    return nothing
+end
+
+function reset!(pivstrat::RandomSamplingPivotingFunctor, args...)
+    return nothing
+end
+
 function (piv::RandomSamplingPivoting)(convcrit::CombinedConvCritFunctor)
     rscrit = findfirst(x -> x isa RandomSamplingFunctor, convcrit.crits)
     if rscrit === nothing
@@ -61,7 +69,10 @@ maximum residual error.
   - Index from the worst-performing random sample
 """
 function (pivstrat::RandomSamplingPivotingFunctor{F,K})(::AbstractArray) where {F<:Real,K}
-    return pivstrat.convcrit.indices[argmax(abs.(pivstrat.convcrit.rest))][pivstrat.rc]
+    nactive = pivstrat.convcrit.nactive
+    rest = view(pivstrat.convcrit.rest, 1:nactive)
+    indices = view(pivstrat.convcrit.indices, 1:nactive)
+    return indices[argmax(abs.(rest))][pivstrat.rc]
 end
 
 """

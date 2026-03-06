@@ -37,6 +37,20 @@ struct CombinedPivStratFunctor <: PivStratFunctor
     strats::Vector{PivStratFunctor}
 end
 
+function Base.resize!(pivstrat::CombinedPivStratFunctor, args...)
+    for strat in pivstrat.strats
+        resize!(strat, args...)
+    end
+    return pivstrat
+end
+
+function reset!(pivstrat::CombinedPivStratFunctor, args...)
+    for strat in pivstrat.strats
+        reset!(strat, args...)
+    end
+    return pivstrat
+end
+
 """
     (pivstrat::CombinedPivStratFunctor)()
 

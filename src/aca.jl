@@ -46,6 +46,97 @@ function ACA(;
     return ACA(rowpivoting, columnpivoting, convergence)
 end
 
+@inline function _resize_acaconvergence!(convcrit::ConvCritFunctor, maxrank::Int)
+    resize!(convcrit, maxrank)
+    return convcrit
+end
+
+@inline function _resize_acapivots!(
+    aca::ACA{RP,CP,C}, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
+) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
+    resize!(aca.rowpivoting, length(rowidcs))
+    resize!(aca.columnpivoting, length(colidcs))
+    return aca
+end
+
+@inline function _reset_acapivots!(
+    aca::ACA{RP,CP,C}, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
+) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
+    reset!(aca.rowpivoting, rowidcs)
+    reset!(aca.columnpivoting, colidcs)
+    return aca
+end
+
+@inline function _resize_acaconvergence!(
+    convcrit::Union{RandomSamplingFunctor,CombinedConvCritFunctor},
+    A,
+    rowidcs::AbstractArray{Int},
+    colidcs::AbstractArray{Int},
+    maxrank::Int,
+)
+    resize!(convcrit, A, rowidcs, colidcs)
+    return convcrit
+end
+
+@inline function _resize_acaconvergence!(
+    convcrit::ConvCritFunctor,
+    A,
+    rowidcs::AbstractArray{Int},
+    colidcs::AbstractArray{Int},
+    maxrank::Int,
+)
+    resize!(convcrit, maxrank)
+    return convcrit
+end
+
+function Base.resize!(
+    aca::ACA{RP,CP,C},
+    rowidcs::AbstractArray{Int},
+    colidcs::AbstractArray{Int};
+    maxrank::Int=40,
+) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
+    _resize_acapivots!(aca, rowidcs, colidcs)
+    _resize_acaconvergence!(aca.convergence, maxrank)
+    return aca
+end
+
+function Base.resize!(
+    aca::ACA{RP,CP,C},
+    A,
+    rowidcs::AbstractArray{Int},
+    colidcs::AbstractArray{Int};
+    maxrank::Int=40,
+) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
+    _resize_acapivots!(aca, rowidcs, colidcs)
+    _resize_acaconvergence!(aca.convergence, A, rowidcs, colidcs, maxrank)
+    return aca
+end
+
+function reset!(
+    aca::ACA{RP,CP,C},
+    rowidcs::AbstractArray{Int},
+    colidcs::AbstractArray{Int};
+    maxrank::Int=40,
+) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
+    resize!(aca, rowidcs, colidcs; maxrank=maxrank)
+    _reset_acapivots!(aca, rowidcs, colidcs)
+    reset!(aca.convergence)
+    return aca
+end
+
+function reset!(
+    aca::ACA{RP,CP,C},
+    A,
+    rowidcs::AbstractArray{Int},
+    colidcs::AbstractArray{Int};
+    maxrank::Int=40,
+) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
+    resize!(aca, A, rowidcs, colidcs; maxrank=maxrank)
+    _reset_acapivots!(aca, rowidcs, colidcs)
+    reset!(aca.convergence)
+    return aca
+end
+
 """
     (aca::ACA)(rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int})
 
@@ -63,8 +154,24 @@ for hierarchical matrix compression.
 
 New `ACA` instance with initialized pivoting state for the given indices.
 """
-function (aca::ACA)(rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int})
-    return ACA(aca.rowpivoting(rowidcs), aca.columnpivoting(colidcs), aca.convergence())
+function (aca::ACA)(
+    rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}; maxrank::Int=40
+)
+    return ACA(
+        aca.rowpivoting(rowidcs), aca.columnpivoting(colidcs), aca.convergence(maxrank)
+    )
+end
+
+function (aca::ACA{RP,CP,C})(
+    rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}; maxrank::Int=40
+) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
+    return reset!(aca, rowidcs, colidcs; maxrank=maxrank)
+end
+
+function (aca::ACA{RP,CP,C})(
+    A, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}; maxrank::Int=40
+) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
+    return reset!(aca, A, rowidcs, colidcs; maxrank=maxrank)
 end
 
 function (aca::ACA{RP,CP,C})(
@@ -74,6 +181,21 @@ function (aca::ACA{RP,CP,C})(
         aca.rowpivoting(rowidcs),
         aca.columnpivoting(colidcs),
         aca.convergence(A, rowidcs, colidcs),
+    )
+end
+
+function (aca::ACA{RP,CP,C})(
+    A,
+    colbuffer::AbstractArray{K},
+    rowbuffer::AbstractArray{K},
+    maxrank::Int;
+    rows=zeros(Int, maxrank),
+    cols=zeros(Int, maxrank),
+    rowidcs=Vector(1:size(colbuffer, 1)),
+    colidcs=Vector(1:size(rowbuffer, 2)),
+) where {K,RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
+    return aca(A, rowidcs, colidcs; maxrank=maxrank)(
+        A, colbuffer, rowbuffer, rows, cols, rowidcs, colidcs, maxrank
     )
 end
 
@@ -291,7 +413,6 @@ function aca(
     compressor = ACA(rowpivoting, columnpivoting, convergence)
     rowbuffer = zeros(K, maxrank, size(M, 2))
     colbuffer = zeros(K, size(M, 1), maxrank)
-
     npivots = compressor(M, colbuffer, rowbuffer, maxrank)
     if svdrecompress
         @views Q, R = qr(colbuffer[1:size(M, 1), 1:npivots])

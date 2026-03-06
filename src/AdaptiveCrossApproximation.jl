@@ -36,10 +36,9 @@ include("hmatrix/abstracthmatrix.jl")
 
 export ACA
 export iACA
-export FNormEstimator, iFNormEstimator
-export FNormExtrapolator
-export MaximumValue
-export Leja2
-export FillDistance
+export FNormEstimator, iFNormEstimator, FNormExtrapolator
+export MaximumValue, Leja2, FillDistance
 export MimicryPivoting, TreeMimicryPivoting
+export reset!
+
 end

@@ -31,9 +31,92 @@ Tracks residual error at sampled matrix entries across iterations.
 """
 mutable struct RandomSamplingFunctor{F<:Real,K} <: ConvCritFunctor
     normUV²::F
+    nsamples::Int
+    factor::F
+    nactive::Int
     indices::Vector{Tuple{Int,Int}}
     rest::Vector{K}
     tol::F
+end
+
+@inline function _samplecount(cc::RandomSampling, rowlen::Int, collen::Int)
+    nsamples = cc.nsamples == 0 ? Int(round(cc.factor * (rowlen + collen))) : cc.nsamples
+    nsamples = max(1, nsamples)
+    return min(nsamples, rowlen * collen)
+end
+
+@inline function _samplecount(convcrit::RandomSamplingFunctor, rowlen::Int, collen::Int)
+    nsamples = if convcrit.nsamples == 0
+        Int(round(convcrit.factor * (rowlen + collen)))
+    else
+        convcrit.nsamples
+    end
+    nsamples = max(1, nsamples)
+    return min(nsamples, rowlen * collen)
+end
+
+function _sample_indices(rowlen::Int, collen::Int, nsamples::Int)
+    idxset = Set{Tuple{Int,Int}}()
+    sizehint!(idxset, nsamples)
+    while length(idxset) < nsamples
+        push!(idxset, (rand(1:rowlen), rand(1:collen)))
+    end
+    return collect(idxset)
+end
+
+function _sample_indices!(
+    indices::Vector{Tuple{Int,Int}}, rowlen::Int, collen::Int, nsamples::Int
+)
+    length(indices) < nsamples && resize!(indices, nsamples)
+    @inbounds for i in 1:nsamples
+        while true
+            rc = (rand(1:rowlen), rand(1:collen))
+            duplicate = false
+            for j in 1:(i - 1)
+                if indices[j] == rc
+                    duplicate = true
+                    break
+                end
+            end
+            duplicate && continue
+            indices[i] = rc
+            break
+        end
+    end
+    return indices
+end
+
+@inline _entryvalue(entry::Number) = entry
+@inline _entryvalue(entry) = entry[1]
+
+function _fill_rest!(
+    rest::AbstractVector,
+    indices::Vector{Tuple{Int,Int}},
+    K::AbstractMatrix,
+    rowidcs::AbstractArray{Int},
+    colidcs::AbstractArray{Int},
+    nactive::Int,
+)
+    @inbounds for i in 1:nactive
+        rc = indices[i]
+        rest[i] = _entryvalue(K[rowidcs[rc[1]], colidcs[rc[2]]])
+    end
+    return rest
+end
+
+function _fill_rest!(
+    rest::AbstractVector,
+    indices::Vector{Tuple{Int,Int}},
+    K::AbstractKernelMatrix,
+    rowidcs::AbstractArray{Int},
+    colidcs::AbstractArray{Int},
+    nactive::Int,
+)
+    @inbounds for i in 1:nactive
+        rc = indices[i]
+        @views K(rest[i:i], rowidcs[rc[1]:rc[1]], colidcs[rc[2]:rc[2]])
+    end
+    return rest
 end
 
 """
@@ -67,10 +150,17 @@ function (cc::RandomSampling)(
 ) where {T}
     rowlen = length(rowidcs)
     collen = length(colidcs)
-    nsamples = cc.nsamples == 0 ? Int(round(cc.factor * (rowlen + collen))) : cc.nsamples
-    indices = collect(Set(zip(rand(1:rowlen, nsamples), rand(1:collen, nsamples))))
-    rest = [K[rowidcs[rc[1]], colidcs[rc[2]]][1] for rc in indices]
-    return RandomSamplingFunctor(0.0, indices, rest, cc.tol)
+    nsamples = _samplecount(cc, rowlen, collen)
+    indices = _sample_indices(rowlen, collen, nsamples)
+
+    rc1 = indices[1]
+    firstval = _entryvalue(K[rowidcs[rc1[1]], colidcs[rc1[2]]])
+    rest = Vector{typeof(firstval)}(undef, length(indices))
+    _fill_rest!(rest, indices, K, rowidcs, colidcs, nsamples)
+
+    return RandomSamplingFunctor(
+        zero(cc.tol), cc.nsamples, cc.factor, nsamples, indices, rest, cc.tol
+    )
 end
 
 """
@@ -89,13 +179,39 @@ function (cc::RandomSampling)(
 ) where {T}
     rowlen = length(rowidcs)
     collen = length(colidcs)
-    nsamples = cc.nsamples == 0 ? Int(round(cc.factor * (rowlen + collen))) : cc.nsamples
-    indices = collect(Set(zip(rand(1:rowlen, nsamples), rand(1:collen, nsamples))))
+    nsamples = _samplecount(cc, rowlen, collen)
+    indices = _sample_indices(rowlen, collen, nsamples)
     rest = zeros(eltype(K), length(indices))
-    for (i, rc) in enumerate(indices)
-        @views K(rest[i:i], rowidcs[rc[1]:rc[1]], colidcs[rc[2]:rc[2]])
-    end
-    return RandomSamplingFunctor(0.0, indices, rest, cc.tol)
+    _fill_rest!(rest, indices, K, rowidcs, colidcs, nsamples)
+    return RandomSamplingFunctor(
+        zero(cc.tol), cc.nsamples, cc.factor, nsamples, indices, rest, cc.tol
+    )
+end
+
+function reset!(convcrit::RandomSamplingFunctor)
+    convcrit.normUV² = zero(convcrit.normUV²)
+    fill!(view(convcrit.rest, 1:convcrit.nactive), zero(eltype(convcrit.rest)))
+    fill!(view(convcrit.indices, 1:convcrit.nactive), (0, 0))
+    return nothing
+end
+
+function Base.resize!(
+    convcrit::RandomSamplingFunctor,
+    K::Union{AbstractMatrix,AbstractKernelMatrix},
+    rowidcs::AbstractArray{Int},
+    colidcs::AbstractArray{Int},
+)
+    rowlen = length(rowidcs)
+    collen = length(colidcs)
+    nsamples = _samplecount(convcrit, rowlen, collen)
+
+    _sample_indices!(convcrit.indices, rowlen, collen, nsamples)
+    length(convcrit.rest) < nsamples && resize!(convcrit.rest, nsamples)
+    _fill_rest!(convcrit.rest, convcrit.indices, K, rowidcs, colidcs, nsamples)
+
+    convcrit.nactive = nsamples
+    convcrit.normUV² = zero(convcrit.normUV²)
+    return convcrit
 end
 
 """
@@ -135,20 +251,23 @@ function (convcrit::RandomSamplingFunctor{F,K})(
     # omit this to increase performance (safty measures)---
     @views rnorm = norm(rowbuffer[npivot, 1:maxcolumns])
     @views cnorm = norm(colbuffer[1:maxrows, npivot])
+    nactive = convcrit.nactive
 
-    for i in eachindex(convcrit.rest)
-        @views convcrit.rest[i] -=
-            colbuffer[convcrit.indices[i][1], npivot] *
-            rowbuffer[npivot, convcrit.indices[i][2]]
+    sumrest2 = zero(real(K))
+    @inbounds for i in 1:nactive
+        rc = convcrit.indices[i]
+        convcrit.rest[i] -= colbuffer[rc[1], npivot] * rowbuffer[npivot, rc[2]]
+        sumrest2 += abs2(convcrit.rest[i])
     end
-    meanrest = sum(abs.(convcrit.rest) .^ 2) / length(convcrit.rest)
+    meanrest = sumrest2 / nactive
 
     (meanrest == 0.0 && rnorm == 0.0 && cnorm == 0.0) && (return npivot - 1, false)
-    (rnorm == 0.0 || cnorm == 0.0) && (
-        return npivot - 1,
-        sqrt(meanrest * maxrows * maxcolumns) > tolerance(convcrit) * sqrt(convcrit.normUV²)
-    )
+
+    lhs = sqrt(meanrest * maxrows * maxcolumns)
+    rhs = tolerance(convcrit) * sqrt(convcrit.normUV²)
+    (rnorm == 0.0 || cnorm == 0.0) && (return npivot - 1, lhs > rhs)
+
     normF!(convcrit, rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
-    return npivot,
-    sqrt(meanrest * maxrows * maxcolumns) > tolerance(convcrit) * sqrt(convcrit.normUV²)
+    rhs = tolerance(convcrit) * sqrt(convcrit.normUV²)
+    return npivot, lhs > rhs
 end

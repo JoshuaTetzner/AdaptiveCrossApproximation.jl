@@ -26,6 +26,99 @@ struct iACA{RowPivType,ColPivType,ConvCritType}
     end
 end
 
+@inline function _reset_iaca_rowpivot!(
+    piv::ValuePivStratFunctor, rows::AbstractVector{Int}, cols::AbstractVector{Int}
+)
+    reset!(piv, rows)
+    return piv
+end
+
+@inline function _reset_iaca_rowpivot!(
+    piv::MimicryPivotingFunctor, rows::AbstractVector{Int}, cols::AbstractVector{Int}
+)
+    reset!(piv, cols, rows)
+    return piv
+end
+
+@inline function _reset_iaca_colpivot!(
+    piv::ValuePivStratFunctor, rows::AbstractVector{Int}, cols::AbstractVector{Int}
+)
+    reset!(piv, cols)
+    return piv
+end
+
+@inline function _reset_iaca_colpivot!(
+    piv::MimicryPivotingFunctor, rows::AbstractVector{Int}, cols::AbstractVector{Int}
+)
+    reset!(piv, rows, cols)
+    return piv
+end
+
+function Base.resize!(
+    iaca::iACA{RowPivType,ColPivType,ConvCritType},
+    rows::AbstractVector{Int},
+    cols::AbstractVector{Int};
+    maxrank::Int=40,
+) where {
+    RowPivType<:PivStratFunctor,ColPivType<:PivStratFunctor,ConvCritType<:ConvCritFunctor
+}
+    resize!(iaca.rowpivoting, length(rows))
+    resize!(iaca.columnpivoting, length(cols))
+    resize!(iaca.convergence, maxrank)
+    return iaca
+end
+
+function reset!(
+    iaca::iACA{RowPivType,ColPivType,ConvCritType},
+    rows::AbstractVector{Int},
+    cols::AbstractVector{Int};
+    maxrank::Int=40,
+) where {
+    RowPivType<:PivStratFunctor,ColPivType<:PivStratFunctor,ConvCritType<:ConvCritFunctor
+}
+    resize!(iaca, rows, cols; maxrank=maxrank)
+    _reset_iaca_rowpivot!(iaca.rowpivoting, rows, cols)
+    _reset_iaca_colpivot!(iaca.columnpivoting, rows, cols)
+    reset!(iaca.convergence)
+    return iaca
+end
+
+@inline function _run_iaca_stateful(
+    iaca::iACA{RowPivType,ColPivType,ConvCritType},
+    A,
+    colbuffer,
+    rowbuffer,
+    maxrank::Int,
+    rows,
+    cols,
+    rowidcs,
+    colidcs,
+) where {
+    RowPivType<:GeoPivStratFunctor,
+    ColPivType<:ValuePivStratFunctor,
+    ConvCritType<:ConvCritFunctor,
+}
+    return iaca(A, colbuffer, rowbuffer, maxrank, rows, cols, colidcs)
+end
+
+@inline function _run_iaca_stateful(
+    iaca::iACA{RowPivType,ColPivType,ConvCritType},
+    A,
+    colbuffer,
+    rowbuffer,
+    maxrank::Int,
+    rows,
+    cols,
+    rowidcs,
+    colidcs,
+) where {
+    RowPivType<:ValuePivStratFunctor,
+    ColPivType<:GeoPivStratFunctor,
+    ConvCritType<:ConvCritFunctor,
+}
+    return iaca(A, colbuffer, rowbuffer, maxrank, rows, cols, rowidcs)
+end
+
 """
     iACA(tpos::Vector{SVector{D,F}}, spos::Vector{SVector{D,F}})
 
@@ -49,7 +142,7 @@ function iACA(tpos::Vector{SVector{D,F}}, spos::Vector{SVector{D,F}}) where {D,F
 end
 
 """
-    (iaca::iACA{GeoPivStrat,ValuePivStrat,ConvCrit})(rows, cols)
+    (iaca::iACA{MimicryPivoting,ValuePivStrat,ConvCrit})(rows, cols)
 
 Initialize iACA functor for row matrix compression with geometric row pivoting.
 Creates functors for geometric row pivoting and value-based column pivoting.
@@ -61,10 +154,20 @@ Creates functors for geometric row pivoting and value-based column pivoting.
 """
 function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     rows::AbstractVector{Int}, cols::AbstractVector{Int}; maxrank::Int=40
-) where {RowPivType<:GeoPivStrat,ColPivType<:ValuePivStrat,ConvCritType<:ConvCrit}
+) where {RowPivType<:MimicryPivoting,ColPivType<:ValuePivStrat,ConvCritType<:ConvCrit}
     return iACA(
         iaca.rowpivoting(cols, rows), iaca.columnpivoting(cols), iaca.convergence(maxrank)
     )
+end
+
+function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
+    rows::AbstractVector{Int}, cols::AbstractVector{Int}; maxrank::Int=40
+) where {
+    RowPivType<:MimicryPivotingFunctor,
+    ColPivType<:ValuePivStratFunctor,
+    ConvCritType<:ConvCritFunctor,
+}
+    return reset!(iaca, rows, cols; maxrank=maxrank)
 end
 
 """
@@ -89,6 +192,24 @@ function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     )
 end
 
+function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
+    A,
+    colbuffer::AbstractMatrix{K},
+    rowbuffer::AbstractMatrix{K},
+    maxrank::Int;
+    rows=zeros(Int, maxrank),
+    cols=zeros(Int, maxrank),
+    rowidcs=Vector(1:size(A, 1)),
+    colidcs=Vector(1:size(A, 2)),
+) where {
+    K,RowPivType<:PivStratFunctor,ColPivType<:PivStratFunctor,ConvCritType<:ConvCritFunctor
+}
+    stateful = iaca(rowidcs, colidcs; maxrank=maxrank)
+    return _run_iaca_stateful(
+        stateful, A, colbuffer, rowbuffer, maxrank, rows, cols, rowidcs, colidcs
+    )
+end
+
 """
     (iaca::iACA{MimicryPivoting,ValuePivStrat,ConvCrit})(A, colbuffer, rowbuffer, maxrank; kwargs...)
 
@@ -107,15 +228,15 @@ Convenience method delegating to main computational routine for mimicry-based ro
 """
 function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     A,
-    rowbuffer::AbstractMatrix{K},
     colbuffer::AbstractMatrix{K},
+    rowbuffer::AbstractMatrix{K},
     maxrank::Int;
     rows=zeros(Int, maxrank),
     cols=zeros(Int, maxrank),
     rowidcs=Vector(1:size(A, 1)),
     colidcs=Vector(1:size(A, 2)),
 ) where {K,RowPivType<:MimicryPivoting,ColPivType<:ValuePivStrat,ConvCritType<:ConvCrit}
-    return iaca(rowidcs, colidcs)(A, rowbuffer, colbuffer, maxrank, rows, cols, colidcs)
+    return iaca(rowidcs, colidcs)(A, colbuffer, rowbuffer, maxrank, rows, cols, colidcs)
 end
 
 """
@@ -136,8 +257,8 @@ Convenience method delegating to main computational routine for tree-based row p
 """
 function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     A,
-    rowbuffer::AbstractMatrix{K},
     colbuffer::AbstractMatrix{K},
+    rowbuffer::AbstractMatrix{K},
     maxrank::Int;
     rows=zeros(Int, maxrank),
     cols=zeros(Int, maxrank),
@@ -145,7 +266,7 @@ function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     colidcs=Vector(1:size(A, 2)),
 ) where {K,RowPivType<:TreeMimicryPivoting,ColPivType<:ValuePivStrat,ConvCritType<:ConvCrit}
     return iaca(rowidcs, colidcs, maxrank)(
-        A, rowbuffer, colbuffer, maxrank, rows, cols, colidcs
+        A, colbuffer, rowbuffer, maxrank, rows, cols, colidcs
     )
 end
 
@@ -235,7 +356,7 @@ end
 # ColumnMatrix
 
 """
-    (iaca::iACA{ValuePivStrat,GeoPivStrat,ConvCrit})(rows, cols)
+    (iaca::iACA{ValuePivStrat,MimicryPivoting,ConvCrit})(rows, cols)
 
 Initialize iACA functor for column matrix compression with geometric column pivoting.
 Creates functors for value-based row pivoting and geometric column pivoting.
@@ -247,10 +368,20 @@ Creates functors for value-based row pivoting and geometric column pivoting.
 """
 function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     rows::AbstractVector{Int}, cols::AbstractVector{Int}; maxrank::Int=40
-) where {RowPivType<:ValuePivStrat,ColPivType<:GeoPivStrat,ConvCritType<:ConvCrit}
+) where {RowPivType<:ValuePivStrat,ColPivType<:MimicryPivoting,ConvCritType<:ConvCrit}
     return iACA(
         iaca.rowpivoting(rows), iaca.columnpivoting(rows, cols), iaca.convergence(maxrank)
     )
+end
+
+function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
+    rows::AbstractVector{Int}, cols::AbstractVector{Int}; maxrank::Int=40
+) where {
+    RowPivType<:ValuePivStratFunctor,
+    ColPivType<:MimicryPivotingFunctor,
+    ConvCritType<:ConvCritFunctor,
+}
+    return reset!(iaca, rows, cols; maxrank=maxrank)
 end
 
 """
@@ -293,15 +424,15 @@ Convenience method delegating to main computational routine for mimicry-based co
 """
 function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     A,
-    rowbuffer::AbstractArray{K},
     colbuffer::AbstractArray{K},
+    rowbuffer::AbstractArray{K},
     maxrank::Int;
     rows=zeros(Int, maxrank),
     cols=zeros(Int, maxrank),
     rowidcs=Vector(1:size(A, 1)),
     colidcs=Vector(1:size(A, 2)),
 ) where {K,RowPivType<:ValuePivStrat,ColPivType<:MimicryPivoting,ConvCritType<:ConvCrit}
-    return iaca(rowidcs, colidcs)(A, rowbuffer, colbuffer, maxrank, rows, cols, rowidcs)
+    return iaca(rowidcs, colidcs)(A, colbuffer, rowbuffer, maxrank, rows, cols, rowidcs)
 end
 
 """
@@ -322,8 +453,8 @@ Convenience method delegating to main computational routine for tree-based colum
 """
 function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     A,
-    rowbuffer::AbstractArray{K},
     colbuffer::AbstractArray{K},
+    rowbuffer::AbstractArray{K},
     maxrank::Int;
     rows=zeros(Int, maxrank),
     cols=zeros(Int, maxrank),
@@ -331,7 +462,7 @@ function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     colidcs=Vector(1:size(A, 2)),
 ) where {K,RowPivType<:ValuePivStrat,ColPivType<:TreeMimicryPivoting,ConvCritType<:ConvCrit}
     return iaca(rowidcs, colidcs, maxrank)(
-        A, rowbuffer, colbuffer, maxrank, rows, cols, rowidcs
+        A, colbuffer, rowbuffer, maxrank, rows, cols, rowidcs
     )
 end
 

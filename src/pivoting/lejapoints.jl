@@ -36,9 +36,10 @@ updated incrementally as new pivots are chosen.
   - `idcs::Vector{Int}`: Indices of points being considered for selection
   - `pos::Vector{SVector{D,F}}`: Geometric positions corresponding to indices
 """
-struct Leja2Functor{D,F<:Real} <: GeoPivStratFunctor
+mutable struct Leja2Functor{D,F<:Real} <: GeoPivStratFunctor
     h::Vector{F}
     idcs::Vector{Int}
+    nactive::Int
     pos::Vector{SVector{D,F}}
 end
 
@@ -59,29 +60,71 @@ pivot selection within the submatrix.
   - `Leja2Functor`: Initialized functor with distance tracking
 """
 function (pivstrat::Leja2{D,F})(idcs::AbstractArray{Int}) where {D,F}
-    return Leja2Functor{D,F}(zeros(F, length(idcs)), idcs, pivstrat.pos)
+    nactive = length(idcs)
+    return Leja2Functor{D,F}(zeros(F, nactive), collect(Int, idcs), nactive, pivstrat.pos)
+end
+
+function Base.resize!(pivstrat::Leja2Functor{D,F}, nactive::Integer) where {D,F<:Real}
+    nactive < 0 && throw(ArgumentError("nactive must be non-negative"))
+    resize!(pivstrat.h, nactive)
+    resize!(pivstrat.idcs, nactive)
+    pivstrat.nactive = min(pivstrat.nactive, Int(nactive))
+    return pivstrat
+end
+
+function reset!(
+    pivstrat::Leja2Functor{D,F}, idcs::AbstractVector{<:Integer}
+) where {D,F<:Real}
+    nactive = length(idcs)
+    length(pivstrat.h) < nactive && resize!(pivstrat, nactive)
+    pivstrat.nactive = nactive
+
+    @inbounds for i in 1:nactive
+        pivstrat.idcs[i] = Int(idcs[i])
+    end
+    fill!(view(pivstrat.h, 1:nactive), zero(F))
+    return pivstrat
 end
 
 """
-    leja2!(pivstrat::GeoPivStratFunctor, nextidx::Int)
+leja2_init!(pivstrat::GeoPivStratFunctor, nextidx::Int, nactive::Int=length(pivstrat.h))
 
-Update minimum distances after selecting pivot `nextidx`.
+Initialize minimum-distance vector `h` from pivot `nextidx`.
 
-Computes distances from all points to the newly selected pivot and updates the
-minimum distance vector `h` by taking element-wise minimum with new distances.
-This shared helper is used by both Leja2 and fill distance strategies.
+# Arguments
+
+  - `pivstrat::GeoPivStratFunctor`: Functor with distance vector to initialize
+  - `nextidx::Int`: Global index of selected pivot
+  - `nactive::Int`: Number of active entries in `idcs`/`h`
+"""
+function leja2_init!(
+    pivstrat::GeoPivStratFunctor, nextidx::Int, nactive::Int=length(pivstrat.h)
+)
+    @inbounds for i in 1:nactive
+        pivstrat.h[i] = norm(pivstrat.pos[pivstrat.idcs[i]] - pivstrat.pos[nextidx])
+    end
+    return nothing
+end
+
+"""
+leja2!(pivstrat::GeoPivStratFunctor, nextidx::Int, nactive::Int=length(pivstrat.h))
+
+Update minimum-distance vector `h` after selecting pivot `nextidx`.
 
 # Arguments
 
   - `pivstrat::GeoPivStratFunctor`: Functor with distance vector to update
-  - `nextidx::Int`: Index of newly selected pivot
+  - `nextidx::Int`: Global index of selected pivot
+  - `nactive::Int`: Number of active entries in `idcs`/`h`
 """
-function leja2!(pivstrat::GeoPivStratFunctor, nextidx::Int)
-    newh = norm.(pivstrat.pos[pivstrat.idcs] .- Scalar(pivstrat.pos[nextidx]))
-    all(==(0.0), pivstrat.h) && (pivstrat.h .= newh)
-    for idx in eachindex(pivstrat.h)
-        pivstrat.h[idx] > newh[idx] && (pivstrat.h[idx] = newh[idx])
+function leja2!(pivstrat::GeoPivStratFunctor, nextidx::Int, nactive::Int=length(pivstrat.h))
+    @inbounds for i in 1:nactive
+        d = norm(pivstrat.pos[pivstrat.idcs[i]] - pivstrat.pos[nextidx])
+        if d < pivstrat.h[i]
+            pivstrat.h[i] = d
+        end
     end
+    return nothing
 end
 
 """
@@ -101,8 +144,13 @@ then updates the distance vector for subsequent iterations.
   - `nextidx::Int`: Index of the point with maximum distance to selected points
 """
 function (pivstrat::Leja2Functor{D,F})(::AbstractArray) where {D,F}
-    nextidx = argmax(pivstrat.h)
-    leja2!(pivstrat, pivstrat.idcs[nextidx])
+    nactive = pivstrat.nactive
+    nextidx = argmax(view(pivstrat.h, 1:nactive))
+    if all(iszero, view(pivstrat.h, 1:nactive))
+        leja2_init!(pivstrat, pivstrat.idcs[nextidx], nactive)
+    else
+        leja2!(pivstrat, pivstrat.idcs[nextidx], nactive)
+    end
 
     return nextidx
 end

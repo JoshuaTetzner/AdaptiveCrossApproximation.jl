@@ -56,7 +56,7 @@ Functor storing state for tree-based mimicry pivoting.
   - `pos::Vector{SVector{D,T}}`: Point coordinates
   - `usedidcs::Vector{Int}`: Selected global point indices (filled progressively)
 """
-struct TreeMimicryPivotingFunctor{D,T,TreeType} <: GeoPivStratFunctor
+mutable struct TreeMimicryPivotingFunctor{D,T,TreeType} <: GeoPivStratFunctor
     F::Vector{Int}
     c::SVector{D,T}
     tree::TreeType
@@ -83,7 +83,7 @@ computes the reference centroid from `refidcs` and allocates `usedidcs` of lengt
 function (pivstrat::TreeMimicryPivoting{D,T})(
     F::V, refidcs::V, maxrank::Int
 ) where {D,T,V<:Vector{Int}}
-    c = sum(pivstrat.refpos[refidcs]) ./ length(refidcs)
+    c = _centroid(pivstrat.refpos, refidcs)
     usedidcs = zeros(Int, maxrank)
     emptyclusters = zeros(Int, maxrank)
     return TreeMimicryPivotingFunctor{D,T}(
@@ -91,12 +91,19 @@ function (pivstrat::TreeMimicryPivoting{D,T})(
     )
 end
 
+function Base.resize!(pivstrat::TreeMimicryPivotingFunctor, maxrank::Integer)
+    return error("resize! is not implemented for TreeMimicryPivotingFunctor.")
+end
+
+function reset!(pivstrat::TreeMimicryPivotingFunctor)
+    return error("reset! is not implemented for TreeMimicryPivotingFunctor.")
+end
+
 #The package expects the `tree` object to implement these functions. Adaptors
 #for concrete tree types should provide implementations in user code.
 center(tree::T, node::Int) where {T} = error("Not implemented for type $T")
-values(tree::T, node::Union{Int,Vector{Int}}) where {T} = error(
-    "Not implemented for type $T"
-)
+values(tree::T, node::Union{Int,Vector{Int}}) where {T} =
+    error("Not implemented for type $T")
 children(tree::T, node::Int) where {T} = error("Not implemented for type $T")
 parent(tree::T, node::Int) where {T} = error("Not implemented for type $T")
 firstchild(tree::T, node::Int) where {T} = error("Not implemented for type $T")
