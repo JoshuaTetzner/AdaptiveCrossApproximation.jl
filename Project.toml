@@ -10,6 +10,7 @@ LinearMaps = "7a12625a-238d-50fd-b39a-03d52299707e"
 OhMyThreads = "67456a42-1dca-4109-a031-0a68de7e3ad5"
 Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [weakdeps]
 BEAST = "bb4162c7-ba94-5a20-af32-d8ec4428bdd1"
