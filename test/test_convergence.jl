@@ -140,25 +140,26 @@ end
 
     reset!(functor)
     @test iszero(functor.normUV²)
-    @test all(iszero, view(functor.rest, 1:functor.nactive))
-    @test all(==((0, 0)), view(functor.indices, 1:functor.nactive))
+    @test all(iszero, view(functor.rest, 1:(functor.nactive)))
+    @test all(==((0, 0)), view(functor.indices, 1:(functor.nactive)))
 
     rowidcs2 = [1, 3]
     colidcs2 = [2, 4]
     Random.seed!(22)
-    resize!(functor, K, rowidcs2, colidcs2)
+    resize!(functor, rowidcs2, colidcs2)
     @test length(functor.indices) >= 4
     @test length(functor.rest) >= 4
     @test functor.nactive == 4
-    @test length(unique(view(functor.indices, 1:functor.nactive))) == 4
+    @test length(unique(view(functor.indices, 1:(functor.nactive)))) == 4
     @test all(
         1 <= rc[1] <= length(rowidcs2) && 1 <= rc[2] <= length(colidcs2) for
-        rc in view(functor.indices, 1:functor.nactive)
+        rc in view(functor.indices, 1:(functor.nactive))
     )
     expected_rest2 = [
-        K[rowidcs2[rc[1]], colidcs2[rc[2]]] for rc in view(functor.indices, 1:functor.nactive)
+        K[rowidcs2[rc[1]], colidcs2[rc[2]]] for
+        rc in view(functor.indices, 1:(functor.nactive))
     ]
-    @test all(isapprox.(view(functor.rest, 1:functor.nactive), expected_rest2))
+    @test all(isapprox.(view(functor.rest, 1:(functor.nactive)), expected_rest2))
 end
 
 @testset "CombinedConvCritFunctor" begin
@@ -189,10 +190,10 @@ end
     @test all(functor.isconverged)
     @test iszero(functor.crits[1].normUV²)
     @test iszero(functor.crits[2].normUV²)
-    @test all(iszero, view(functor.crits[2].rest, 1:functor.crits[2].nactive))
-    @test all(==((0, 0)), view(functor.crits[2].indices, 1:functor.crits[2].nactive))
+    @test all(iszero, view(functor.crits[2].rest, 1:(functor.crits[2].nactive)))
+    @test all(==((0, 0)), view(functor.crits[2].indices, 1:(functor.crits[2].nactive)))
 
-    resize!(functor, K, [1, 2], [1, 2, 3])
+    resize!(functor, [1, 2], [1, 2, 3])
     @test all(functor.isconverged)
     @test functor.crits[2].nactive == 3
     @test length(functor.crits[2].indices) >= 3

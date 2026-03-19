@@ -29,18 +29,20 @@ as new pivots are chosen.
 
 # Fields
 
-  - `h::Vector{F}`: Current minimum distance from each point to selected points
-  - `pos::Vector{SVector{D,F}}`: Geometric positions corresponding to indices
+    - `pivoting::FillDistance{D,F}`: Immutable strategy carrying geometric positions
+    - `nactive::Int`: Active prefix length in state vectors
+    - `idcs::Vector{Int}`: Active indices into `pivoting.pos`
+    - `h::Vector{F}`: Current minimum distance from each point to selected points
 """
 mutable struct FillDistanceFunctor{D,F<:Real} <: GeoPivStratFunctor
-    h::Vector{F}
-    idcs::Vector{Int}
+    pivoting::FillDistance{D,F}
     nactive::Int
-    pos::Vector{SVector{D,F}}
+    idcs::Vector{Int}
+    h::Vector{F}
 end
 
 """
-    (pivstrat::FillDistance{D,F})(idcs::AbstractArray{Int})
+    (pivstrat::FillDistance{D,F})(idcs::AbstractVector{<:Integer})
 
 Create a `FillDistanceFunctor` for the given index subset.
 
@@ -49,39 +51,35 @@ pivot selection within the submatrix.
 
 # Arguments
 
-  - `idcs::AbstractArray{Int}`: Indices of points to consider
+    - `idcs::AbstractVector{<:Integer}`: Indices of points to consider
 
 # Returns
 
   - `FillDistanceFunctor`: Initialized functor with distance tracking
 """
-function (pivstrat::FillDistance{D,F})(idcs::AbstractArray{Int}) where {D,F}
+function (pivstrat::FillDistance{D,F})(idcs::AbstractVector{<:Integer}) where {D,F}
     nactive = length(idcs)
-    return FillDistanceFunctor(zeros(F, nactive), collect(Int, idcs), nactive, pivstrat.pos)
+    return FillDistanceFunctor(pivstrat, nactive, collect(Int, idcs), zeros(F, nactive))
 end
 
-function Base.resize!(
-    pivstrat::FillDistanceFunctor{D,F}, nactive::Integer
-) where {D,F<:Real}
-    nactive < 0 && throw(ArgumentError("nactive must be non-negative"))
-    resize!(pivstrat.h, nactive)
-    resize!(pivstrat.idcs, nactive)
-    pivstrat.nactive = min(pivstrat.nactive, Int(nactive))
-    return pivstrat
+function Base.resize!(pivstrat::FillDistanceFunctor{D,F}, nactive::Int) where {D,F<:Real}
+    length(pivstrat.h) < nactive && resize!(pivstrat.h, nactive)
+    length(pivstrat.idcs) < nactive && resize!(pivstrat.idcs, nactive)
+    pivstrat.nactive = nactive
+    return nothing
 end
 
 function reset!(
     pivstrat::FillDistanceFunctor{D,F}, idcs::AbstractVector{<:Integer}
 ) where {D,F<:Real}
     nactive = length(idcs)
-    length(pivstrat.h) < nactive && resize!(pivstrat, nactive)
-    pivstrat.nactive = nactive
+    resize!(pivstrat, nactive)
 
     @inbounds for i in 1:nactive
         pivstrat.idcs[i] = Int(idcs[i])
     end
     fill!(view(pivstrat.h, 1:nactive), zero(F))
-    return pivstrat
+    return nothing
 end
 
 """
@@ -112,6 +110,7 @@ updates the distance vector `h` for subsequent iterations.
 """
 function (pivstrat::FillDistanceFunctor{D,F})(::AbstractArray) where {D,F}
     nactive = pivstrat.nactive
+    pos = pivstrat.pivoting.pos
     all(iszero, view(pivstrat.h, 1:nactive)) && (return pivstrat())
     nextidx = argmax(view(pivstrat.h, 1:nactive))
     maxval = pivstrat.h[nextidx]
@@ -120,7 +119,7 @@ function (pivstrat::FillDistanceFunctor{D,F})(::AbstractArray) where {D,F}
         pivstrat.h[k] == 0.0 && continue
         newfd = zero(F)
         for ind in 1:nactive
-            d = norm(pivstrat.pos[pivstrat.idcs[k]] - pivstrat.pos[pivstrat.idcs[ind]])
+            d = norm(pos[pivstrat.idcs[k]] - pos[pivstrat.idcs[ind]])
             if pivstrat.h[ind] > d
                 newfd < d && (newfd = d)
             else

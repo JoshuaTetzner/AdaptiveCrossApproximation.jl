@@ -123,3 +123,20 @@ end
     end
     return c / length(refidcs)
 end
+
+"""
+    update_refcentroid!(functor::PivStratFunctor, refidcs)
+
+Update the stored reference-domain centroid in pivoting functors that expose
+`refcentroid`. For those functors, the reference positions are taken from
+`functor.pivoting.refpos`. For functors without `refcentroid`, this is a no-op.
+"""
+function update_refcentroid!(functor::PivStratFunctor, refidcs::AbstractVector{<:Integer})
+    if !hasproperty(functor, :refcentroid)
+        return functor
+    end
+
+    pivoting = getproperty(functor, :pivoting)
+    functor.refcentroid = _centroid(getproperty(pivoting, :refpos), refidcs)
+    return functor
+end

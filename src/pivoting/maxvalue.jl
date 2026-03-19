@@ -24,33 +24,30 @@ Maintains a boolean vector to ensure each index is selected at most once.
   - `usedidcs::Vector{Bool}`: Tracks which indices have been selected as pivots
 """
 mutable struct MaximumValueFunctor <: ValuePivStratFunctor
-    usedidcs::Vector{Bool}
     nactive::Int
+    usedidcs::Vector{Bool}
 end
 
 """
-    (::MaximumValue)(idcs::AbstractArray{Int})
+    (::MaximumValue)(idcs::AbstractVector{<:Integer})
 
 Create a `MaximumValueFunctor` for the given index array.
 
 Returns a functor with tracking vector sized to match the length of `idcs`.
 """
-(::MaximumValue)(idcs::AbstractArray{Int}) =
-    MaximumValueFunctor(zeros(Bool, length(idcs)), length(idcs))
+(::MaximumValue)(idcs::AbstractVector{<:Integer}) =
+    MaximumValueFunctor(length(idcs), zeros(Bool, length(idcs)))
 
-function Base.resize!(pivstrat::MaximumValueFunctor, nactive::Integer)
-    nactive < 0 && throw(ArgumentError("nactive must be non-negative"))
-    resize!(pivstrat.usedidcs, nactive)
-    pivstrat.nactive = min(pivstrat.nactive, Int(nactive))
-    return pivstrat
+function Base.resize!(pivstrat::MaximumValueFunctor, nactive::Int)
+    length(pivstrat.usedidcs) < nactive && resize!(pivstrat.usedidcs, nactive)
+    pivstrat.nactive = nactive
+    return nothing
 end
 
 function reset!(pivstrat::MaximumValueFunctor, idcs::AbstractVector{<:Integer})
-    nactive = length(idcs)
-    length(pivstrat.usedidcs) < nactive && resize!(pivstrat, nactive)
-    pivstrat.nactive = nactive
-    fill!(view(pivstrat.usedidcs, 1:nactive), false)
-    return pivstrat
+    resize!(pivstrat, length(idcs))
+    fill!(view(pivstrat.usedidcs, 1:(pivstrat.nactive)), false)
+    return nothing
 end
 
 """

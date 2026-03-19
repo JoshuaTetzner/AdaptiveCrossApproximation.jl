@@ -33,6 +33,106 @@ using Test
     @test all(isapprox.(view(functor.h, 1:3), [0.0, 2.0, 4.0]))
 end
 
+@testset "TreeMimicryPivoting" begin
+    struct MockTree
+        centers::Vector{SVector{3,Float64}}
+        nodevalues::Vector{Vector{Int}}
+        nodechildren::Vector{Vector{Int}}
+        nodeparent::Vector{Int}
+    end
+
+    AdaptiveCrossApproximation.center(tree::MockTree, node::Int) = tree.centers[node]
+    AdaptiveCrossApproximation.values(tree::MockTree, node::Int) = tree.nodevalues[node]
+    AdaptiveCrossApproximation.values(tree::MockTree, nodes::Vector{Int}) =
+        reduce(vcat, (tree.nodevalues[n] for n in nodes); init=Int[])
+    AdaptiveCrossApproximation.children(tree::MockTree, node::Int) = tree.nodechildren[node]
+    AdaptiveCrossApproximation.parent(tree::MockTree, node::Int) = tree.nodeparent[node]
+    AdaptiveCrossApproximation.firstchild(tree::MockTree, node::Int) =
+        isempty(tree.nodechildren[node]) ? 0 : first(tree.nodechildren[node])
+
+    tree = MockTree(
+        [
+            SVector(4.5, 0.0, 0.0),
+            SVector(2.5, 0.0, 0.0),
+            SVector(6.5, 0.0, 0.0),
+            SVector(1.5, 0.0, 0.0),
+            SVector(3.5, 0.0, 0.0),
+            SVector(5.5, 0.0, 0.0),
+            SVector(7.5, 0.0, 0.0),
+        ],
+        [collect(1:8), collect(1:4), collect(5:8), [1, 2], [3, 4], [5, 6], [7, 8]],
+        [[2, 3], [4, 5], [6, 7], Int[], Int[], Int[], Int[]],
+        [0, 1, 1, 2, 2, 3, 3],
+    )
+
+    refpos = [@SVector [Float64(i), 0.0, 0.0] for i in 1:8]
+    pos = [@SVector [Float64(i), 1.0, 0.0] for i in 1:8]
+    piv = AdaptiveCrossApproximation.TreeMimicryPivoting(refpos, pos, tree)
+    functor = piv([2, 3], [1, 8], 5)
+
+    @test length(functor.usedidcs) == 5
+    @test length(functor.emptyclusters) == 5
+    @test functor.nactive == 2
+    @test length(functor.h) == 2
+    @test length(functor.leja) == 2
+    @test length(functor.w) == 2
+    @test collect(view(functor.farfield, 1:2)) == [2, 3]
+
+    firstpivot = functor()
+    @test firstpivot in 1:8
+    secondpivot = functor(2)
+    @test secondpivot in 1:8
+
+    usedbuf = functor.usedidcs
+    emptybuf = functor.emptyclusters
+    farfieldbuf = functor.farfield
+    hbuf = functor.h
+    lejabuf = functor.leja
+    wbuf = functor.w
+
+    resize!(functor, 9)
+    @test length(functor.farfield) == 9
+    @test length(functor.h) == 9
+    @test length(functor.leja) == 9
+    @test length(functor.w) == 9
+    @test length(functor.usedidcs) == 5
+    @test length(functor.emptyclusters) == 5
+    @test functor.nactive == 9
+
+    resize!(functor, 4)
+    @test length(functor.farfield) == 9
+    @test length(functor.h) == 9
+    @test length(functor.leja) == 9
+    @test length(functor.w) == 9
+    @test functor.nactive == 4
+
+    reset!(functor, [2, 3])
+    @test functor.usedidcs === usedbuf
+    @test functor.emptyclusters === emptybuf
+    @test functor.farfield === farfieldbuf
+    @test functor.h === hbuf
+    @test functor.leja === lejabuf
+    @test functor.w === wbuf
+    @test functor.nempty == 0
+    @test functor.nactive == 2
+    @test collect(view(functor.farfield, 1:2)) == [2, 3]
+    @test all(iszero, view(functor.h, 1:2))
+    @test all(isone, view(functor.leja, 1:2))
+    @test all(iszero, view(functor.w, 1:2))
+    @test all(iszero, view(functor.usedidcs, 1:5))
+    @test all(iszero, view(functor.emptyclusters, 1:5))
+
+    reset!(functor, [2, 3, 4])
+    @test functor.nactive == 3
+    @test collect(view(functor.farfield, 1:3)) == [2, 3, 4]
+    @test length(functor.farfield) == 9
+    @test length(functor.h) == 9
+    @test length(functor.leja) == 9
+    @test length(functor.w) == 9
+    @test length(functor.usedidcs) == 5
+    @test length(functor.emptyclusters) == 5
+end
+
 @testset "FillDistance" begin
     pts = [@SVector [Float64(i), 0.0, 0.0] for i in 1:8]
     piv = AdaptiveCrossApproximation.FillDistance(pts)
@@ -136,11 +236,6 @@ end
     idx2 = functor([0.1, 2.0, 0.2])
     @test idx2 == 1
 
-    resize!(functor, 5)
-    @test length(functor.strats[1].usedidcs) == 5
-    @test length(functor.strats[2].idcs) == 5
-    @test length(functor.strats[2].h) == 5
-
     reset!(functor, [3, 1, 2, 3, 1])
     @test all(.!view(functor.strats[1].usedidcs, 1:5))
     @test collect(view(functor.strats[2].idcs, 1:5)) == [3, 1, 2, 3, 1]
@@ -168,7 +263,11 @@ end
     @test chosen_fd == 1
     @test all(isapprox.(functor_fd.strats[2].h, [0.0, 2.0, 4.0]))
 
-    resize!(functor_fd, 7)
+    reset!(functor_fd, [2, 4, 6, 1, 5, 6, 2])
+    @test length(functor_fd.strats[1].usedidcs) == 7
+    @test length(functor_fd.strats[2].h) == 7
+    @test functor_fd.strats[2].nactive == 7
+
     reset!(functor_fd, [2, 4, 6])
     chosen_fd_reset = functor_fd(zeros(3))
     @test chosen_fd_reset == 1
@@ -217,7 +316,7 @@ end
     first = functor()
     @test first in (2, 4, 6, 8)
 
-    reset!(functor, [2, 3], [1, 3, 5])
+    AdaptiveCrossApproximation.reset_pivoting!(functor, [1, 3, 5], [2, 3])
     @test functor.idcs === idbuf
     @test functor.h === hbuf
     @test functor.leja === lejabuf
@@ -232,7 +331,7 @@ end
     @test length(functor.w) == 10
     @test functor.nactive == 10
 
-    reset!(functor, [1, 4, 6], [2, 5, 8, 7])
+    AdaptiveCrossApproximation.reset_pivoting!(functor, [2, 5, 8, 7], [1, 4, 6])
     @test functor.nactive == 4
     @test collect(view(functor.idcs, 1:4)) == [2, 5, 8, 7]
     @test all(iszero, view(functor.h, 1:4))

@@ -29,16 +29,11 @@ mutable struct CombinedConvCritFunctor <: ConvCritFunctor
     isconverged::Vector{Bool}
 end
 
-function reset!(convcrit::CombinedConvCritFunctor)
+function reset!(convcrit::CombinedConvCritFunctor, args...)
     for crit in convcrit.crits
-        reset!(crit)
+        reset!(crit, args...)
     end
     fill!(convcrit.isconverged, true)
-    return convcrit
-end
-
-function reset!(convcrit::CombinedConvCritFunctor, args...)
-    reset!(convcrit)
     return convcrit
 end
 

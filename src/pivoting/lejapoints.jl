@@ -32,19 +32,20 @@ updated incrementally as new pivots are chosen.
 
 # Fields
 
-  - `h::Vector{F}`: Current minimum distance from each point to selected points
-  - `idcs::Vector{Int}`: Indices of points being considered for selection
-  - `pos::Vector{SVector{D,F}}`: Geometric positions corresponding to indices
+    - `pivoting::Leja2{D,F}`: Immutable strategy carrying geometric positions
+    - `nactive::Int`: Active prefix length in state vectors
+    - `idcs::Vector{Int}`: Indices of points being considered for selection
+    - `h::Vector{F}`: Current minimum distance from each point to selected points
 """
 mutable struct Leja2Functor{D,F<:Real} <: GeoPivStratFunctor
-    h::Vector{F}
-    idcs::Vector{Int}
+    pivoting::Leja2{D,F}
     nactive::Int
-    pos::Vector{SVector{D,F}}
+    idcs::Vector{Int}
+    h::Vector{F}
 end
 
 """
-    (pivstrat::Leja2{D,F})(idcs::AbstractArray{Int})
+    (pivstrat::Leja2{D,F})(idcs::AbstractVector{<:Integer})
 
 Create a `Leja2Functor` for the given index subset.
 
@@ -53,37 +54,37 @@ pivot selection within the submatrix.
 
 # Arguments
 
-  - `idcs::AbstractArray{Int}`: Indices of points to consider
+    - `idcs::AbstractVector{<:Integer}`: Indices of points to consider
 
 # Returns
 
   - `Leja2Functor`: Initialized functor with distance tracking
 """
-function (pivstrat::Leja2{D,F})(idcs::AbstractArray{Int}) where {D,F}
+function (pivstrat::Leja2{D,F})(idcs::AbstractVector{<:Integer}) where {D,F}
     nactive = length(idcs)
-    return Leja2Functor{D,F}(zeros(F, nactive), collect(Int, idcs), nactive, pivstrat.pos)
+    return Leja2Functor{D,F}(pivstrat, nactive, collect(Int, idcs), zeros(F, nactive))
 end
 
-function Base.resize!(pivstrat::Leja2Functor{D,F}, nactive::Integer) where {D,F<:Real}
-    nactive < 0 && throw(ArgumentError("nactive must be non-negative"))
-    resize!(pivstrat.h, nactive)
-    resize!(pivstrat.idcs, nactive)
-    pivstrat.nactive = min(pivstrat.nactive, Int(nactive))
-    return pivstrat
+@inline _positions(pivstrat::GeoPivStratFunctor) = pivstrat.pivoting.pos
+
+function Base.resize!(pivstrat::Leja2Functor{D,F}, nactive::Int) where {D,F<:Real}
+    length(pivstrat.h) < nactive && resize!(pivstrat.h, nactive)
+    length(pivstrat.idcs) < nactive && resize!(pivstrat.idcs, nactive)
+    pivstrat.nactive = nactive
+    return nothing
 end
 
 function reset!(
     pivstrat::Leja2Functor{D,F}, idcs::AbstractVector{<:Integer}
 ) where {D,F<:Real}
     nactive = length(idcs)
-    length(pivstrat.h) < nactive && resize!(pivstrat, nactive)
-    pivstrat.nactive = nactive
+    resize!(pivstrat, nactive)
 
     @inbounds for i in 1:nactive
         pivstrat.idcs[i] = Int(idcs[i])
     end
     fill!(view(pivstrat.h, 1:nactive), zero(F))
-    return pivstrat
+    return nothing
 end
 
 """
@@ -100,8 +101,9 @@ Initialize minimum-distance vector `h` from pivot `nextidx`.
 function leja2_init!(
     pivstrat::GeoPivStratFunctor, nextidx::Int, nactive::Int=length(pivstrat.h)
 )
+    pos = _positions(pivstrat)
     @inbounds for i in 1:nactive
-        pivstrat.h[i] = norm(pivstrat.pos[pivstrat.idcs[i]] - pivstrat.pos[nextidx])
+        pivstrat.h[i] = norm(pos[pivstrat.idcs[i]] - pos[nextidx])
     end
     return nothing
 end
@@ -118,8 +120,9 @@ Update minimum-distance vector `h` after selecting pivot `nextidx`.
   - `nactive::Int`: Number of active entries in `idcs`/`h`
 """
 function leja2!(pivstrat::GeoPivStratFunctor, nextidx::Int, nactive::Int=length(pivstrat.h))
+    pos = _positions(pivstrat)
     @inbounds for i in 1:nactive
-        d = norm(pivstrat.pos[pivstrat.idcs[i]] - pivstrat.pos[nextidx])
+        d = norm(pos[pivstrat.idcs[i]] - pos[nextidx])
         if d < pivstrat.h[i]
             pivstrat.h[i] = d
         end

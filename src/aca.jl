@@ -46,94 +46,15 @@ function ACA(;
     return ACA(rowpivoting, columnpivoting, convergence)
 end
 
-@inline function _resize_acaconvergence!(convcrit::ConvCritFunctor, maxrank::Int)
-    resize!(convcrit, maxrank)
-    return convcrit
-end
-
-@inline function _resize_acapivots!(
-    aca::ACA{RP,CP,C}, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
-) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
-    resize!(aca.rowpivoting, length(rowidcs))
-    resize!(aca.columnpivoting, length(colidcs))
-    return aca
-end
-
-@inline function _reset_acapivots!(
-    aca::ACA{RP,CP,C}, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
+function reset!(
+    aca::ACA{RP,CP,C},
+    rowidcs::AbstractArray{Int},
+    colidcs::AbstractArray{Int};
+    maxrank::Int=40,
 ) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
     reset!(aca.rowpivoting, rowidcs)
     reset!(aca.columnpivoting, colidcs)
-    return aca
-end
-
-@inline function _resize_acaconvergence!(
-    convcrit::Union{RandomSamplingFunctor,CombinedConvCritFunctor},
-    A,
-    rowidcs::AbstractArray{Int},
-    colidcs::AbstractArray{Int},
-    maxrank::Int,
-)
-    resize!(convcrit, A, rowidcs, colidcs)
-    return convcrit
-end
-
-@inline function _resize_acaconvergence!(
-    convcrit::ConvCritFunctor,
-    A,
-    rowidcs::AbstractArray{Int},
-    colidcs::AbstractArray{Int},
-    maxrank::Int,
-)
-    resize!(convcrit, maxrank)
-    return convcrit
-end
-
-function Base.resize!(
-    aca::ACA{RP,CP,C},
-    rowidcs::AbstractArray{Int},
-    colidcs::AbstractArray{Int};
-    maxrank::Int=40,
-) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
-    _resize_acapivots!(aca, rowidcs, colidcs)
-    _resize_acaconvergence!(aca.convergence, maxrank)
-    return aca
-end
-
-function Base.resize!(
-    aca::ACA{RP,CP,C},
-    A,
-    rowidcs::AbstractArray{Int},
-    colidcs::AbstractArray{Int};
-    maxrank::Int=40,
-) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
-    _resize_acapivots!(aca, rowidcs, colidcs)
-    _resize_acaconvergence!(aca.convergence, A, rowidcs, colidcs, maxrank)
-    return aca
-end
-
-function reset!(
-    aca::ACA{RP,CP,C},
-    rowidcs::AbstractArray{Int},
-    colidcs::AbstractArray{Int};
-    maxrank::Int=40,
-) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
-    resize!(aca, rowidcs, colidcs; maxrank=maxrank)
-    _reset_acapivots!(aca, rowidcs, colidcs)
-    reset!(aca.convergence)
-    return aca
-end
-
-function reset!(
-    aca::ACA{RP,CP,C},
-    A,
-    rowidcs::AbstractArray{Int},
-    colidcs::AbstractArray{Int};
-    maxrank::Int=40,
-) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
-    resize!(aca, A, rowidcs, colidcs; maxrank=maxrank)
-    _reset_acapivots!(aca, rowidcs, colidcs)
-    reset!(aca.convergence)
+    reset!(aca.convergence, rowidcs, colidcs)
     return aca
 end
 
@@ -171,7 +92,7 @@ end
 function (aca::ACA{RP,CP,C})(
     A, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}; maxrank::Int=40
 ) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
-    return reset!(aca, A, rowidcs, colidcs; maxrank=maxrank)
+    return reset!(aca, rowidcs, colidcs; maxrank=maxrank)
 end
 
 function (aca::ACA{RP,CP,C})(

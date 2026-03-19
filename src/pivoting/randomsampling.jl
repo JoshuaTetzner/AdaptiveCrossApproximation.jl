@@ -17,7 +17,7 @@ struct RandomSamplingPivoting <: ConvPivStrat
 end
 
 """
-    RandomSamplingPivotingFunctor{F,K} <: ConvPivStratFunctor
+    RandomSamplingPivotingFunctor{F,K,M} <: ConvPivStratFunctor
 
 Stateful functor for random sampling-based pivot selection.
 
@@ -27,20 +27,35 @@ samples.
 
 # Fields
 
-  - `convcrit::RandomSamplingFunctor{F,K}`: Convergence criterion with sample information
+    - `convcrit::RandomSamplingFunctor{F,K,M}`: Convergence criterion with sample information
+
   - `rc::Int`: Coordinate index (1 for row, 2 for column)
 """
-struct RandomSamplingPivotingFunctor{F,K} <: ConvPivStratFunctor
-    convcrit::RandomSamplingFunctor{F,K}
+struct RandomSamplingPivotingFunctor{F,K,M} <: ConvPivStratFunctor
+    convcrit::RandomSamplingFunctor{F,K,M}
     rc::Int
 end
 
-function Base.resize!(pivstrat::RandomSamplingPivotingFunctor, args...)
-    return nothing
-end
+"""
+    (pivstrat::RandomSamplingPivoting)(convcrit::RandomSamplingFunctor{F,K,M})
 
-function reset!(pivstrat::RandomSamplingPivotingFunctor, args...)
-    return nothing
+Create a `RandomSamplingPivotingFunctor` linked to the convergence criterion.
+
+Initializes the functor by connecting it to the random sampling convergence
+criterion that tracks sampled indices and residuals.
+
+# Arguments
+
+    - `convcrit::RandomSamplingFunctor{F,K,M}`: Random sampling convergence functor
+
+# Returns
+
+  - `RandomSamplingPivotingFunctor`: Initialized functor linked to the criterion
+"""
+function (pivstrat::RandomSamplingPivoting)(
+    convcrit::RandomSamplingFunctor{F,K,M}
+) where {F<:Real,K,M}
+    return RandomSamplingPivotingFunctor(convcrit, pivstrat.rc)
 end
 
 function (piv::RandomSamplingPivoting)(convcrit::CombinedConvCritFunctor)
@@ -51,8 +66,18 @@ function (piv::RandomSamplingPivoting)(convcrit::CombinedConvCritFunctor)
     return RandomSamplingPivotingFunctor(convcrit.crits[rscrit], piv.rc)
 end
 
+function Base.resize!(pivstrat::RandomSamplingPivotingFunctor, args...)
+    # Linked to RandomSamplingFunctor state; nothing to resize locally.
+    return nothing
+end
+
+function reset!(pivstrat::RandomSamplingPivotingFunctor, args...)
+    # Linked to RandomSamplingFunctor state; nothing to reset locally.
+    return nothing
+end
+
 """
-    (pivstrat::RandomSamplingPivotingFunctor{F,K})(::AbstractArray)
+    (pivstrat::RandomSamplingPivotingFunctor{F,K,M})(::AbstractArray)
 
 Select pivot from the sample with largest residual.
 
@@ -68,31 +93,11 @@ maximum residual error.
 
   - Index from the worst-performing random sample
 """
-function (pivstrat::RandomSamplingPivotingFunctor{F,K})(::AbstractArray) where {F<:Real,K}
+function (pivstrat::RandomSamplingPivotingFunctor{F,K,M})(
+    ::AbstractArray
+) where {F<:Real,K,M}
     nactive = pivstrat.convcrit.nactive
     rest = view(pivstrat.convcrit.rest, 1:nactive)
     indices = view(pivstrat.convcrit.indices, 1:nactive)
     return indices[argmax(abs.(rest))][pivstrat.rc]
-end
-
-"""
-    (pivstrat::RandomSamplingPivoting)(convcrit::RandomSamplingFunctor{F,K})
-
-Create a `RandomSamplingPivotingFunctor` linked to the convergence criterion.
-
-Initializes the functor by connecting it to the random sampling convergence
-criterion that tracks sampled indices and residuals.
-
-# Arguments
-
-  - `convcrit::RandomSamplingFunctor{F,K}`: Random sampling convergence functor
-
-# Returns
-
-  - `RandomSamplingPivotingFunctor`: Initialized functor linked to the criterion
-"""
-function (pivstrat::RandomSamplingPivoting)(
-    convcrit::RandomSamplingFunctor{F,K}
-) where {F<:Real,K}
-    return RandomSamplingPivotingFunctor(convcrit, pivstrat.rc)
 end

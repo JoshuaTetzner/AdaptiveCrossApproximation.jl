@@ -19,9 +19,43 @@ useful for H²--matrix compression where incomplete factorizations are sufficien
   - `D`: Spatial dimension
   - `F`: Floating point type for coordinates
 """
-mutable struct MimicryPivoting{D,F<:Real} <: GeoPivStrat
+struct MimicryPivoting{D,F<:Real} <: GeoPivStrat
     refpos::Vector{SVector{D,F}}
     pos::Vector{SVector{D,F}}
+end
+
+"""
+    bestindex(leja, h, w, nactive, npivot)
+
+Return the index in `1:nactive` that maximizes
+
+`leja[i]^(2/(npivot-1)) * h[i] * w[i]^4`
+
+without allocating temporary arrays.
+"""
+@inline function bestindex(
+    leja::AbstractVector{F},
+    h::AbstractVector{F},
+    w::AbstractVector{F},
+    nactive::Int,
+    npivot::Int,
+) where {F<:Real}
+    nactive > 0 || throw(ArgumentError("nactive must be positive."))
+    npivot > 1 || throw(ArgumentError("npivot must be larger than 1."))
+
+    exponent = F(2) / F(npivot - 1)
+    @inbounds begin
+        nextlocal = 1
+        bestscore = (leja[1]^exponent) * h[1] * (w[1]^4)
+        for i in 2:nactive
+            score = (leja[i]^exponent) * h[i] * (w[i]^4)
+            if score > bestscore
+                bestscore = score
+                nextlocal = i
+            end
+        end
+        return nextlocal
+    end
 end
 
 """
@@ -33,20 +67,20 @@ Maintains vectors for leja2 (h), leja (leja), and weights (w) based on distance 
 
 # Fields
 
-    - `refpos::Vector{SVector{D,F}}`: Reference positions used to compute centroid weights
+    - `pivoting::MimicryPivoting{D,F}`: Immutable strategy carrying `refpos` and `pos`
+    - `nactive::Int`: Active prefix length in state vectors
+    - `refcentroid::SVector{D,F}`: Reference centroid used to bias selection
 
-  - `pos::Vector{SVector{D,F}}`: All geometric positions
   - `idcs::Vector{Int}`: Current indices being considered for selection
-  - `nactive::Int`: Active prefix length in state vectors
   - `h::Vector{F}`: Minimum distances from each point to selected points (fill distance)
   - `leja::Vector{F}`: Product of distances to all selected points (Leja metric)
   - `w::Vector{F}`: Weights based on inverse distance to reference centroid
 """
 mutable struct MimicryPivotingFunctor{D,F<:Real} <: GeoPivStratFunctor
-    refpos::Vector{SVector{D,F}}
-    pos::Vector{SVector{D,F}}
-    idcs::Vector{Int}
+    pivoting::MimicryPivoting{D,F}
     nactive::Int
+    refcentroid::SVector{D,F}
+    idcs::Vector{Int}
     h::Vector{F}
     leja::Vector{F}
     w::Vector{F}
@@ -64,69 +98,50 @@ the selected pivots to spatially mimic the reference distribution.
 # Arguments
 
   - `refidcs`: Indices of reference points (e.g., parent cluster pivots)
-  - `rcidcs`: Indices of candidate points to select from (e.g., child cluster points)
+  - `idcs`: Indices of candidate points to select from (e.g., child cluster points)
 
 # Returns
 
   - `MimicryPivotingFunctor`: Initialized functor with computed weights and metrics
 """
-function (strat::MimicryPivoting{D,F})(refidcs, rcidcs) where {D,F}
-    nactive = length(rcidcs)
-    ref = _centroid(strat.refpos, refidcs)
-    idcs = collect(rcidcs)
+function (strat::MimicryPivoting{D,F})(refidcs, idcs) where {D,F}
+    nactive = length(idcs)
+    refcentroid = _centroid(strat.refpos, refidcs)
+    idcs = collect(idcs)
     h = zeros(F, nactive)
     w = zeros(F, nactive)
     leja = ones(F, nactive)
 
     @inbounds for i in 1:nactive
-        w[i] = 1 / norm(strat.pos[idcs[i]] - ref)
+        w[i] = 1 / norm(strat.pos[idcs[i]] - refcentroid)
     end
 
-    return MimicryPivotingFunctor{D,F}(strat.refpos, strat.pos, idcs, nactive, h, leja, w)
+    return MimicryPivotingFunctor{D,F}(strat, nactive, refcentroid, idcs, h, leja, w)
 end
 
-function Base.resize!(
-    functor::MimicryPivotingFunctor{D,F}, nactive::Integer
-) where {D,F<:Real}
-    nactive < 0 && throw(ArgumentError("nactive must be non-negative"))
-    resize!(functor.idcs, nactive)
-    resize!(functor.h, nactive)
-    resize!(functor.leja, nactive)
-    resize!(functor.w, nactive)
+function Base.resize!(functor::MimicryPivotingFunctor{D,F}, nactive::Int) where {D,F<:Real}
+    if length(functor.idcs) < nactive
+        resize!(functor.idcs, nactive)
+        resize!(functor.h, nactive)
+        resize!(functor.leja, nactive)
+        resize!(functor.w, nactive)
+    end
     functor.nactive = nactive
-    return functor
+    return nothing
 end
 
 function reset!(
-    functor::MimicryPivotingFunctor{D,F},
-    refidcs::AbstractVector{<:Integer},
-    rcidcs::AbstractVector{<:Integer},
+    functor::MimicryPivotingFunctor{D,F}, idcs::AbstractVector{Int}
 ) where {D,F<:Real}
-    nactive = length(rcidcs)
-    length(functor.idcs) < nactive && resize!(functor, nactive)
-    functor.nactive = nactive
-
-    ref = _centroid(functor.refpos, refidcs)
-    @inbounds for i in 1:nactive
-        idx = Int(rcidcs[i])
-        functor.idcs[i] = idx
+    resize!(functor, length(idcs))
+    pos = functor.pivoting.pos
+    @inbounds for i in 1:(functor.nactive)
+        functor.idcs[i] = idcs[i]
         functor.h[i] = zero(F)
         functor.leja[i] = one(F)
-        functor.w[i] = 1 / norm(functor.pos[idx] - ref)
+        functor.w[i] = 1 / norm(pos[functor.idcs[i]] - functor.refcentroid)
     end
-
-    return functor
-end
-
-function reset!(
-    functor::MimicryPivotingFunctor{D,F},
-    strat::MimicryPivoting{D,F},
-    refidcs::AbstractVector{<:Integer},
-    rcidcs::AbstractVector{<:Integer},
-) where {D,F<:Real}
-    functor.refpos = strat.refpos
-    functor.pos = strat.pos
-    return reset!(functor, refidcs, rcidcs)
+    return nothing
 end
 
 """
@@ -177,22 +192,13 @@ The balance between these factors evolves with iteration number `npivot`.
 """
 function (strat::MimicryPivotingFunctor{D,F})(npivot::Int) where {D,F<:Real}
     nactive = strat.nactive
-    exponent = F(2) / F(npivot - 1)
-
-    nextlocal = 1
-    bestscore = -Inf
-    @inbounds for i in 1:nactive
-        score = (strat.leja[i]^exponent) * strat.h[i] * (strat.w[i]^4)
-        if score > bestscore
-            bestscore = score
-            nextlocal = i
-        end
-    end
+    nextlocal = bestindex(strat.leja, strat.h, strat.w, nactive, npivot)
 
     nextidx = strat.idcs[nextlocal]
-    nextpos = strat.pos[nextidx]
+    pos = strat.pivoting.pos
+    nextpos = pos[nextidx]
     @inbounds for i in 1:nactive
-        d = norm(strat.pos[strat.idcs[i]] - nextpos)
+        d = norm(pos[strat.idcs[i]] - nextpos)
         if strat.h[i] > d
             strat.h[i] = d
         end

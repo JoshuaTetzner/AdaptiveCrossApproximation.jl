@@ -14,8 +14,12 @@ Used during compression to track convergence state across iterations.
 """
 abstract type ConvCritFunctor end
 
-function reset!(convcrit::ConvCritFunctor, args...)
+function reset!(convcrit::ConvCritFunctor)
     throw(ArgumentError("reset! is not implemented for $(typeof(convcrit))."))
+end
+
+function reset!(convcrit::ConvCritFunctor, args...)
+    return reset!(convcrit)
 end
 
 function Base.resize!(convcrit::ConvCritFunctor, args...)

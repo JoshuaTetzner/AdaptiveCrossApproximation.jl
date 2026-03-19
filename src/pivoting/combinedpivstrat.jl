@@ -41,14 +41,14 @@ function Base.resize!(pivstrat::CombinedPivStratFunctor, args...)
     for strat in pivstrat.strats
         resize!(strat, args...)
     end
-    return pivstrat
+    return nothing
 end
 
 function reset!(pivstrat::CombinedPivStratFunctor, args...)
     for strat in pivstrat.strats
         reset!(strat, args...)
     end
-    return pivstrat
+    return nothing
 end
 
 """
