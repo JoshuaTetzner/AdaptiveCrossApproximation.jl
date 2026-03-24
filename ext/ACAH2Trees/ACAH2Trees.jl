@@ -7,6 +7,11 @@ using AdaptiveCrossApproximation
 import AdaptiveCrossApproximation: GeoPivStrat, GeoPivStratFunctor
 
 include("treemimicrypivoting.jl")
+function AdaptiveCrossApproximation._tree(
+    ::AdaptiveCrossApproximation.H2Tree, args...; kwargs...
+)
+    return H2Trees.TwoNTree(args...; kwargs...)
+end
 
 function AdaptiveCrossApproximation.permutation(tree::H2Trees.H2ClusterTree)
     perm = zeros(Int, H2Trees.numberofvalues(tree))
@@ -32,13 +37,11 @@ end
 
 AdaptiveCrossApproximation.testtree(tree::H2Trees.BlockTree) = testtree(tree)
 AdaptiveCrossApproximation.trialtree(tree::H2Trees.BlockTree) = trialtree(tree)
-AdaptiveCrossApproximation.values(tree::H2Trees.H2ClusterTree, node::Int) = H2Trees.values(
-    tree, node
-)
+AdaptiveCrossApproximation.values(tree::H2Trees.H2ClusterTree, node::Int) =
+    H2Trees.values(tree, node)
 AdaptiveCrossApproximation.levels(tree::H2Trees.H2ClusterTree) = H2Trees.levels(tree)
-AdaptiveCrossApproximation.LevelIterator(tree::H2Trees.H2ClusterTree, level::Int) = H2Trees.LevelIterator(
-    tree, level
-)
+AdaptiveCrossApproximation.LevelIterator(tree::H2Trees.H2ClusterTree, level::Int) =
+    H2Trees.LevelIterator(tree, level)
 
 include("nearinteractions.jl")
 include("farinteractions.jl")

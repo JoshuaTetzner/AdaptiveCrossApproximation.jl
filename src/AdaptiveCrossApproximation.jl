@@ -3,6 +3,8 @@ module AdaptiveCrossApproximation
 using LinearAlgebra
 using StaticArrays
 
+include("utils.jl")
+
 include("hmatrix/kernelmatrix/abstractkernelmatrix.jl")
 include("hmatrix/kernelmatrix/beastkernelmatrix.jl")
 include("hmatrix/kernelmatrix/pointmatrix.jl")
@@ -34,6 +36,27 @@ end
 
 include("hmatrix/abstracthmatrix.jl")
 
+module H
+    using ..AdaptiveCrossApproximation: HMatrix, _tree, H2Tree
+
+    function assemble(op, space; args...)
+        return error("Not implemented")
+    end
+
+    function assemble(
+        op,
+        testspace,
+        trialspace;
+        tree=_tree(
+            H2Tree(), testspace, trialspace, 1 / 2^10; minvaluestest=200, minvaluestrial=200
+        ),
+        kwargs...,
+    )
+        return HMatrix(op, testspace, trialspace, tree; kwargs...)
+    end
+end
+
+export H
 export ACA
 export iACA
 export FNormEstimator, iFNormEstimator, FNormExtrapolator

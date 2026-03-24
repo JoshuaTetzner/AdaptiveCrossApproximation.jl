@@ -9,6 +9,38 @@ end
 function nearinteractions(tree; args...)
     return error("Needs to be implemented for $(typeof(tree))")
 end
+function nearinteractions_consecutive(tree; args...)
+    return error("Needs to be implemented for $(typeof(tree))")
+end
+
+function assemblenears(
+    operator,
+    testspace,
+    trialspace,
+    tree,
+    ::PreserveSpaceOrder;
+    isnear=isnear(),
+    scheduler=SerialScheduler(),
+    matrixdata=defaultmatrixdata(operator, testspace, trialspace),
+)
+    nearmatrix = AbstractKernelMatrix(
+        operator, testspace, trialspace; matrixdata=matrixdata
+    )
+    values, nearvalues = nearinteractions(tree; isnear=isnear)
+    blocks = Vector{Matrix{eltype(nearmatrix)}}(undef, length(values))
+    @tasks for i in eachindex(blocks)
+        @set scheduler = scheduler
+        blk = zeros(eltype(nearmatrix), length.(values), length(nearvalues))
+        nearmatrix(blk, values[i], nearvalues[i])
+        blocks[i] = blk
+    end
+
+    nears = BlockSparseMatrix(
+        blocks, values, nearvalues, size(nearmatrix); scheduler=scheduler
+    )
+
+    return nears
+end
 
 function splitblock(block::Matrix{T}, lens::Vector{Int}) where {T}
     return [
@@ -21,7 +53,8 @@ function assemblenears(
     operator,
     testspace,
     trialspace,
-    tree;
+    tree,
+    ::PermuteSpaceInPlace;
     isnear=isnear(),
     scheduler=SerialScheduler(),
     matrixdata=defaultmatrixdata(operator, testspace, trialspace),
@@ -29,10 +62,9 @@ function assemblenears(
     nearmatrix = AbstractKernelMatrix(
         operator, testspace, trialspace; matrixdata=matrixdata
     )
-    values, nearvalues = nearinteractions(tree; isnear=isnear)
-    blocks = zeros.(
-        eltype(nearmatrix), length.(values), [sum(length.(n)) for n in nearvalues]
-    )
+    values, nearvalues = nearinteractions_consecutive(tree; isnear=isnear)
+    blocks =
+        zeros.(eltype(nearmatrix), length.(values), [sum(length.(n)) for n in nearvalues])
     # There should be a prettier not hardcoded way to do this, but it works for now
     viewblocks = Vector{
         Vector{
