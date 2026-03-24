@@ -15,7 +15,7 @@ H2Trees = "9db26ae3-82ff-4374-85e9-9ed87405fd16"
 ACAH2Trees = ["H2Trees"]
 
 [compat]
-H2Trees = "0.1"
+H2Trees = "0.1, 0.2"
 Polynomials = "4.1.0"
 StaticArrays = "1.9.13"
 julia = "1.10, 1.12"
