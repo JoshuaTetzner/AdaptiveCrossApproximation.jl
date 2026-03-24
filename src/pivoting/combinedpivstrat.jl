@@ -37,6 +37,41 @@ struct CombinedPivStratFunctor <: PivStratFunctor
     strats::Vector{PivStratFunctor}
 end
 
+"""
+    (pivstrat::CombinedPivStrat)(convergence::CombinedConvCritFunctor, idcs::AbstractArray{Int})
+
+Create a combined pivoting functor for the given index subset.
+
+Initializes all constituent strategies with the provided indices and links them to
+the combined convergence criterion. Handles special cases like `RandomSamplingPivoting`
+which requires the convergence criterion functor rather than indices.
+
+# Arguments
+
+  - `convergence::CombinedConvCritFunctor`: Combined convergence criterion
+  - `idcs::AbstractArray{Int}`: Indices for the submatrix
+
+# Returns
+
+  - `CombinedPivStratFunctor`: Initialized combined strategy with functors for all sub-strategies
+"""
+function (pivstrat::CombinedPivStrat)(
+    convergence::CombinedConvCritFunctor, idcs::AbstractArray{Int}
+)
+    curr_strats = Vector{PivStratFunctor}(undef, length(pivstrat.strats))
+    for (i, strat) in enumerate(pivstrat.strats)
+        if isa(strat, RandomSamplingPivoting)
+            curr_strats[i] = strat(convergence)
+        else
+            curr_strats[i] = strat(idcs)
+        end
+    end
+
+    return CombinedPivStratFunctor(convergence, curr_strats)
+end
+
+_buildpivstrat(strat::CombinedPivStrat, aca, idcs) = strat(aca.convergence, idcs)
+
 function Base.resize!(pivstrat::CombinedPivStratFunctor, args...)
     for strat in pivstrat.strats
         resize!(strat, args...)
@@ -99,41 +134,4 @@ function (pivstrat::CombinedPivStratFunctor)(rc::AbstractArray)
 
         return nextidx
     end
-end
-
-"""
-    (pivstrat::CombinedPivStrat)(convergence::CombinedConvCritFunctor, idcs::AbstractArray{Int})
-
-Create a combined pivoting functor for the given index subset.
-
-Initializes all constituent strategies with the provided indices and links them to
-the combined convergence criterion. Handles special cases like `RandomSamplingPivoting`
-which requires the convergence criterion functor rather than indices.
-
-# Arguments
-
-  - `convergence::CombinedConvCritFunctor`: Combined convergence criterion
-  - `idcs::AbstractArray{Int}`: Indices for the submatrix
-
-# Returns
-
-  - `CombinedPivStratFunctor`: Initialized combined strategy with functors for all sub-strategies
-"""
-function (pivstrat::CombinedPivStrat)(
-    convergence::CombinedConvCritFunctor, idcs::AbstractArray{Int}
-)
-    curr_strats = Vector{PivStratFunctor}(undef, length(pivstrat.strats))
-    for (i, strat) in enumerate(pivstrat.strats)
-        if isa(strat, RandomSamplingPivoting)
-            curr_strats[i] = strat(convergence)
-        else
-            curr_strats[i] = strat(idcs)
-        end
-    end
-
-    return CombinedPivStratFunctor(convergence, curr_strats)
-end
-
-function (pivstrat::CombinedPivStrat)(_::ConvCritFunctor, _::AbstractArray{Int})
-    throw(ArgumentError("CombinedPivStrat requires a CombinedConvCritFunctor"))
 end

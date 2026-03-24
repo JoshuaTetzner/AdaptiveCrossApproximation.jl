@@ -52,13 +52,12 @@ function (cc::FNormExtrapolator{F})(maxrank::Int) where {F}
     return FNormExtrapolatorFunctor(zeros(F, maxrank), cc.estimator())
 end
 
+# abstract helper identical for all criteria types
+_buildconvcrit(cc::FNormExtrapolator, A, rowidcs, colidcs, maxrank) = cc(maxrank)
+
 function reset!(convcrit::FNormExtrapolatorFunctor)
     fill!(convcrit.lastnorms, zero(eltype(convcrit.lastnorms)))
     reset!(convcrit.estimator)
-    return nothing
-end
-
-function Base.resize!(::FNormExtrapolatorFunctor, args...)
     return nothing
 end
 

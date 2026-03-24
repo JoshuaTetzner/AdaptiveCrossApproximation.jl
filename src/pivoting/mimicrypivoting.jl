@@ -119,6 +119,8 @@ function (strat::MimicryPivoting{D,F})(refidcs, idcs) where {D,F}
     return MimicryPivotingFunctor{D,F}(strat, nactive, refcentroid, idcs, h, leja, w)
 end
 
+_buildpivstrat(strat::MimicryPivoting, refidcs, idcs, maxrank) = strat(refidcs, idcs)
+
 function Base.resize!(functor::MimicryPivotingFunctor{D,F}, nactive::Int) where {D,F<:Real}
     if length(functor.idcs) < nactive
         resize!(functor.idcs, nactive)
@@ -131,9 +133,12 @@ function Base.resize!(functor::MimicryPivotingFunctor{D,F}, nactive::Int) where 
 end
 
 function reset!(
-    functor::MimicryPivotingFunctor{D,F}, idcs::AbstractVector{Int}
+    functor::MimicryPivotingFunctor{D,F},
+    refidcs::AbstractVector{Int},
+    idcs::AbstractVector{Int},
 ) where {D,F<:Real}
     resize!(functor, length(idcs))
+    functor.refcentroid = _centroid(functor.pivoting.refpos, refidcs)
     pos = functor.pivoting.pos
     @inbounds for i in 1:(functor.nactive)
         functor.idcs[i] = idcs[i]

@@ -106,12 +106,14 @@ Abstract type for stateful value-based pivoting functors.
 """
 abstract type ValuePivStratFunctor <: PivStratFunctor end
 
-function reset!(functor::PivStratFunctor, args...)
-    throw(ArgumentError("reset! is not implemented for $(typeof(functor))."))
-end
+_buildpivstrat(strat::PivStrat, aca, idcs) = strat(idcs)
 
 function Base.resize!(functor::PivStratFunctor, args...)
     throw(ArgumentError("resize! is not implemented for $(typeof(functor))."))
+end
+
+function reset!(functor::PivStratFunctor, args...)
+    throw(ArgumentError("reset! is not implemented for $(typeof(functor))."))
 end
 
 @inline function _centroid(

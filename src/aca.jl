@@ -25,18 +25,6 @@ struct ACA{RowPivType,ColPivType,ConvCritType}
     end
 end
 
-"""
-    ACA(; rowpivoting=MaximumValue(), columnpivoting=MaximumValue(),
-          convergence=FNormEstimator(1e-4))
-
-Construct an ACA compressor with keyword arguments.
-
-# Keyword Arguments
-
-  - `rowpivoting`: Row pivot selection strategy (default: `MaximumValue()`)
-  - `columnpivoting`: Column pivot selection strategy (default: `MaximumValue()`)
-  - `convergence`: Convergence criterion (default: `FNormEstimator(1e-4)`)
-"""
 function ACA(;
     tol=1e-4,
     rowpivoting=MaximumValue(),
@@ -46,64 +34,48 @@ function ACA(;
     return ACA(rowpivoting, columnpivoting, convergence)
 end
 
-function reset!(
-    aca::ACA{RP,CP,C},
+function (aca::ACA{RP,CP,C})(
+    rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
+) where {RP<:MaximumValue,CP<:MaximumValue,C<:FNormEstimator}
+    return ACA(aca.rowpivoting(rowidcs), aca.columnpivoting(colidcs), aca.convergence())
+end
+
+function (aca::ACA{RP,CP,C})(
+    A::Union{AbstractMatrix,AbstractKernelMatrix},
     rowidcs::AbstractArray{Int},
-    colidcs::AbstractArray{Int};
-    maxrank::Int=40,
+    colidcs::AbstractArray{Int},
+    maxrank::Int,
+) where {RP<:PivStrat,CP<:PivStrat,C<:ConvCrit}
+    rowpiv = _buildpivstrat(aca.rowpivoting, aca, rowidcs)
+    colpiv = _buildpivstrat(aca.columnpivoting, aca, colidcs)
+    convcrit = _buildconvcrit(aca.convergence, A, rowidcs, colidcs, maxrank)
+
+    return ACA(rowpiv, colpiv, convcrit)
+end
+
+function reset!(
+    aca::ACA{RP,CP,C}, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
 ) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
     reset!(aca.rowpivoting, rowidcs)
     reset!(aca.columnpivoting, colidcs)
     reset!(aca.convergence, rowidcs, colidcs)
-    return aca
+    return nothing
 end
 
-"""
-    (aca::ACA)(rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int})
-
-Create a specialized ACA instance for a submatrix defined by index sets.
-
-Initializes pivoting functors with the provided row and column indices. Used internally
-for hierarchical matrix compression.
-
-# Arguments
-
-  - `rowidcs`: Row indices of the submatrix
-  - `colidcs`: Column indices of the submatrix
-
-# Returns
-
-New `ACA` instance with initialized pivoting state for the given indices.
-"""
-function (aca::ACA)(
-    rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}; maxrank::Int=40
-)
-    return ACA(
-        aca.rowpivoting(rowidcs), aca.columnpivoting(colidcs), aca.convergence(maxrank)
+#=function (aca::ACA{RP,CP,C})(
+    A,
+    colbuffer::AbstractArray{K},
+    rowbuffer::AbstractArray{K},
+    maxrank::Int;
+    rows=zeros(Int, maxrank),
+    cols=zeros(Int, maxrank),
+    rowidcs=Vector(1:size(colbuffer, 1)),
+    colidcs=Vector(1:size(rowbuffer, 2)),
+) where {K,RP<:PivStrat,CP<:PivStrat,C<:ConvCrit}
+    return aca(A, rowidcs, colidcs, maxrank)(
+        A, colbuffer, rowbuffer, rows, cols, rowidcs, colidcs, maxrank
     )
-end
-
-function (aca::ACA{RP,CP,C})(
-    rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}; maxrank::Int=40
-) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
-    return reset!(aca, rowidcs, colidcs; maxrank=maxrank)
-end
-
-function (aca::ACA{RP,CP,C})(
-    A, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}; maxrank::Int=40
-) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
-    return reset!(aca, rowidcs, colidcs; maxrank=maxrank)
-end
-
-function (aca::ACA{RP,CP,C})(
-    A, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
-) where {RP<:PivStrat,CP<:PivStrat,C<:Union{RandomSampling,CombinedConvCrit}}
-    return ACA(
-        aca.rowpivoting(rowidcs),
-        aca.columnpivoting(colidcs),
-        aca.convergence(A, rowidcs, colidcs),
-    )
-end
+end=#
 
 function (aca::ACA{RP,CP,C})(
     A,
@@ -115,74 +87,8 @@ function (aca::ACA{RP,CP,C})(
     rowidcs=Vector(1:size(colbuffer, 1)),
     colidcs=Vector(1:size(rowbuffer, 2)),
 ) where {K,RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
-    return aca(A, rowidcs, colidcs; maxrank=maxrank)(
-        A, colbuffer, rowbuffer, rows, cols, rowidcs, colidcs, maxrank
-    )
-end
-
-function (aca::ACA{RP,CP,C})(
-    A, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
-) where {RP<:CombinedPivStrat,CP<:Union{ValuePivStrat,GeoPivStrat},C<:CombinedConvCrit}
-    convcrit = aca.convergence(A, rowidcs, colidcs)
-    return ACA(aca.rowpivoting(convcrit, rowidcs), aca.columnpivoting(colidcs), convcrit)
-end
-
-function (aca::ACA{RP,CP,C})(
-    A, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
-) where {RP<:Union{ValuePivStrat,GeoPivStrat},CP<:CombinedPivStrat,C<:CombinedConvCrit}
-    convcrit = aca.convergence(A, rowidcs, colidcs)
-    return ACA(aca.rowpivoting(rowidcs), aca.columnpivoting(convcrit, colidcs), convcrit)
-end
-
-"""
-    nextrc!(buf, A::AbstractArray, i, j)
-
-Fill buffer `buf` with submatrix `A[i, j]`.
-
-Internal utility for matrix element access. Can be extended for custom matrix types
-to enable ACA compression of matrix-free operators.
-"""
-nextrc!(buf, A::AbstractArray, i, j) = (buf .= view(A, i, j))
-
-"""
-    (aca::ACA{P,P,C})(A, colbuffer, rowbuffer, maxrank; kwargs...)
-
-Convenience method that initializes pivoting functors when using uniform strategies.
-
-Delegates to the main computational routine after creating index-specialized functors.
-Only available when both pivoting strategies are of the same stateless type `P <: PivStrat`.
-
-See the main `(aca::ACA)(A, colbuffer, rowbuffer, rows, cols, rowidcs, colidcs, maxrank)`
-method for detailed argument documentation.
-"""
-function (aca::ACA{RP,CP,C})(
-    A,
-    colbuffer::AbstractArray{K},
-    rowbuffer::AbstractArray{K},
-    maxrank::Int;
-    rows=zeros(Int, maxrank),
-    cols=zeros(Int, maxrank),
-    rowidcs=Vector(1:size(colbuffer, 1)),
-    colidcs=Vector(1:size(rowbuffer, 2)),
-) where {K,RP<:PivStrat,CP<:PivStrat,C<:ConvCrit}
-    return aca(rowidcs, colidcs)(
-        A, colbuffer, rowbuffer, rows, cols, rowidcs, colidcs, maxrank
-    )
-end
-
-function (aca::ACA{RP,CP,C})(
-    A,
-    colbuffer::AbstractArray{K},
-    rowbuffer::AbstractArray{K},
-    maxrank::Int;
-    rows=zeros(Int, maxrank),
-    cols=zeros(Int, maxrank),
-    rowidcs=Vector(1:size(colbuffer, 1)),
-    colidcs=Vector(1:size(rowbuffer, 2)),
-) where {K,RP<:PivStrat,CP<:PivStrat,C<:Union{RandomSampling,CombinedConvCrit}}
-    return aca(A, rowidcs, colidcs)(
-        A, colbuffer, rowbuffer, rows, cols, rowidcs, colidcs, maxrank
-    )
+    reset!(aca, rowidcs, colidcs)
+    return aca(A, colbuffer, rowbuffer, rows, cols, rowidcs, colidcs, maxrank)
 end
 
 """

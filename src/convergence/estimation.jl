@@ -32,16 +32,14 @@ end
 
 Initialize FNormEstimator functor with zero accumulated norm.
 """
-function (cc::FNormEstimator{F})(args...) where {F}
+function (cc::FNormEstimator{F})() where {F}
     return FNormEstimatorFunctor(F(0.0), cc.tol)
 end
+# abstract helper identical for all criteria types
+_buildconvcrit(cc::FNormEstimator, A, rowidcs, colidcs, maxrank) = cc()
 
 function reset!(convcrit::FNormEstimatorFunctor)
     convcrit.normUV² = zero(convcrit.normUV²)
-    return nothing
-end
-
-function Base.resize!(::FNormEstimatorFunctor, args...)
     return nothing
 end
 

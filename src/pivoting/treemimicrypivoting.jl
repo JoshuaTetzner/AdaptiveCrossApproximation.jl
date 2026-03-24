@@ -80,10 +80,10 @@ computes the reference centroid from `refidcs` and allocates `usedidcs` of lengt
 `maxrank` for storing selected point indices.
 """
 function (pivstrat::TreeMimicryPivoting{D,T})(
-    farfield::AbstractVector{Int}, refidcs::AbstractVector{Int}, maxrank::Int
+    refidcs::AbstractVector{Int}, idcs::AbstractVector{Int}, maxrank::Int
 ) where {D,T}
     refcentroid = _centroid(pivstrat.refpos, refidcs)
-    farfieldbuf = collect(Int, farfield)
+    farfieldbuf = collect(Int, idcs)
     farfieldlen = length(farfieldbuf)
     h = zeros(T, farfieldlen)
     leja = ones(T, farfieldlen)
@@ -104,6 +104,9 @@ function (pivstrat::TreeMimicryPivoting{D,T})(
     )
 end
 
+_buildpivstrat(strat::TreeMimicryPivoting, refidcs, idcs, maxrank) =
+    strat(refidcs, idcs, maxrank)
+
 function Base.resize!(pivstrat::TreeMimicryPivotingFunctor, nactive::Int)
     length(pivstrat.farfield) < nactive && resize!(pivstrat.farfield, nactive)
     if length(pivstrat.h) < nactive
@@ -116,12 +119,15 @@ function Base.resize!(pivstrat::TreeMimicryPivotingFunctor, nactive::Int)
 end
 
 function reset!(
-    pivstrat::TreeMimicryPivotingFunctor{D,T}, idcs::AbstractVector{<:Integer}
+    pivstrat::TreeMimicryPivotingFunctor{D,T},
+    refidcs::AbstractVector{Int},
+    idcs::AbstractVector{Int},
 ) where {D,T<:Real}
     resize!(pivstrat, length(idcs))
     @inbounds for i in 1:(pivstrat.nactive)
         pivstrat.farfield[i] = Int(idcs[i])
     end
+    pivstrat.refcentroid = _centroid(pivstrat.pivoting.refpos, refidcs)
     fill!(view(pivstrat.h, 1:(pivstrat.nactive)), zero(T))
     fill!(view(pivstrat.leja, 1:(pivstrat.nactive)), one(T))
     fill!(view(pivstrat.w, 1:(pivstrat.nactive)), zero(T))

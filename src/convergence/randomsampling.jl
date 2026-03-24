@@ -17,6 +17,21 @@ struct RandomSampling{F<:Real} <: ConvCrit
 end
 
 """
+    RandomSampling(; factor=1.0, nsamples=0, tol=1e-4)
+
+Construct random sampling convergence criterion.
+
+# Arguments
+
+  - `factor::F`: Multiplier for automatic sample count (default: `1.0`)
+  - `nsamples::Int`: Fixed sample count (default: `0`, use factor instead)
+  - `tol::F`: Convergence tolerance (default: `1e-4`)
+"""
+function RandomSampling(; factor::F=1.0, nsamples::Int=0, tol::F=1e-4) where {F<:Real}
+    return RandomSampling(nsamples, factor, tol)
+end
+
+"""
     RandomSamplingFunctor{F<:Real,K,M} <: ConvCritFunctor
 
 Stateful random sampling convergence checker.
@@ -30,16 +45,16 @@ Tracks residual error at sampled matrix entries across iterations.
     - `tol::F`: Convergence tolerance
     - `mat::M`: Matrix handle used for refreshing random samples
 """
-mutable struct RandomSamplingFunctor{F<:Real,K,M} <: ConvCritFunctor
-    normUV²::F
-    nsamples::Int
-    factor::F
+mutable struct RandomSamplingFunctor{F<:Real,K,M,T} <: ConvCritFunctor
+    convergence::T
+    mat::M
     nactive::Int
+    normUV²::F
     indices::Vector{Tuple{Int,Int}}
     rest::Vector{K}
-    tol::F
-    mat::M
 end
+
+tolerance(cc::RandomSamplingFunctor) = cc.tol
 
 @inline function _samplecount(cc::RandomSampling, rowlen::Int, collen::Int)
     nsamples = cc.nsamples == 0 ? Int(round(cc.factor * (rowlen + collen))) : cc.nsamples
@@ -47,17 +62,7 @@ end
     return min(nsamples, rowlen * collen)
 end
 
-@inline function _samplecount(convcrit::RandomSamplingFunctor, rowlen::Int, collen::Int)
-    nsamples = if convcrit.nsamples == 0
-        Int(round(convcrit.factor * (rowlen + collen)))
-    else
-        convcrit.nsamples
-    end
-    nsamples = max(1, nsamples)
-    return min(nsamples, rowlen * collen)
-end
-
-function _sample_indices(rowlen::Int, collen::Int, nsamples::Int)
+function _sampleindices(rowlen::Int, collen::Int, nsamples::Int)
     idxset = Set{Tuple{Int,Int}}()
     sizehint!(idxset, nsamples)
     while length(idxset) < nsamples
@@ -66,7 +71,7 @@ function _sample_indices(rowlen::Int, collen::Int, nsamples::Int)
     return collect(idxset)
 end
 
-function _sample_indices!(
+function _sampleindices!(
     indices::Vector{Tuple{Int,Int}}, rowlen::Int, collen::Int, nsamples::Int
 )
     length(indices) < nsamples && resize!(indices, nsamples)
@@ -88,10 +93,7 @@ function _sample_indices!(
     return indices
 end
 
-@inline _entryvalue(entry::Number) = entry
-@inline _entryvalue(entry) = entry[1]
-
-function _fill_rest!(
+function _fillrest!(
     rest::AbstractVector,
     indices::Vector{Tuple{Int,Int}},
     K::AbstractMatrix,
@@ -99,23 +101,14 @@ function _fill_rest!(
     colidcs::AbstractArray{Int},
     nactive::Int,
 )
+    length(rest) < nactive && resize!(rest, nactive)
     @inbounds for i in 1:nactive
         rc = indices[i]
-        rest[i] = _entryvalue(K[rowidcs[rc[1]], colidcs[rc[2]]])
+        rest[i] = K[rowidcs[rc[1]], colidcs[rc[2]]]
     end
-    return rest
 end
 
-function _restbuffer(
-    K::Union{AbstractMatrix,AbstractKernelMatrix},
-    rowidcs::AbstractArray{Int},
-    colidcs::AbstractArray{Int},
-    indices::Vector{Tuple{Int,Int}},
-)
-    return Vector{eltype(K)}(undef, length(indices))
-end
-
-function _fill_rest!(
+function _fillrest!(
     rest::AbstractVector,
     indices::Vector{Tuple{Int,Int}},
     K::AbstractKernelMatrix,
@@ -123,26 +116,11 @@ function _fill_rest!(
     colidcs::AbstractArray{Int},
     nactive::Int,
 )
+    length(rest) < nactive && resize!(rest, nactive)
     @inbounds for i in 1:nactive
         rc = indices[i]
         @views K(rest[i:i], rowidcs[rc[1]:rc[1]], colidcs[rc[2]:rc[2]])
     end
-    return rest
-end
-
-"""
-    RandomSampling(; factor=1.0, nsamples=0, tol=1e-4)
-
-Construct random sampling convergence criterion.
-
-# Arguments
-
-  - `factor::F`: Multiplier for automatic sample count (default: `1.0`)
-  - `nsamples::Int`: Fixed sample count (default: `0`, use factor instead)
-  - `tol::F`: Convergence tolerance (default: `1e-4`)
-"""
-function RandomSampling(; factor::F=1.0, nsamples::Int=0, tol::F=1e-4) where {F<:Real}
-    return RandomSampling(nsamples, factor, tol)
 end
 
 function (cc::RandomSampling)(
@@ -153,54 +131,29 @@ function (cc::RandomSampling)(
     rowlen = length(rowidcs)
     collen = length(colidcs)
     nsamples = _samplecount(cc, rowlen, collen)
-    indices = _sample_indices(rowlen, collen, nsamples)
-    rest = _restbuffer(K, rowidcs, colidcs, indices)
-    _fill_rest!(rest, indices, K, rowidcs, colidcs, nsamples)
-    return RandomSamplingFunctor(
-        zero(cc.tol), cc.nsamples, cc.factor, nsamples, indices, rest, cc.tol, K
-    )
+    indices = _sampleindices(rowlen, collen, nsamples)
+    rest = zeros(eltype(K), nsamples)
+    _fillrest!(rest, indices, K, rowidcs, colidcs, nsamples)
+    return RandomSamplingFunctor(cc, K, nsamples, zero(cc.tol), indices, rest)
 end
 
-function reset!(convcrit::RandomSamplingFunctor)
-    convcrit.normUV² = zero(convcrit.normUV²)
-    fill!(view(convcrit.rest, 1:(convcrit.nactive)), zero(eltype(convcrit.rest)))
-    fill!(view(convcrit.indices, 1:(convcrit.nactive)), (0, 0))
-    return nothing
-end
+# abstract helper identical for all criteria types
+_buildconvcrit(cc::RandomSampling, K, rowidcs, colidcs, maxrank) = cc(K, rowidcs, colidcs)
 
 function reset!(
     convcrit::RandomSamplingFunctor,
     rowidcs::AbstractArray{Int},
     colidcs::AbstractArray{Int},
 )
-    resize!(convcrit, rowidcs, colidcs)
-    return nothing
-end
-
-function Base.resize!(
-    convcrit::RandomSamplingFunctor,
-    rowidcs::AbstractArray{Int},
-    colidcs::AbstractArray{Int},
-)
     rowlen = length(rowidcs)
     collen = length(colidcs)
-    nsamples = _samplecount(convcrit, rowlen, collen)
-
-    _sample_indices!(convcrit.indices, rowlen, collen, nsamples)
-    length(convcrit.rest) < nsamples && resize!(convcrit.rest, nsamples)
-    _fill_rest!(convcrit.rest, convcrit.indices, convcrit.mat, rowidcs, colidcs, nsamples)
-
+    nsamples = _samplecount(convcrit.convergence, rowlen, collen)
+    _sampleindices!(convcrit.indices, rowlen, collen, nsamples)
+    _fillrest!(convcrit.rest, convcrit.indices, convcrit.mat, rowidcs, colidcs, nsamples)
     convcrit.nactive = nsamples
     convcrit.normUV² = zero(convcrit.normUV²)
-    return convcrit
+    return nothing
 end
-
-"""
-    tolerance(cc::RandomSamplingFunctor)
-
-Get tolerance from random sampling functor.
-"""
-tolerance(cc::RandomSamplingFunctor) = cc.tol
 
 """
     (convcrit::RandomSamplingFunctor)(rowbuffer, colbuffer, npivot, maxrows, maxcolumns)

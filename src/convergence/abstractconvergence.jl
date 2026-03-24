@@ -14,16 +14,29 @@ Used during compression to track convergence state across iterations.
 """
 abstract type ConvCritFunctor end
 
+function (cc::ConvCrit)(
+    K::Union{AbstractMatrix,AbstractKernelMatrix},
+    rowidcs::AbstractArray{Int},
+    colidcs::AbstractArray{Int};
+    maxrank::Int=40,
+)
+    if isa(cc, CombinedConvCrit)
+        return cc(K, rowidcs, colidcs; maxrank=maxrank)
+    elseif isa(cc, RandomSampling)
+        return cc(K, rowidcs, colidcs)
+    elseif isa(cc, FNormExtrapolator)
+        return cc(maxrank)
+    else
+        return cc()
+    end
+end
+
 function reset!(convcrit::ConvCritFunctor)
     throw(ArgumentError("reset! is not implemented for $(typeof(convcrit))."))
 end
 
 function reset!(convcrit::ConvCritFunctor, args...)
     return reset!(convcrit)
-end
-
-function Base.resize!(convcrit::ConvCritFunctor, args...)
-    throw(ArgumentError("resize! is not implemented for $(typeof(convcrit))."))
 end
 
 """

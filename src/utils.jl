@@ -54,17 +54,49 @@ function linearizestorage(v::Vector{Vector{T}}) where {T}
     return ptr, data
 end
 
-function buffersize(ptr::Vector{Int}, vals::Vector{T}, nodes::Vector{Int}) where {T}
+function buffersize(
+    vals::Vector{T}, ptr::Vector{Int}, farvals::Vector{T}, nodes::Vector{Int}
+) where {T}
     blen = 0
+    fblen = 0
     @inbounds for node in nodes
         start = ptr[node]
         stop  = ptr[node + 1] - 1
+        len   = length(vals[node])
+        blen < len && (blen = len)
         for faridx in start:stop
-            len = length(vals[faridx])
-            if len > blen
-                blen = len
+            len = length(farvals[faridx])
+            if len > fblen
+                fblen = len
             end
         end
     end
-    return blen
+    return blen, fblen
+end
+
+# required for blocksparse format
+function blockvalues(
+    values::Vector{Vector{Int}},
+    farptr::Vector{Int},
+    farvalues::Vector{Vector{Int}},
+    levelnodes::Vector{Int},
+)
+    nblocks = 0
+    @inbounds for node in levelnodes
+        nblocks += farptr[node + 1] - farptr[node]
+    end
+    levelvals = Vector{Vector{Int}}(undef, nblocks)
+    levelfarvals = Vector{Vector{Int}}(undef, nblocks)
+    i = 1
+    for node in levelnodes
+        farptr[node + 1] == farptr[node] && continue
+        r = values[node]
+        for j in farptr[node]:(farptr[node + 1] - 1)
+            levelfarvals[i] = farvalues[j]
+            levelvals[i] = r
+            i += 1
+        end
+    end
+
+    return levelvals, levelfarvals
 end

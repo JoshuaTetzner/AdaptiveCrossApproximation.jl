@@ -27,10 +27,15 @@ function assemblenears(
         operator, testspace, trialspace; matrixdata=matrixdata
     )
     values, nearvalues = nearinteractions(tree; isnear=isnear)
+
+    isempty(values) && return BlockSparseMatrix(
+        Matrix{eltype(nearmatrix)}[], Vector{Int}[], Vector{Int}[], size(nearmatrix)
+    )
+
     blocks = Vector{Matrix{eltype(nearmatrix)}}(undef, length(values))
     @tasks for i in eachindex(blocks)
         @set scheduler = scheduler
-        blk = zeros(eltype(nearmatrix), length.(values), length(nearvalues))
+        blk = zeros(eltype(nearmatrix), length(values[i]), length(nearvalues[i]))
         nearmatrix(blk, values[i], nearvalues[i])
         blocks[i] = blk
     end

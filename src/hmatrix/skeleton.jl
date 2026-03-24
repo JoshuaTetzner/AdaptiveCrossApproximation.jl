@@ -9,6 +9,7 @@ function LowRankMatrix(U::T, V::T) where {K,T<:AbstractMatrix{K}}
     return LowRankMatrix{K}(U, V, zeros(K, size(U, 2)))
 end
 
+Base.eltype(::Type{<:LowRankMatrix{K}}) where {K} = K
 Base.size(lrm::LowRankMatrix) = (size(lrm.U, 1), size(lrm.V, 2))
 
 function LinearAlgebra.mul!(y::AbstractVecOrMat, M::LowRankMatrix, x::AbstractVector)

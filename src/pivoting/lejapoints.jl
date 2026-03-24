@@ -65,6 +65,8 @@ function (pivstrat::Leja2{D,F})(idcs::AbstractVector{<:Integer}) where {D,F}
     return Leja2Functor{D,F}(pivstrat, nactive, collect(Int, idcs), zeros(F, nactive))
 end
 
+_buildpivstrat(strat::Leja2, aca, idcs) = strat(idcs)
+
 @inline _positions(pivstrat::GeoPivStratFunctor) = pivstrat.pivoting.pos
 
 function Base.resize!(pivstrat::Leja2Functor{D,F}, nactive::Int) where {D,F<:Real}

@@ -19,7 +19,7 @@ function fars_consecutive!(
         end
     end
     farvalues[tnode] = localfarnodes
-    values[tnode] = range(treea, tnode)
+    !isempty(localfarnodes) && (values[tnode] = range(treea, tnode))
     for child in children(treea, tnode)
         fars_consecutive!(treea, treeb, values, farvalues, child, childnodes; isnear=isnear)
     end
@@ -43,7 +43,7 @@ function fars!(
             append!(childnodes, collect(children(treeb, snode)))
         end
     end
-    !isempty(localfarvalues) && (farvalues[tnode] = localfarvalues)
+    farvalues[tnode] = localfarvalues
     !isempty(localfarvalues) && (values[tnode] = H2Trees.values(treea, tnode))
     for child in children(treea, tnode)
         fars!(treea, treeb, values, farvalues, child, childnodes; isnear=isnear)
@@ -62,15 +62,15 @@ function AdaptiveCrossApproximation.farinteractions(
     treea, treeb; isnear=AdaptiveCrossApproximation.isnear(1.0)
 )
     vals = Vector{Vector{Int}}(undef, length(treea.nodes))
-    nestedfarvals = Vector{Vector{Int}}(undef, length(treea.nodes))
+    nestedfarvals = Vector{Vector{Vector{Int}}}(undef, length(treea.nodes))
     if !isnear(treea, treeb, root(treea), root(treeb))
         vals[root(treea)] = H2Trees.values(treea, root(treea))
         nestedfarvals[root(treea)] = [H2Trees.values(treeb, root(treeb))]
     else
         fars!(treea, treeb, vals, nestedfarvals, root(treea), [root(treeb)]; isnear=isnear)
     end
-
-    return vals, AdaptiveCrossApproximation.linearizestorage(nestedfarvals)
+    farptr, farvals = AdaptiveCrossApproximation.linearizestorage(nestedfarvals)
+    return vals, farptr, farvals
 end
 
 function AdaptiveCrossApproximation.farinteractions_consecutive(

@@ -26,6 +26,8 @@ include("convergence/combinedconvcrit.jl")
 include("pivoting/combinedpivstrat.jl")
 include("pivoting/randomsampling.jl")
 
+nextrc!(buf, A::AbstractArray, i, j) = (buf .= view(A, i, j))
+
 include("aca.jl")
 include("acaT.jl")
 include("iaca.jl")
@@ -63,5 +65,5 @@ export FNormEstimator, iFNormEstimator, FNormExtrapolator
 export MaximumValue, Leja2, FillDistance
 export MimicryPivoting, TreeMimicryPivoting
 export reset!
-
+export AbstractKernelMatrix
 end
