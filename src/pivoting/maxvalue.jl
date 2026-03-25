@@ -23,18 +23,34 @@ Maintains a boolean vector to ensure each index is selected at most once.
 
   - `usedidcs::Vector{Bool}`: Tracks which indices have been selected as pivots
 """
-struct MaximumValueFunctor <: ValuePivStratFunctor
+mutable struct MaximumValueFunctor <: ValuePivStratFunctor
+    nactive::Int
     usedidcs::Vector{Bool}
 end
 
 """
-    (::MaximumValue)(idcs::AbstractArray{Int})
+    (::MaximumValue)(idcs::AbstractVector{<:Integer})
 
 Create a `MaximumValueFunctor` for the given index array.
 
 Returns a functor with tracking vector sized to match the length of `idcs`.
 """
-(::MaximumValue)(idcs::AbstractArray{Int}) = MaximumValueFunctor(zeros(Bool, length(idcs)))
+(::MaximumValue)(idcs::AbstractVector{<:Integer}) = MaximumValueFunctor(
+    length(idcs), zeros(Bool, length(idcs))
+)
+(::MaximumValue)(nidcs::Int) = MaximumValueFunctor(nidcs, zeros(Bool, nidcs))
+
+function Base.resize!(pivstrat::MaximumValueFunctor, nactive::Int)
+    length(pivstrat.usedidcs) < nactive && resize!(pivstrat.usedidcs, nactive)
+    pivstrat.nactive = nactive
+    return nothing
+end
+
+function reset!(pivstrat::MaximumValueFunctor, idcs::AbstractVector{<:Integer})
+    resize!(pivstrat, length(idcs))
+    fill!(view(pivstrat.usedidcs, 1:(pivstrat.nactive)), false)
+    return nothing
+end
 
 """
     (pivstrat::MaximumValueFunctor)()
@@ -44,6 +60,7 @@ Select the first index as the initial pivot.
 Returns `1` and marks it as used. Used when no row/column data is available yet.
 """
 function (pivstrat::MaximumValueFunctor)()
+    @assert pivstrat.nactive >= 1
     pivstrat.usedidcs[1] = true
     return 1
 end
@@ -65,9 +82,18 @@ marks it as used, and returns its index.
   - `nextidx::Int`: Index of the maximum absolute value among unused indices
 """
 function (pivstrat::MaximumValueFunctor)(rc::AbstractArray)
+    nactive = pivstrat.nactive
+    used = view(pivstrat.usedidcs, 1:nactive)
+
+    if all(used)
+        @warn "Rectangular full-rank blockstructure detected."
+        absrx = abs.(view(rc, 1:nactive))
+        maximum(absrx) != 0.0 && (return argmax(absrx))
+    end
+
     nextidx = 1
     maxval = 0.0
-    for i in eachindex(pivstrat.usedidcs)
+    for i in 1:nactive
         if (!pivstrat.usedidcs[i]) && abs(rc[i]) >= maxval
             nextidx = i
             maxval = abs(rc[i])

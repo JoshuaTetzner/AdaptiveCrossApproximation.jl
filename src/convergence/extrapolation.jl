@@ -10,7 +10,7 @@ Combines norm estimation with quadratic extrapolation to predict convergence.
 
   - `estimator::Union{FNormEstimator{F},iFNormEstimator{F}}`: Underlying norm estimator
 """
-mutable struct FNormExtrapolator{F} <: ConvCrit
+struct FNormExtrapolator{F} <: ConvCrit
     estimator::Union{FNormEstimator{F},iFNormEstimator{F}}
 end
 
@@ -25,7 +25,7 @@ Fits quadratic polynomial to log-scaled norms for convergence prediction.
   - `lastnorms::Vector{F}`: History of pivot norms for extrapolation
   - `estimator::Union{FNormEstimatorFunctor{F},iFNormEstimatorFunctor{F}}`: Active estimator functor
 """
-mutable struct FNormExtrapolatorFunctor{F} <: ConvCritFunctor
+struct FNormExtrapolatorFunctor{F} <: ConvCritFunctor
     lastnorms::Vector{F}
     estimator::Union{FNormEstimatorFunctor{F},iFNormEstimatorFunctor{F}}
 end
@@ -48,8 +48,17 @@ end
 
 Initialize extrapolator functor with empty history.
 """
-function (cc::FNormExtrapolator{F})() where {F}
-    return FNormExtrapolatorFunctor(F[], cc.estimator())
+function (cc::FNormExtrapolator{F})(maxrank::Int) where {F<:Real}
+    return FNormExtrapolatorFunctor(zeros(F, maxrank), cc.estimator())
+end
+
+# abstract helper identical for all criteria types
+_buildconvcrit(cc::FNormExtrapolator, A, rowidcs, colidcs, maxrank) = cc(maxrank)
+
+function reset!(convcrit::FNormExtrapolatorFunctor)
+    fill!(convcrit.lastnorms, zero(eltype(convcrit.lastnorms)))
+    reset!(convcrit.estimator)
+    return nothing
 end
 
 """
@@ -87,14 +96,12 @@ function (convcrit::FNormExtrapolatorFunctor{F})(
 ) where {F<:Real,K}
     npivot_, conv = convcrit.estimator(rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
     (npivot_ != npivot) && (return npivot_, conv)
-    (!conv) && (f2 = fit(Vector(1:(npivot - 1)), log10.(convcrit.lastnorms), 2))
-    conv && (@views push!(
-        convcrit.lastnorms,
-        norm(rowbuffer[npivot, 1:maxcolumns]) * norm(colbuffer[1:maxrows, npivot]),
-    ))
     if conv
+        @views convcrit.lastnorms[npivot] =
+            norm(rowbuffer[npivot, 1:maxcolumns]) * norm(colbuffer[1:maxrows, npivot])
         return npivot, true
     else
+        f2 = fit(Vector(1:(npivot - 1)), log10.(convcrit.lastnorms[1:(npivot - 1)]), 2)
         return npivot,
         f2(npivot) > log10(convcrit.estimator.tol * sqrt(convcrit.estimator.normUV²))
     end
@@ -122,12 +129,11 @@ function (convcrit::FNormExtrapolatorFunctor{F})(
     npivot_, conv = convcrit.estimator(rcbuffer, npivot)
     (npivot_ != npivot) && (return npivot_, conv)
 
-    (!conv) &&
-        (f2 = fit(Vector(1:length(convcrit.lastnorms)), log10.(convcrit.lastnorms), 2))
-    @views push!(convcrit.lastnorms, norm(rcbuffer))
+    @views convcrit.lastnorms[npivot] = norm(rcbuffer)
     if conv
         return npivot, true
     else
+        f2 = fit(Vector(1:(npivot - 1)), log10.(convcrit.lastnorms[1:(npivot - 1)]), 2)
         return npivot, f2(npivot) > log10(tolerance(convcrit) * convcrit.estimator.normUV)
     end
 end
