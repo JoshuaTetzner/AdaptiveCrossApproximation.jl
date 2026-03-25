@@ -35,6 +35,13 @@ Initialize FNormEstimator functor with zero accumulated norm.
 function (cc::FNormEstimator{F})() where {F}
     return FNormEstimatorFunctor(F(0.0), cc.tol)
 end
+# abstract helper identical for all criteria types
+_buildconvcrit(cc::FNormEstimator, A, rowidcs, colidcs, maxrank) = cc()
+
+function reset!(convcrit::FNormEstimatorFunctor)
+    convcrit.normUV² = zero(convcrit.normUV²)
+    return nothing
+end
 
 """
     tolerance(cc::FNormEstimator)
@@ -71,7 +78,6 @@ function (convcrit::FNormEstimatorFunctor{F})(
 ) where {F<:Real,K}
     @views rnorm = norm(rowbuffer[npivot, 1:maxcolumns])
     @views cnorm = norm(colbuffer[1:maxrows, npivot])
-
     (isapprox(rnorm, 0.0) && isapprox(cnorm, 0.0)) && (return npivot - 1, false)
     if (isapprox(rnorm, 0.0) || isapprox(cnorm, 0.0))
         (npivot == 1) ? (return npivot - 1, true) : (return npivot - 1, false)
@@ -117,6 +123,11 @@ Initialize iFNormEstimator functor with zero accumulated norm.
 """
 function (cc::iFNormEstimator{F})() where {F}
     return iFNormEstimatorFunctor(F(0.0), cc.tol)
+end
+
+function reset!(convcrit::iFNormEstimatorFunctor)
+    convcrit.normUV = zero(convcrit.normUV)
+    return nothing
 end
 
 """

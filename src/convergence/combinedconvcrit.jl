@@ -30,6 +30,54 @@ mutable struct CombinedConvCritFunctor <: ConvCritFunctor
 end
 
 """
+    (convcrit::CombinedConvCrit)(K::AbstractMatrix, rowidcs, colidcs)
+
+Initialize combined criterion functors.
+Handles special initialization for sampling-based criteria.
+
+# Arguments
+
+  - `K::AbstractMatrix`: Matrix to compress
+  - `rowidcs::AbstractArray{Int}`: Active row indices
+  - `colidcs::AbstractArray{Int}`: Active column indices
+"""
+function (convcrit::CombinedConvCrit)(
+    K::Union{AbstractMatrix,AbstractKernelMatrix},
+    rowidcs::AbstractArray{Int},
+    colidcs::AbstractArray{Int};
+    maxrank::Int=40,
+)
+    curr_crits = Vector{ConvCritFunctor}(undef, length(convcrit.crits))
+    for (i, crit) in enumerate(convcrit.crits)
+        if isa(crit, RandomSampling)
+            curr_crits[i] = crit(K, rowidcs, colidcs)
+        elseif isa(crit, FNormExtrapolatorFunctor)
+            curr_crits[i] = crit(maxrank)
+        else
+            curr_crits[i] = crit()
+        end
+    end
+    return CombinedConvCritFunctor(curr_crits, ones(Bool, length(curr_crits)))
+end
+
+# abstract helper identical for all criteria types
+_buildconvcrit(cc::CombinedConvCrit, A, rowidcs, colidcs, maxrank) = cc(
+    A, rowidcs, colidcs; maxrank=maxrank
+)
+
+function reset!(
+    convcrit::CombinedConvCritFunctor,
+    rowidcs::AbstractVector{Int},
+    colidcs::AbstractVector{Int},
+)
+    for crit in convcrit.crits
+        reset!(crit, rowidcs, colidcs)
+    end
+    fill!(convcrit.isconverged, true)
+    return convcrit
+end
+
+"""
     (convcrit::CombinedConvCritFunctor)(rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
 
 Check convergence using all combined criteria.
@@ -59,33 +107,13 @@ function (convcrit::CombinedConvCritFunctor)(
         npivot_, convcrit.isconverged[i] = crit(
             rowbuffer, colbuffer, npivot, maxrows, maxcolumns
         )
-        npivot_ != npivot && return npivot_, convcrit.isconverged[i]
-    end
-    return npivot, any(convcrit.isconverged)
-end
 
-"""
-    (convcrit::CombinedConvCrit)(K::AbstractMatrix, rowidcs, colidcs)
-
-Initialize combined criterion functors.
-Handles special initialization for sampling-based criteria.
-
-# Arguments
-
-  - `K::AbstractMatrix`: Matrix to compress
-  - `rowidcs::AbstractArray{Int}`: Active row indices
-  - `colidcs::AbstractArray{Int}`: Active column indices
-"""
-function (convcrit::CombinedConvCrit)(
-    K::AbstractMatrix, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
-)
-    curr_crits = Vector{ConvCritFunctor}(undef, length(convcrit.crits))
-    for (i, crit) in enumerate(convcrit.crits)
-        if isa(crit, RandomSampling)
-            curr_crits[i] = crit(K, rowidcs, colidcs)
-        else
-            curr_crits[i] = crit()
+        if (npivot_ != npivot && i == length(convcrit.crits))
+            rowbuffer[npivot, :] .= K(0)
+            colbuffer[:, npivot] .= K(0)
+            return npivot_, convcrit.isconverged[i]
         end
     end
-    return CombinedConvCritFunctor(curr_crits, ones(Bool, length(curr_crits)))
+
+    return npivot, any(convcrit.isconverged)
 end
