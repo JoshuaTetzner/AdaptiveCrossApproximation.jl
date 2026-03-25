@@ -4,30 +4,44 @@ version = "0.1.0"
 authors = ["JoshuaTetzner <joshua.tetzner@uni-rostock.de>"]
 
 [deps]
+BlockSparseMatrices = "1ef78180-cc57-4e70-b6ec-c3e471307147"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+LinearMaps = "7a12625a-238d-50fd-b39a-03d52299707e"
+OhMyThreads = "67456a42-1dca-4109-a031-0a68de7e3ad5"
 Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [weakdeps]
+BEAST = "bb4162c7-ba94-5a20-af32-d8ec4428bdd1"
 H2Trees = "9db26ae3-82ff-4374-85e9-9ed87405fd16"
 
 [extensions]
+ACABEAST = ["BEAST"]
 ACAH2Trees = ["H2Trees"]
 
 [compat]
-H2Trees = "0.1"
+BEAST = "2.8.0"
+BlockSparseMatrices = "0.3.1"
+CompScienceMeshes = "0.9.0 - 0.11.0"
+H2Trees = "0.2.0"
+LinearMaps = "3.11.4"
+OhMyThreads = "0.8.4"
+ParallelKMeans = "1.1.0"
 Polynomials = "4.1.0"
 StaticArrays = "1.9.13"
 
 [extras]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+CompScienceMeshes = "3e66a162-7b8c-5da0-b8f8-124ecd2c3ae1"
 H2Trees = "9db26ae3-82ff-4374-85e9-9ed87405fd16"
 JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
 JuliaFormatter = "98e50ef6-434e-11e9-1051-2b60c6c9e899"
+ParallelKMeans = "42b8e9d4-006b-409a-8472-7f34b3fb58af"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TestItemRunner = "f8b46487-2199-4994-9208-9a1283c18c0a"
 TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [targets]
-test = ["Aqua", "JET", "JuliaFormatter", "Test", "TestItemRunner", "TestItems", "Random", "H2Trees"]
+test = ["Aqua", "JET", "JuliaFormatter", "Test", "TestItemRunner", "TestItems", "Random", "ParallelKMeans", "BEAST", "H2Trees", "CompScienceMeshes", "LinearAlgebra"]
