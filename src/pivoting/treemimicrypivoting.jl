@@ -61,13 +61,13 @@ mutable struct TreeMimicryPivotingFunctor{D,T,TreeType} <: GeoPivStratFunctor
     c::SVector{D,T}
     tree::TreeType
     pos::Vector{SVector{D,T}}
-    usednodes::Vector{Int}
+    emptyclusters::Vector{Int}
     usedidcs::Vector{Int}
 
     function TreeMimicryPivotingFunctor{D,T}(
-        F::Vector{Int}, c, tree, pos, usednodes::Vector{Int}, usedidcs::Vector{Int}
+        F::Vector{Int}, c, tree, pos, emptyclusters::Vector{Int}, usedidcs::Vector{Int}
     ) where {D,T}
-        return new{D,T,typeof(tree)}(F, c, tree, pos, usednodes, usedidcs)
+        return new{D,T,typeof(tree)}(F, c, tree, pos, emptyclusters, usedidcs)
     end
 end
 
@@ -85,9 +85,9 @@ function (pivstrat::TreeMimicryPivoting{D,T})(
 ) where {D,T,V<:Vector{Int}}
     c = sum(pivstrat.refpos[refidcs]) ./ length(refidcs)
     usedidcs = zeros(Int, maxrank)
-    usednodes = zeros(Int, maxrank)
+    emptyclusters = zeros(Int, maxrank)
     return TreeMimicryPivotingFunctor{D,T}(
-        F, c, pivstrat.tree, pivstrat.pos, usednodes, usedidcs
+        F, c, pivstrat.tree, pivstrat.pos, emptyclusters, usedidcs
     )
 end
 
@@ -98,12 +98,13 @@ values(tree::T, node::Union{Int,Vector{Int}}) where {T} = error(
     "Not implemented for type $T"
 )
 children(tree::T, node::Int) where {T} = error("Not implemented for type $T")
+parent(tree::T, node::Int) where {T} = error("Not implemented for type $T")
 firstchild(tree::T, node::Int) where {T} = error("Not implemented for type $T")
 
 """
     findcluster(pivstrat, F)
 
-Find a leaf cluster (node) that best matches the reference centroid.
+Find a leaf cluster (node) for first pivot that best matches the reference centroid.
 
 Traverses the tree greedily by choosing child clusters whose centers are
 closest (in weighted inverse-distance sense) to the reference centroid `pivstrat.c`.
@@ -117,12 +118,11 @@ function findcluster(
         w[idx] = 1 / norm(center(pivstrat.tree, f) - pivstrat.c)
     end
     iszero(firstchild(pivstrat.tree, F[argmax(w)])) && return F[argmax(w)]
-
     childs = Int[]
     for child in children(pivstrat.tree, F[argmax(w)])
-        !(child in pivstrat.usednodes) && push!(childs, child)
+        #!(child in pivstrat.usednodes) && push!(childs, child)
+        push!(childs, child)
     end
-
     return findcluster(pivstrat, childs)
 end
 
@@ -153,9 +153,38 @@ function findcluster(
         end
     end
     cluster = F[argmax(leja .^ (2 / (npivot - 1)) .* h .* w .^ 4)]
-    iszero(firstchild(pivstrat.tree, cluster)) && return cluster
 
-    return findcluster(pivstrat, collect(children(pivstrat.tree, cluster)), npivot)
+    #iszero(firstchild(pivstrat.tree, cluster)) && return cluster
+    # Increased rescue measure, check performance!!!!
+    if iszero(firstchild(pivstrat.tree, cluster))
+        if issubset(values(pivstrat.tree, cluster), pivstrat.usedidcs)
+            if length(F) == 1
+                pivstrat.emptyclusters[findfirst(pivstrat.emptyclusters .== 0)] = parent(
+                    pivstrat.tree, cluster
+                )
+                return findcluster(
+                    pivstrat, setdiff(pivstrat.F, pivstrat.emptyclusters), npivot
+                )
+            else
+                pivstrat.emptyclusters[findfirst(pivstrat.emptyclusters .== 0)] = cluster
+                deleteat!(F, findfirst(F .== cluster))
+                return findcluster(pivstrat, F, npivot)
+            end
+        else
+            return cluster
+        end
+    end
+
+    if setdiff(collect(children(pivstrat.tree, cluster)), pivstrat.emptyclusters) == []
+        pivstrat.emptyclusters[findfirst(pivstrat.emptyclusters .== 0)] = cluster
+        return findcluster(pivstrat, setdiff(pivstrat.F, pivstrat.emptyclusters), npivot)
+    else
+        return findcluster(
+            pivstrat,
+            setdiff(collect(children(pivstrat.tree, cluster)), pivstrat.emptyclusters),
+            npivot,
+        )
+    end
 end
 
 """
@@ -182,17 +211,15 @@ Select subsequent pivots by finding a cluster and then selecting the best
 point within that cluster based on mimicry pivoting strategy.
 """
 function (pivstrat::TreeMimicryPivotingFunctor{D,F})(npivot::Int) where {D,F<:Real}
-    if pivstrat.F == []
-        error("No more clusters available for pivot selection.")
-    end
-
-    targetcluster = findcluster(pivstrat, pivstrat.F, npivot)
+    targetcluster = findcluster(
+        pivstrat, setdiff(pivstrat.F, pivstrat.emptyclusters), npivot
+    )
     nodeidcs = values(pivstrat.tree, targetcluster)
-    if issubset(nodeidcs, pivstrat.usedidcs)
-        println(pivstrat.F, targetcluster)
+    @assert !issubset(nodeidcs, pivstrat.usedidcs)
+    #=    println("we will never be here")
         deleteat!(pivstrat.F, findfirst(pivstrat.F .== targetcluster))
         return pivstrat(npivot)
-    end
+    end=#
 
     w = zeros(F, length(nodeidcs))
     h = zeros(F, length(nodeidcs))
