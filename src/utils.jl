@@ -88,16 +88,18 @@ function blockvalues(
     end
     levelvals = Vector{Vector{Int}}(undef, nblocks)
     levelfarvals = Vector{Vector{Int}}(undef, nblocks)
+    levelidcs = Vector{Int}(undef, nblocks)
     i = 1
     for node in levelnodes
         farptr[node + 1] == farptr[node] && continue
         r = values[node]
         for j in farptr[node]:(farptr[node + 1] - 1)
+            levelidcs[i] = j
             levelfarvals[i] = farvalues[j]
             levelvals[i] = r
             i += 1
         end
     end
 
-    return levelvals, levelfarvals
+    return levelvals, levelfarvals, levelidcs
 end

@@ -94,7 +94,7 @@ function AdaptiveCrossApproximation.nearinteractions(
     !isnear(testtree(tree), trialtree(tree), root(testtree(tree)), root(trialtree(tree))) &&
         return Vector{Int}[], Vector{Int}[]
     values = Vector{Vector{Int}}(undef, length(testtree(tree).nodes))
-    nearvalues = Vector{Vector{Int}}(undef, length(trialtree(tree).nodes))
+    nearvalues = Vector{Vector{Int}}(undef, length(testtree(tree).nodes))
     nears!(
         tree,
         values,

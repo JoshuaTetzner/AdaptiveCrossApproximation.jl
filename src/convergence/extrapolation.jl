@@ -67,7 +67,7 @@ end
 Get tolerance from underlying estimator.
 """
 tolerance(cc::FNormExtrapolatorFunctor) = cc.estimator.tol
-
+tolerance(cc::FNormExtrapolator) = cc.estimator.tol
 """
     (convcrit::FNormExtrapolatorFunctor)(rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
 

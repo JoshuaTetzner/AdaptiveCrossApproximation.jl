@@ -35,9 +35,8 @@ Create a `MaximumValueFunctor` for the given index array.
 
 Returns a functor with tracking vector sized to match the length of `idcs`.
 """
-(::MaximumValue)(idcs::AbstractVector{<:Integer}) = MaximumValueFunctor(
-    length(idcs), zeros(Bool, length(idcs))
-)
+(::MaximumValue)(idcs::AbstractVector{<:Integer}) =
+    MaximumValueFunctor(length(idcs), zeros(Bool, length(idcs)))
 (::MaximumValue)(nidcs::Int) = MaximumValueFunctor(nidcs, zeros(Bool, nidcs))
 
 function Base.resize!(pivstrat::MaximumValueFunctor, nactive::Int)
@@ -86,7 +85,7 @@ function (pivstrat::MaximumValueFunctor)(rc::AbstractArray)
     used = view(pivstrat.usedidcs, 1:nactive)
 
     if all(used)
-        @warn "Rectangular full-rank blockstructure detected."
+        #@warn "Rectangular full-rank blockstructure detected."
         absrx = abs.(view(rc, 1:nactive))
         maximum(absrx) != 0.0 && (return argmax(absrx))
     end
