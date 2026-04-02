@@ -78,3 +78,41 @@ fct32 = myfct32()
         end
     end
 end
+
+##
+
+using BEAST
+using CompScienceMeshes
+using ParallelKMeans
+using H2Trees
+using AdaptiveCrossApproximation
+
+k = 2.4567799554075624 + 0.0im
+
+circ = CompScienceMeshes.meshcircle(1.0, 0.025)
+X = BEAST.lagrangecx(circ; order=2)
+tree = BlockTree(KMeansTree(X.pos, 2; minvalues=100), KMeansTree(X.pos, 2; minvalues=100))
+
+op = Helmholtz2D.doublelayer(; wavenumber=k)
+quadstrat = BEAST.DoubleNumSauterQstrat(2, 3, 0, 4, 3, 4)
+DLop = AdaptiveCrossApproximation.HMatrix(
+    op,
+    X,
+    X,
+    tree;
+    tol=1e-3,
+    nearmatrixdata=BEAST.DoubleNumSauterQstrat(2, 3, 0, 4, 3, 4),
+    farmatrixdata=BEAST.DoubleNumSauterQstrat(2, 3, 0, 4, 3, 4),
+    spaceordering=AdaptiveCrossApproximation.PreserveSpaceOrder(),
+)
+Iop = Matrix(assemble(BEAST.Identity(), X, X))
+
+DL = DLop + (-0.5 .* Iop)
+DL2_op = assemble(op, X, X; quadstrat=quadstrat)
+DL2 = DL2_op + (-0.5 .* Iop)
+##
+using LinearAlgebra
+
+x = rand(eltype(DLop), size(DLop, 2))
+norm(DLop * x - DL2_op * x) / norm(DL2_op * x)
+println("HMatnorm = ", norm(DL * x - DL2 * x) / norm(DL2 * x))

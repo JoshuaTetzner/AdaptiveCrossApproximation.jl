@@ -39,9 +39,9 @@ function LinearMaps._unsafe_mul!(
 ) where {K,M<:HMatrix{K}}
     fill!(y, zero(K))
 
-    mul!(y, A.nearinteractions, x)
+    y .+= A.nearinteractions * x
     for farinteraction in A.farinteractions
-        y += farinteraction * x
+        y .+= farinteraction * x
     end
 
     return y
@@ -52,9 +52,9 @@ function LinearMaps._unsafe_mul!(
 ) where {K,Z<:HMatrix{K},M<:LinearMaps.TransposeMap{<:Any,Z}}
     fill!(y, zero(K))
 
-    mul!(y, transpose(A.lmap.nearinteractions), x)
+    y .+= transpose(A.lmap.nearinteractions) * x
     for farinteraction in A.lmap.farinteractions
-        y += transpose(farinteraction) * x
+        y .+= transpose(farinteraction) * x
     end
 
     return y
@@ -65,9 +65,9 @@ function LinearMaps._unsafe_mul!(
 ) where {K,Z<:HMatrix{K},M<:LinearMaps.AdjointMap{<:Any,Z}}
     fill!(y, zero(K))
 
-    mul!(y, adjoint(A.lmap.nearinteractions), x)
+    y .+= adjoint(A.lmap.nearinteractions) * x
     for farinteraction in A.lmap.farinteractions
-        y += adjoint(farinteraction) * x
+        y .+= adjoint(farinteraction) * x
     end
 
     return y
