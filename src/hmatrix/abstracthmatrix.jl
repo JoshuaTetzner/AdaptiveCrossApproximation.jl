@@ -61,6 +61,7 @@ function HMatrix(
     tol=1e-4,
     compressor=ACA(; tol=tol),
     isnear=isnear(),
+    maxrank=40,
     spaceordering::SpaceOrderingStyle=PermuteSpaceInPlace(),
     nearmatrixdata=defaultmatrixdata(operator, testspace, trialspace),
     farmatrixdata=defaultfarmatrixdata(operator, testspace, trialspace),
@@ -85,6 +86,7 @@ function HMatrix(
         trialspace,
         tree,
         spaceordering;
+        maxrank=maxrank,
         compressor=compressor,
         isnear=isnear,
         matrixdata=farmatrixdata,
@@ -106,4 +108,32 @@ function HMatrix(
     ntasks=Threads.nthreads(),
 )
     return error("Symmetric version not implemented yet")
+end
+
+function farmatrix(hmat::HMatrix)
+    blocks = Matrix{eltype(hmat)}[]
+    nears = BlockSparseMatrix(blocks, Vector{Int}[], Vector{Int}[], hmat.dim)
+
+    return HMatrix{eltype(hmat)}(nears, hmat.farinteractions, hmat.dim)
+end
+
+function nearmatrix(hmat::HMatrix)
+    return hmat.nearinteractions
+end
+
+function storage(hmat::HMatrix)
+    refsize = size(hmat, 1) * size(hmat, 2) * sizeof(eltype(hmat))
+    matsize = 0
+    for blk in hmat.nearinteractions.blocks
+        matsize += length(blk)
+    end
+    for farmat in hmat.farinteractions
+        for blk in farmat.blocks
+            matsize += length(blk)
+        end
+    end
+    println("storage: ", matsize * sizeof(eltype(hmat)) * 10^-9, " GB")
+    println("summary size: ", Base.summarysize(hmat) * 10^-9, " GB")
+    println("compression ratio: ", (matsize * sizeof(eltype(hmat))) / refsize)
+    return matsize * sizeof(eltype(hmat)) * 10^-9
 end

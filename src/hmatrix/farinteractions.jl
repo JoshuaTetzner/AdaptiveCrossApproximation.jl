@@ -55,6 +55,7 @@ function assemblefars(
                     rowidcs=values[node],
                     colidcs=farvalues[faridx],
                 )
+                npivots == maxrank && @warn "Maximum rank block"
                 blocks[faridx] = LowRankMatrix(
                     colbuffer[values[node], 1:npivots],
                     rowbuffer[1:npivots, 1:length(farvalues[faridx])],
@@ -63,11 +64,17 @@ function assemblefars(
                 rowbuffer[1:npivots, 1:length(farvalues[faridx])] .= eltype(kernelmatrix)(0)
             end
         end
-        levelvals, levelfarvals = blockvalues(values, farptr, farvalues, levelnodes)
+        levelvals, levelfarvals, levelidcs = blockvalues(
+            values, farptr, farvalues, levelnodes
+        )
         push!(
             farinteractionmatrix,
             BlockSparseMatrix(
-                blocks, levelvals, levelfarvals, size(kernelmatrix); scheduler=scheduler
+                view(blocks, levelidcs),
+                levelvals,
+                levelfarvals,
+                size(kernelmatrix);
+                scheduler=scheduler,
             ),
         )
     end

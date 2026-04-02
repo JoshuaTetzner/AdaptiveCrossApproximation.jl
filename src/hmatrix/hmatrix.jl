@@ -29,18 +29,6 @@ function nnz(A::HMatrix)
     return nnz + fnnz
 end
 
-function storage(A::HMatrix)
-    storage = BlockSparseMatrices.nnz(A.nearinteractions) * 8 * 1e-9
-    println("Nearinteractions: $storage MB")
-    fstorage = 0
-    for farinteraction in A.farinteractions
-        fstorage += BlockSparseMatrices.nnz(farinteraction)
-    end
-    fstorage = fstorage * 8 * 1e-9
-    println("Farinteractions: $fstorage MB")
-    return storage + fstorage
-end
-
 function Base.size(A::HMatrix, dim=nothing)
     dim === nothing && return (A.dim[1], A.dim[2])
     return A.dim[dim]

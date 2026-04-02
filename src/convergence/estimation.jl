@@ -136,7 +136,7 @@ end
 Get tolerance threshold from iACA estimator functor.
 """
 tolerance(cc::iFNormEstimatorFunctor) = cc.tol
-
+tolerance(cc::iFNormEstimator) = cc.tol
 """
     (convcrit::iFNormEstimatorFunctor)(rcbuffer::AbstractVector{K}, npivot::Int)
 
