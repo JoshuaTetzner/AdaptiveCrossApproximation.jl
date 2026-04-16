@@ -1,4 +1,3 @@
-
 """
     MimicryPivoting{D,F<:Real} <: GeoPivStrat
 
@@ -24,15 +23,6 @@ struct MimicryPivoting{D,F<:Real} <: GeoPivStrat
     pos::Vector{SVector{D,F}}
 end
 
-"""
-    bestindex(leja, h, w, nactive, npivot)
-
-Return the index in `1:nactive` that maximizes
-
-`leja[i]^(2/(npivot-1)) * h[i] * w[i]^4`
-
-without allocating temporary arrays.
-"""
 @inline function bestindex(
     leja::AbstractVector{F},
     h::AbstractVector{F},
@@ -58,24 +48,6 @@ without allocating temporary arrays.
     end
 end
 
-"""
-    MimicryPivotingFunctor{D,F<:Real} <: GeoPivStratFunctor
-
-Functor for mimicry-based pivot selection.
-
-Maintains vectors for leja2 (h), leja (leja), and weights (w) based on distance to reference centroid.
-
-# Fields
-
-    - `pivoting::MimicryPivoting{D,F}`: Immutable strategy carrying `refpos` and `pos`
-    - `nactive::Int`: Active prefix length in state vectors
-    - `refcentroid::SVector{D,F}`: Reference centroid used to bias selection
-
-  - `idcs::Vector{Int}`: Current indices being considered for selection
-  - `h::Vector{F}`: Minimum distances from each point to selected points (fill distance)
-  - `leja::Vector{F}`: Product of distances to all selected points (Leja metric)
-  - `w::Vector{F}`: Weights based on inverse distance to reference centroid
-"""
 mutable struct MimicryPivotingFunctor{D,F<:Real} <: GeoPivStratFunctor
     pivoting::MimicryPivoting{D,F}
     nactive::Int
@@ -86,24 +58,6 @@ mutable struct MimicryPivotingFunctor{D,F<:Real} <: GeoPivStratFunctor
     w::Vector{F}
 end
 
-"""
-    (strat::MimicryPivoting{D,F})(refidcs, rcidcs)
-
-Create a `MimicryPivotingFunctor` for the given reference and candidate indices.
-
-Initializes the functor by computing the centroid of the reference points and
-setting up weights that favor points close to this centroid. This encourages
-the selected pivots to spatially mimic the reference distribution.
-
-# Arguments
-
-  - `refidcs`: Indices of reference points (e.g., parent cluster pivots)
-  - `idcs`: Indices of candidate points to select from (e.g., child cluster points)
-
-# Returns
-
-  - `MimicryPivotingFunctor`: Initialized functor with computed weights and metrics
-"""
 function (strat::MimicryPivoting{D,F})(refidcs, idcs) where {D,F}
     nactive = length(idcs)
     refcentroid = _centroid(strat.refpos, refidcs)
@@ -149,66 +103,25 @@ function reset!(
     return nothing
 end
 
-"""
-    (strat::MimicryPivotingFunctor{D,F})()
-
-Select the first pivot based on proximity to reference centroid.
-
-Chooses the point with maximum weight (closest to the reference centroid),
-then initializes distance metrics for subsequent pivot selection.
-
-# Returns
-
-  - Global index of the selected pivot point
-"""
-function (strat::MimicryPivotingFunctor{D,F})() where {D,F<:Real}
-    nactive = strat.nactive
-    nextlocal = argmax(view(strat.w, 1:nactive))
-    nextidx = strat.idcs[nextlocal]
-
-    AdaptiveCrossApproximation.leja2_init!(strat, nextidx, nactive)
-    @inbounds for i in 1:nactive
-        strat.leja[i] = strat.h[i]
-    end
-
-    return nextidx
+function (pivstrat::MimicryPivotingFunctor{D,F})() where {D,F}
+    AdaptiveCrossApproximation.leja2_init!(pivstrat, pivstrat.idcs[1], pivstrat.nactive)
+    return 1
 end
 
-"""
-    (strat::MimicryPivotingFunctor{D,F})(npivot::Int)
-
-Select next pivot balancing Leja separation, fill distance, and reference proximity.
-
-Uses a composite metric that combines:
-
-  - Leja product (geometric separation from all selected points)
-  - Fill distance (maximum minimum distance criterion)
-  - Reference weights (proximity to target distribution)
-
-The balance between these factors evolves with iteration number `npivot`.
-
-# Arguments
-
-  - `npivot::Int`: Current pivot iteration number (influences weight balance)
-
-# Returns
-
-  - Global index of the selected pivot point
-"""
-function (strat::MimicryPivotingFunctor{D,F})(npivot::Int) where {D,F<:Real}
-    nactive = strat.nactive
-    nextlocal = bestindex(strat.leja, strat.h, strat.w, nactive, npivot)
-
-    nextidx = strat.idcs[nextlocal]
-    pos = strat.pivoting.pos
-    nextpos = pos[nextidx]
-    @inbounds for i in 1:nactive
-        d = norm(pos[strat.idcs[i]] - nextpos)
-        if strat.h[i] > d
-            strat.h[i] = d
-        end
-        strat.leja[i] *= d
+function (pivstrat::MimicryPivotingFunctor{D,F})(rc::AbstractArray) where {D,F}
+    nactive = pivstrat.nactive
+    if all(iszero, view(pivstrat.h, 1:nactive))
+        AdaptiveCrossApproximation.leja2_init!(pivstrat, pivstrat.idcs[1], nactive)
     end
 
+    nextidx = bestindex(
+        view(pivstrat.leja, 1:nactive),
+        view(pivstrat.h, 1:nactive),
+        view(pivstrat.w, 1:nactive),
+        nactive,
+        1,
+    )
+
+    AdaptiveCrossApproximation.leja2!(pivstrat, pivstrat.idcs[nextidx], nactive)
     return nextidx
 end

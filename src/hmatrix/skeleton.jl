@@ -1,3 +1,27 @@
+"""
+    LowRankMatrix{K} <: LinearMaps.LinearMap{K}
+
+Efficient storage and evaluation of low-rank matrix blocks as U*V.
+
+Stores left and right factors separately, performing matrix-vector products as
+`(U*V)*x = U*(V*x)` to avoid forming the dense `U*V` product. Critical for
+efficient hierarchical matrix computations where blocks are stored in low-rank form.
+
+# Fields
+
+  - `U::Matrix{K}`: Left factor, size `(m, r)` where `r` is the rank
+  - `V::Matrix{K}`: Right factor, size `(r, n)`
+  - `z::Vector{K}`: Temporary buffer for intermediate products `V*x`
+
+# Type parameters
+
+  - `K`: scalar element type
+
+# Notes
+
+Create via `LowRankMatrix(U, V)` which allocates the temporary buffer automatically.
+Block dimensions are `(m, n) = (size(U, 1), size(V, 2))`.
+"""
 struct LowRankMatrix{K} <: LinearMaps.LinearMap{K}
     U::Matrix{K}
     V::Matrix{K}

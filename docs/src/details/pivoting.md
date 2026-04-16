@@ -8,41 +8,49 @@ Value-based strategies select pivots by examining matrix entries to find the mos
 
 ### Maximum Value Pivoting
 
-The maximum value strategy, also referred to as partial pivoting [[1, 2]](@ref refs), selects the pivot with the largest absolute value in the current residual. 
-In the standard ACA when starting with the first row, all following columns are selected as
+The maximum value strategy, also referred to as partial pivoting [[1, 2]](@ref refs), selects the pivot with the largest absolute value in the current residual.
+In the standard ACA when starting with the first row, all following columns are selected as:
 
-$$\argmax_{j} |\bm v_{r, j}|$$
+```math
+\arg\max_{j} |\mathbf{v}_{r,j}|
+```
 
-and all rows for $r > 1$ are selected as
+and all rows for `r > 1` are selected as:
 
-$$\argmax_{i} |\bm u_{r-1, i}|\,.$$
+```math
+\arg\max_{i} |\mathbf{u}_{r-1,i}|
+```
 
 **API:** [`MaximumValue`](@ref)
 
 ### Random Sampling
 
 Random sampling pivoting is typically combined with the random sampling convergence criterion or a combined convergence criterion.
-It selects the next row or column leveraging the randomly sampled entries of the underlying matrix used in the convergence criterion, choosing row or column of the sample with the maximum absolute error after the $r$-th iteration, following 
+It selects the next row or column leveraging the randomly sampled entries of the underlying matrix used in the convergence criterion, choosing row or column of the sample with the maximum absolute error after iteration `r`:
 
-$$\argmax_{k} |\bm e_{r, k}|\,, $$
+```math
+\arg\max_{k} |\mathbf{e}_{r,k}|
+```
 
-where $\bm e_r$ contains the error of the sampled entries after the $r$-th iteration.
+where `e_r` contains the error of the sampled entries after the `r`-th iteration.
 
 In the random sampling convergence criterion, the mean error of the random samples is used to estimate the overall residual error.
 
 
-API: [`RandomSamplingPivoting`](@ref)
+API: [`AdaptiveCrossApproximation.RandomSamplingPivoting`](@ref)
 
 ## Geometry-Based Strategies
 
 Geometry-based strategies exploit spatial information about the underlying point sets or basis functions.
 
 ### Fill Distance
-The fill distance strategy, following [[3]](@ref refs) selects the row or column associated with geometrical positions $\bm x \in X$ that minimize the fill distance
+The fill distance strategy, following [[3]](@ref refs), selects the row or column associated with geometrical positions `x ∈ X` that minimize the fill distance:
 
-$$\bm h\coloneqq \sup_{\bm x \in X}\text{dist}(\bm x, X_r)\,,$$
+```math
+h \coloneqq \sup_{x \in X} \mathrm{dist}(x, X_r)
+```
 
-where $\text{dist}(\bm x, X_r) = \min_{\bm y \in X_r} |\bm x - \bm y|$ and $X_r$ is the set of already selected points associated with rows or columns after $r$ iterations, from one step to the next.
+where `dist(x, X_r) = min_{y ∈ X_r} |x - y|` and `X_r` is the set of already selected points associated with rows or columns after `r` iterations, from one step to the next.
 This strategy aims to cover the domain uniformly, ensuring that no region is left unrepresented.
 
 *Note: this strategy should be used only either for the rows or the columns, not both simultaneously and be combined with partial pivoting.*
@@ -51,9 +59,11 @@ This strategy aims to cover the domain uniformly, ensuring that no region is lef
 API: [`FillDistance`](@ref)
 
 ### Modified Leja Points
-Modified Leja points, following [[5]](@ref refs), follow a similar idea to the fill distance strategy but instead of minimizing the fill distance in each iteration selects the node furthest away from the already selected points $X_r$:
+Modified Leja points, following [[5]](@ref refs), follow a similar idea to the fill distance strategy but instead of minimizing the fill distance in each iteration select the node furthest away from the already selected points `X_r`:
 
-$$\argmax_i (\bm h_i)$$
+```math
+\arg\max_i h_i
+```
 
 This approach results in a similar geometrical distribution as the fill distance strategy, however, it is significantly more efficient.
 
@@ -63,15 +73,31 @@ This approach results in a similar geometrical distribution as the fill distance
 API: [`Leja2`](@ref)
 
 ### Mimicry Pivoting
-Mimicry pivoting, following [[7]](@ref refs), selects rows or columns based on geometric information to mimic the geometric distribution of the positions associated with the rows or columns picked by the partial pivoting. 
-This is achieved by solving in each the maximization problem
+Mimicry pivoting, following [[7]](@ref refs), approximates the pivot distribution of a fully pivoted ACA without requiring full matrix access.
+The pivot selection combines three principles:
 
-$$\argmax_{j:\bm x_j \in X} \biggr[ \big(\text{dist}(\bm x_j, X_r)\big)\biggr(\prod_{\bm x_i \in X_r}|\bm x_i-\bm x_j|\biggr)^{1/r}\big(|\bm x_j-\bm c|\big)^{-4}\biggr]\,,$$
+- **Angular distribution** (uniform coverage)
+- **Boundary emphasis** (Leja-like selection)
+- **Distance weighting** (favor near-field contributions)
 
-where $\bm c$ is the geometric center of the positions associated with the rows when columns are selected and the other way around.
+Formally, the pivot index is selected as:
 
-This strategy is designed for the incomplete ACA (iACA).
+```math
+j_r = \arg\max_{z \in \mathcal{Z}} \left[
+\left(\min_{z_k \in \mathcal{Z}_f} \|z - z_k\|\right)
+\cdot
+\left(\prod_{z_k \in \mathcal{Z}_f} \|z - z_k\|\right)^{2/|\mathcal{Z}_f|}
+\cdot
+\left(\frac{1}{\|z - c\|}\right)^4
+\right]
+```
 
+where:
+- `\mathcal{Z}` are candidate points,
+- `\mathcal{Z}_f` are previously selected pivots,
+- `c` is the cluster center.
+
+This strategy 
 
 *Note: this strategy should be used only either for the rows or the columns, not both simultaneously and be combined with partial pivoting.*
 

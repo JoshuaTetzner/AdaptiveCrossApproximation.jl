@@ -1,4 +1,3 @@
-
 """
     Leja2{D,F<:Real} <: GeoPivStrat
 
@@ -22,21 +21,6 @@ struct Leja2{D,F<:Real} <: GeoPivStrat
     pos::Vector{SVector{D,F}}
 end
 
-"""
-    Leja2Functor{D,F<:Real} <: PivStratFunctor
-
-Stateful functor for modified leja point pivot selection.
-
-Maintains minimum distances from each point to all selected points, which are
-updated incrementally as new pivots are chosen.
-
-# Fields
-
-    - `pivoting::Leja2{D,F}`: Immutable strategy carrying geometric positions
-    - `nactive::Int`: Active prefix length in state vectors
-    - `idcs::Vector{Int}`: Indices of points being considered for selection
-    - `h::Vector{F}`: Current minimum distance from each point to selected points
-"""
 mutable struct Leja2Functor{D,F<:Real} <: GeoPivStratFunctor
     pivoting::Leja2{D,F}
     nactive::Int
@@ -75,17 +59,6 @@ function reset!(
     return nothing
 end
 
-"""
-leja2_init!(pivstrat::GeoPivStratFunctor, nextidx::Int, nactive::Int=length(pivstrat.h))
-
-Initialize minimum-distance vector `h` from pivot `nextidx`.
-
-# Arguments
-
-  - `pivstrat::GeoPivStratFunctor`: Functor with distance vector to initialize
-  - `nextidx::Int`: Global index of selected pivot
-  - `nactive::Int`: Number of active entries in `idcs`/`h`
-"""
 function leja2_init!(
     pivstrat::GeoPivStratFunctor, nextidx::Int, nactive::Int=length(pivstrat.h)
 )
@@ -96,17 +69,6 @@ function leja2_init!(
     return nothing
 end
 
-"""
-leja2!(pivstrat::GeoPivStratFunctor, nextidx::Int, nactive::Int=length(pivstrat.h))
-
-Update minimum-distance vector `h` after selecting pivot `nextidx`.
-
-# Arguments
-
-  - `pivstrat::GeoPivStratFunctor`: Functor with distance vector to update
-  - `nextidx::Int`: Global index of selected pivot
-  - `nactive::Int`: Number of active entries in `idcs`/`h`
-"""
 function leja2!(pivstrat::GeoPivStratFunctor, nextidx::Int, nactive::Int=length(pivstrat.h))
     pos = _positions(pivstrat)
     @inbounds for i in 1:nactive
@@ -118,22 +80,6 @@ function leja2!(pivstrat::GeoPivStratFunctor, nextidx::Int, nactive::Int=length(
     return nothing
 end
 
-"""
-    (pivstrat::Leja2Functor{D,F})(::AbstractArray)
-
-Select the next pivot with maximum minimum distance to selected points.
-
-Chooses the point that is farthest from the set of already selected points,
-then updates the distance vector for subsequent iterations.
-
-# Arguments
-
-  - `::AbstractArray`: Row/column data (unused, selection is purely geometric)
-
-# Returns
-
-  - `nextidx::Int`: Index of the point with maximum distance to selected points
-"""
 function (pivstrat::Leja2Functor{D,F})(::AbstractArray) where {D,F}
     nactive = pivstrat.nactive
     nextidx = argmax(view(pivstrat.h, 1:nactive))

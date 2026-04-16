@@ -1,5 +1,3 @@
-## Not Up To Date ##
-
 """
     ACAᵀ{RowPivType,ColPivType,ConvCritType}
 
@@ -24,86 +22,102 @@ struct ACAᵀ{RowPivType,ColPivType,ConvCritType}
     end
 end
 
-"""
-    ACAᵀ(; rowpivoting=MaximumValue(), columnpivoting=MaximumValue(), convergence=FNormEstimator(1e-4))
-
-Construct column-first ACA compressor with specified strategies.
-
-# Arguments
-
-  - `rowpivoting`: Row pivoting strategy (default: `MaximumValue()`)
-  - `columnpivoting`: Column pivoting strategy (default: `MaximumValue()`)
-  - `convergence`: Convergence criterion (default: `FNormEstimator(1e-4)`)
-"""
 function ACAᵀ(;
+    tol=1e-4,
     rowpivoting=MaximumValue(),
     columnpivoting=MaximumValue(),
-    convergence=FNormEstimator(1e-4),
+    convergence=FNormEstimator(tol),
 )
     return ACAᵀ(rowpivoting, columnpivoting, convergence)
 end
 
-"""
-    (aca::ACAᵀ)(rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int})
-
-Initialize ACAᵀ functor with index sets.
-Creates functors for pivoting strategies bound to specific index ranges.
-
-# Arguments
-
-  - `rowidcs::AbstractArray{Int}`: Row indices for this compression
-  - `colidcs::AbstractArray{Int}`: Column indices for this compression
-"""
-function (aca::ACAᵀ)(rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int})
+function (aca::ACAᵀ{RP,CP,C})(
+    rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}
+) where {RP<:MaximumValue,CP<:MaximumValue,C<:FNormEstimator}
     return ACAᵀ(aca.rowpivoting(rowidcs), aca.columnpivoting(colidcs), aca.convergence())
 end
 
-"""
-    (aca::ACAᵀ{P,P,C})(A, colbuffer, rowbuffer, maxrank; kwargs...)
+function (aca::ACAᵀ{RP,CP,C})(
+    A, rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}, maxrank::Int
+) where {RP<:PivStrat,CP<:PivStrat,C<:ConvCrit}
+    convcrit = _buildconvcrit(aca.convergence, A, rowidcs, colidcs, maxrank)
+    rowpiv = _buildpivstrat(aca.rowpivoting, convcrit, rowidcs)
+    colpiv = _buildpivstrat(aca.columnpivoting, convcrit, colidcs)
 
-Convenience method that initializes pivoting functors when using uniform strategies.
+    return ACAᵀ(rowpiv, colpiv, convcrit)
+end
 
-Delegates to the main computational routine after creating index-specialized functors.
-Only available when both pivoting strategies are of the same stateless type `P <: PivStrat`.
+function (aca::ACAᵀ{RP,CP,C})(
+    A, nrowidcs::Int, ncolidcs::Int, maxrank::Int
+) where {RP<:PivStrat,CP<:PivStrat,C<:ConvCrit}
+    convcrit = _buildconvcrit(aca.convergence, A, nrowidcs, ncolidcs, maxrank)
+    rowpiv = _buildpivstrat(aca.rowpivoting, convcrit, nrowidcs)
+    colpiv = _buildpivstrat(aca.columnpivoting, convcrit, ncolidcs)
 
-See the main `(aca::ACAᵀ)(A, colbuffer, rowbuffer, rows, cols, rowidcs, colidcs, maxrank)`
-method for detailed argument documentation.
-"""
-function (aca::ACAᵀ{P,P,C})(
+    return ACAᵀ(rowpiv, colpiv, convcrit)
+end
+
+function reset!(
+    aca::ACAᵀ{RP,CP,C}, rowidcs::AbstractArray{Int}, colidcs::AbstractArray{Int}
+) where {RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
+    reset!(aca.rowpivoting, rowidcs)
+    reset!(aca.columnpivoting, colidcs)
+    reset!(aca.convergence, rowidcs, colidcs)
+    return nothing
+end
+
+function (aca::ACAᵀ{RP,CP,C})(
     A,
     colbuffer::AbstractArray{K},
     rowbuffer::AbstractArray{K},
     maxrank::Int;
-    rows=zeros(Int, maxrank),
-    cols=zeros(Int, maxrank),
-    rowidcs=Vector(1:size(colbuffer, 1)),
-    colidcs=Vector(1:size(rowbuffer, 2)),
-) where {K,P<:PivStrat,C<:ConvCrit}
-    return aca(rowidcs, colidcs)(
+    rows::Vector{Int}=zeros(Int, maxrank),
+    cols::Vector{Int}=zeros(Int, maxrank),
+    rowidcs::AbstractVector{Int}=Vector(1:size(colbuffer, 1)),
+    colidcs::AbstractVector{Int}=Vector(1:size(rowbuffer, 2)),
+) where {K,RP<:PivStrat,CP<:PivStrat,C<:ConvCrit}
+    return aca(A, rowidcs, colidcs, maxrank)(
         A, colbuffer, rowbuffer, rows, cols, rowidcs, colidcs, maxrank
     )
 end
 
-"""
-    (aca::ACAᵀ)(A, colbuffer, rowbuffer, maxrank; rows, cols, rowidcs, colidcs)
+function (aca::ACAᵀ{RP,CP,C})(
+    A,
+    colbuffer::AbstractArray{K},
+    rowbuffer::AbstractArray{K},
+    maxrank::Int;
+    rows::Vector{Int}=zeros(Int, maxrank),
+    cols::Vector{Int}=zeros(Int, maxrank),
+    rowidcs::AbstractVector{Int}=Vector(1:size(colbuffer, 1)),
+    colidcs::AbstractVector{Int}=Vector(1:size(rowbuffer, 2)),
+) where {K,RP<:PivStratFunctor,CP<:PivStratFunctor,C<:ConvCritFunctor}
+    reset!(aca, rowidcs, colidcs)
+    return aca(A, colbuffer, rowbuffer, rows, cols, rowidcs, colidcs, maxrank)
+end
 
-Perform column-first ACA compression.
-Computes low-rank approximation A ≈ colbuffer * rowbuffer by iteratively selecting columns then rows.
+"""
+    (aca::ACAᵀ)(A, colbuffer, rowbuffer, rows, cols, rowidcs, colidcs, maxrank)
+
+Compute column-first ACA approximation with preallocated buffers (main computational routine).
+
+Fills `colbuffer` and `rowbuffer` with low-rank factors U and V such that
+`A[rowidcs, colidcs] ≈ U * V`. Uses deflation to ensure orthogonality of pivots.
 
 # Arguments
 
-  - `A`: Matrix to compress
-  - `colbuffer::AbstractArray{K}`: Pre-allocated column storage (nrows × maxrank)
-  - `rowbuffer::AbstractArray{K}`: Pre-allocated row storage (maxrank × ncols)
-  - `maxrank::Int`: Maximum number of pivots
-  - `rows`: Selected row indices (optional, pre-allocated)
-  - `cols`: Selected column indices (optional, pre-allocated)
-  - `rowidcs`: Active row index range (optional)
-  - `colidcs`: Active column index range (optional)
+  - `A`: Matrix or matrix-like object (must support `nextrc!` interface)
+  - `colbuffer::AbstractArray{K}`: Buffer for U factors, size `(length(rowidcs), maxrank)`
+  - `rowbuffer::AbstractArray{K}`: Buffer for V factors, size `(maxrank, length(colidcs))`
+  - `rows::Vector{Int}`: Storage for selected row indices
+  - `cols::Vector{Int}`: Storage for selected column indices
+  - `rowidcs::Vector{Int}`: Global row indices of the block to compress
+  - `colidcs::Vector{Int}`: Global column indices of the block to compress
+  - `maxrank::Int`: Maximum number of pivots (hard limit on rank)
 
 # Returns
 
-  - `npivot::Int`: Number of pivots computed
+  - `npivot::Int`: Number of pivots computed (≤ maxrank). The approximation is
+    `A[rowidcs, colidcs] ≈ colbuffer[:, 1:npivot] * rowbuffer[1:npivot, :]`
 """
 function (aca::ACAᵀ)(
     A,
@@ -183,24 +197,39 @@ function (aca::ACAᵀ)(
 end
 
 """
-    acaᵀ(M; tol=1e-4, rowpivoting, columnpivoting, convergence, maxrank=40)
+    acaᵀ(M; tol=1e-4, rowpivoting=MaximumValue(), columnpivoting=MaximumValue(),
+        convergence=FNormEstimator(tol), maxrank=40, svdrecompress=false)
 
-Convenience function for column-first ACA compression.
-Automatically allocates buffers and performs compression.
+Compute column-first adaptive cross approximation of matrix `M` returning low-rank factors.
+
+High-level convenience function that automatically allocates buffers and returns
+`U, V` such that `M ≈ U * V`.
 
 # Arguments
 
-  - `M::AbstractMatrix{K}`: Matrix to compress
-  - `tol`: Convergence tolerance (default: `1e-4`)
-  - `rowpivoting`: Row pivoting strategy (default: `MaximumValueFunctor`)
-  - `columnpivoting`: Column pivoting strategy (default: `MaximumValueFunctor`)
-  - `convergence`: Convergence criterion (default: `FNormEstimator(0.0, tol)`)
-  - `maxrank`: Maximum rank (default: `40`)
+  - `M::AbstractMatrix{K}`: Matrix to approximate
+
+# Keyword Arguments
+
+  - `tol::Real = 1e-4`: Approximation tolerance
+  - `rowpivoting = MaximumValue()`: Row pivot selection strategy
+  - `columnpivoting = MaximumValue()`: Column pivot selection strategy
+  - `convergence = FNormEstimator(tol)`: Convergence criterion
+  - `maxrank::Int = 40`: Maximum rank (hard limit)
+  - `svdrecompress::Bool = false`: Apply SVD-based recompression to reduce rank further
 
 # Returns
 
-  - `colbuffer`: Column factor (nrows × npivots)
-  - `rowbuffer`: Row factor (npivots × ncols)
+  - `U::Matrix{K}`: Left factor, size `(size(M,1), r)` where `r ≤ maxrank`
+  - `V::Matrix{K}`: Right factor, size `(r, size(M,2))`
+
+Satisfies `M ≈ U * V` with `norm(M - U*V) / norm(M) ≲ tol` (if maxrank sufficient).
+
+# SVD Recompression
+
+When `svdrecompress=true`, performs QR-SVD recompression: computes `M ≈ U*V`, then
+`U = Q*R`, `R*V = Û*Σ*V̂ᵀ`, truncates small singular values, and returns optimal
+rank factors at the cost of additional computation.
 """
 function acaᵀ(
     M::AbstractMatrix{K};
@@ -208,15 +237,13 @@ function acaᵀ(
     rowpivoting=MaximumValue(),
     columnpivoting=MaximumValue(),
     convergence=FNormEstimator(tol),
-    maxrank::Int=40,
+    maxrank=40,
     svdrecompress=false,
 ) where {K}
     compressor = ACAᵀ(rowpivoting, columnpivoting, convergence)
     rowbuffer = zeros(K, maxrank, size(M, 2))
     colbuffer = zeros(K, size(M, 1), maxrank)
-
     npivots = compressor(M, colbuffer, rowbuffer, maxrank)
-
     if svdrecompress
         @views Q, R = qr(colbuffer[1:size(M, 1), 1:npivots])
         @views U, s, V = svd(R * rowbuffer[1:npivots, 1:size(M, 2)])

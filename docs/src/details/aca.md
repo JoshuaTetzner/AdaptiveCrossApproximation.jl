@@ -30,7 +30,7 @@ API: [`ACA`](@ref)
 The column-first variant starts by selecting a column, then a row, reversing the standard order. 
 This can be advantageous when the matrix structure favors column operations.
 
-API: [`AdaptiveCrossApproximation.ACAᵀ`](@ref) 
+API: `acaᵀ` 
 
 ### Pivoting
 To select the row and column indices $i_r$ and $j_r$ different pivoting strategies can be employed. 

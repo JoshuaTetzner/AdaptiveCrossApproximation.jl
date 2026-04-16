@@ -1,4 +1,3 @@
-
 """
     TreeMimicryPivoting{D,T,TreeType} <: GeoPivStrat
 
@@ -31,32 +30,12 @@ struct TreeMimicryPivoting{D,T,TreeType} <: GeoPivStrat
     end
 end
 
-"""
-    TreeMimicryPivoting(refpos, pos, tree)
-
-Convenience constructor inferring tree type. `refpos` and `pos` must be
-vectors of `SVector{D,T}` coordinates and `tree` must provide required methods.
-"""
 function TreeMimicryPivoting(
     refpos::Vector{SVector{D,T}}, pos::Vector{SVector{D,T}}, tree
 ) where {D,T<:Real}
     return TreeMimicryPivoting{D,T}(refpos, pos, tree)
 end
 
-"""
-    TreeMimicryPivotingFunctor{D,T,TreeType} <: GeoPivStratFunctor
-
-Functor storing state for tree-based mimicry pivoting.
-
-# Fields
-
-    - `pivoting::TreeMimicryPivoting{D,T,TreeType}`: Immutable strategy with `refpos`, `pos`, and `tree`
-    - `nactive::Int`: Active prefix length in state vectors
-    - `refcentroid::SVector{D,T}`: Reference centroid used to bias selection
-    - `farfield::Vector{Int}`: Candidate cluster node indices to search
-
-  - `usedidcs::Vector{Int}`: Selected global point indices (filled progressively)
-"""
 mutable struct TreeMimicryPivotingFunctor{D,T,TreeType} <: GeoPivStratFunctor
     pivoting::TreeMimicryPivoting{D,T,TreeType}
     nactive::Int
@@ -70,15 +49,6 @@ mutable struct TreeMimicryPivotingFunctor{D,T,TreeType} <: GeoPivStratFunctor
     usedidcs::Vector{Int}
 end
 
-"""
-    (pivstrat::TreeMimicryPivoting)(farfield, refidcs, maxrank)
-
-Initialize a tree-aware mimicry functor.
-
-`farfield` is a vector of tree node candidates (e.g., root children). The function
-computes the reference centroid from `refidcs` and allocates `usedidcs` of length
-`maxrank` for storing selected point indices.
-"""
 function (pivstrat::TreeMimicryPivoting{D,T})(
     refidcs::AbstractVector{Int}, idcs::AbstractVector{Int}, maxrank::Int
 ) where {D,T}
@@ -127,7 +97,7 @@ function reset!(
     @inbounds for i in 1:(pivstrat.nactive)
         pivstrat.farfield[i] = Int(idcs[i])
     end
-    #pivstrat.refcentroid = _centroid(pivstrat.pivoting.refpos, refidcs)
+    pivstrat.refcentroid = _centroid(pivstrat.pivoting.refpos, refidcs)
     fill!(view(pivstrat.h, 1:(pivstrat.nactive)), zero(T))
     fill!(view(pivstrat.leja, 1:(pivstrat.nactive)), one(T))
     fill!(view(pivstrat.w, 1:(pivstrat.nactive)), zero(T))
@@ -212,15 +182,6 @@ end
     return filtered
 end
 
-"""
-    findcluster(pivstrat, F)
-
-Find a leaf cluster (node) for first pivot that best matches the reference centroid.
-
-Traverses the tree greedily by choosing child clusters whose centers are
-closest (in weighted inverse-distance sense) to the reference centroid `pivstrat.refcentroid`.
-Returns a node index whose `firstchild` is zero (leaf) or recurses into children.
-"""
 function findcluster(
     pivstrat::TreeMimicryPivotingFunctor{D,T}, nodes::AbstractVector{Int}
 ) where {D,T<:Real}
@@ -236,15 +197,6 @@ function findcluster(
     return findcluster(pivstrat, collect(Int, children(tree, node)))
 end
 
-"""
-    findcluster(pivstrat, F, npivot)
-
-Cluster-based selection used during later pivot iterations.
-
-For each candidate cluster `f` in `F`, compute a composite score combining Leja
-products, fill distances and inverse-distance weights to the reference centroid;
-select the cluster maximizing this score and recurse until a leaf is reached.
-"""
 function findcluster(
     pivstrat::TreeMimicryPivotingFunctor{D,T}, idcs::AbstractVector{Int}, npivot::Int
 ) where {D,T<:Real}
@@ -280,12 +232,6 @@ function findcluster(
     return findcluster(pivstrat, chds, npivot)
 end
 
-"""
-    (pivstrat::TreeMimicryPivotingFunctor)()
-
-Select the first pivot by locating a promising leaf cluster and choosing the
-point within that cluster that is closest to the reference centroid.
-"""
 function (pivstrat::TreeMimicryPivotingFunctor{D,F})() where {D,F<:Real}
     targetcluster = findcluster(pivstrat, view(pivstrat.farfield, 1:(pivstrat.nactive)))
     pos = pivstrat.pivoting.pos
@@ -303,12 +249,6 @@ function (pivstrat::TreeMimicryPivotingFunctor{D,F})() where {D,F<:Real}
     return pivstrat.usedidcs[1]
 end
 
-"""
-    (pivstrat::TreeMimicryPivotingFunctor)(npivot)
-
-Select subsequent pivots by finding a cluster and then selecting the best
-point within that cluster based on mimicry pivoting strategy.
-"""
 function (pivstrat::TreeMimicryPivotingFunctor{D,F})(npivot::Int) where {D,F<:Real}
     activefarfield = _filter_emptyclusters(
         pivstrat, view(pivstrat.farfield, 1:(pivstrat.nactive))

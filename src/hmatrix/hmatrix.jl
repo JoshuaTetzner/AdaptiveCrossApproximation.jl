@@ -1,4 +1,26 @@
 
+"""
+    HMatrix{K,NearInteractionType,FarInteractionType}
+
+Hierarchical matrix that stores near-field interactions explicitly and far-field interactions
+as low-rank block data.
+
+# Arguments
+- `nearinteractions`: block-sparse near-field contribution
+- `farinteractions`: collection of compressed far-field interaction blocks
+- `dim::Tuple{Int,Int}`: matrix dimensions `(m, n)`
+
+# Returns
+An `HMatrix` linear map that supports matrix-vector products and conversion to a dense matrix
+via `Matrix`.
+
+# Notes
+`HMatrix` is typically created through the high-level constructor
+`HMatrix(operator, testspace, trialspace, tree; kwargs...)` or `H.assemble(...)`.
+
+# See also
+`HMatrix`, `H.assemble`, `farmatrix`, `nearmatrix`
+"""
 struct HMatrix{K,NearInteractionType,FarInteractionType} <: LinearMaps.LinearMap{K}
     nearinteractions::NearInteractionType
     farinteractions::FarInteractionType
