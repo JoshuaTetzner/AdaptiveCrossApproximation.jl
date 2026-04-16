@@ -31,20 +31,6 @@ function RandomSampling(; factor::F=1.0, nsamples::Int=0, tol::F=1e-4) where {F<
     return RandomSampling(nsamples, factor, tol)
 end
 
-"""
-    RandomSamplingFunctor{F<:Real,K,M} <: ConvCritFunctor
-
-Stateful random sampling convergence checker.
-Tracks residual error at sampled matrix entries across iterations.
-
-# Fields
-
-    - `normUV²::F`: Squared Frobenius norm of approximation
-    - `indices::Vector{Tuple{Int,Int}}`: Sampled matrix positions
-    - `rest::Vector{K}`: Residual values at sampled positions
-    - `tol::F`: Convergence tolerance
-    - `mat::M`: Matrix handle used for refreshing random samples
-"""
 mutable struct RandomSamplingFunctor{F<:Real,K,M,T} <: ConvCritFunctor
     convergence::T
     mat::M
@@ -145,7 +131,6 @@ function (cc::RandomSampling)(
     return RandomSamplingFunctor(cc, K, nsamples, zero(cc.tol), indices, rest)
 end
 
-# abstract helper identical for all criteria types
 _buildconvcrit(cc::RandomSampling, K, rowidcs, colidcs, maxrank) = cc(K, rowidcs, colidcs)
 
 function reset!(
@@ -163,25 +148,6 @@ function reset!(
     return nothing
 end
 
-"""
-    (convcrit::RandomSamplingFunctor)(rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
-
-Check convergence using random sampling.
-Updates residuals at sampled positions and compares to tolerance.
-
-# Arguments
-
-  - `rowbuffer::AbstractMatrix{K}`: Row factor buffer
-  - `colbuffer::AbstractMatrix{K}`: Column factor buffer
-  - `npivot::Int`: Current pivot index
-  - `maxrows::Int`: Number of active rows
-  - `maxcolumns::Int`: Number of active columns
-
-# Returns
-
-  - `npivot::Int`: Final pivot count
-  - `continue::Bool`: Whether to continue iteration
-"""
 function (convcrit::RandomSamplingFunctor{F,K,M})(
     rowbuffer::AbstractMatrix{K},
     colbuffer::AbstractMatrix{K},
@@ -190,7 +156,6 @@ function (convcrit::RandomSamplingFunctor{F,K,M})(
     maxcolumns::Int,
 ) where {F<:Real,K,M}
 
-    # omit this to increase performance (safty measures)---
     @views rnorm = norm(rowbuffer[npivot, 1:maxcolumns])
     @views cnorm = norm(colbuffer[1:maxrows, npivot])
     nactive = convcrit.nactive

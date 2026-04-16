@@ -1,4 +1,11 @@
 [deps]
-FastBEAST = "3fccbda2-992b-41a0-8fae-2b833e1e73d8"
-StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+AdaptiveCrossApproximation = "ef3ffb92-1c7b-43b8-a0d7-a7e2ce4fd1e5"
+BEAST = "bb4162c7-ba94-5a20-af32-d8ec4428bdd1"
+CompScienceMeshes = "3e66a162-7b8c-5da0-b8f8-124ecd2c3ae1"
+H2Trees = "9db26ae3-82ff-4374-85e9-9ed87405fd16"
+Krylov = "ba0b0d4f-ebba-5204-a429-3ac8c609bfb7"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+ParallelKMeans = "42b8e9d4-006b-409a-8472-7f34b3fb58af"
+PlotlyJS = "f0f68f2c-4968-5e81-91da-67840de0976a"
+SphericalScattering = "1a9ea918-b599-4f1f-bd9a-d681e8bb5b3e"

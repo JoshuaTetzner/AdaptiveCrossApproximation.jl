@@ -1,4 +1,3 @@
-
 """
     FillDistance{D,F<:Real} <: GeoPivStrat
 
@@ -19,21 +18,6 @@ struct FillDistance{D,F<:Real} <: GeoPivStrat
     pos::Vector{SVector{D,F}}
 end
 
-"""
-    FillDistanceFunctor{D,F<:Real} <: PivStratFunctor
-
-Stateful functor for fill distance pivot selection.
-
-Maintains the minimum distances from each point to the set of selected points, updating them
-as new pivots are chosen.
-
-# Fields
-
-    - `pivoting::FillDistance{D,F}`: Immutable strategy carrying geometric positions
-    - `nactive::Int`: Active prefix length in state vectors
-    - `idcs::Vector{Int}`: Active indices into `pivoting.pos`
-    - `h::Vector{F}`: Current minimum distance from each point to selected points
-"""
 mutable struct FillDistanceFunctor{D,F<:Real} <: GeoPivStratFunctor
     pivoting::FillDistance{D,F}
     nactive::Int
@@ -70,32 +54,11 @@ function reset!(
     return nothing
 end
 
-"""
-    (pivstrat::Union{Leja2Functor{D,F},FillDistanceFunctor{D,F}})()
-
-Select the first point as the initial pivot.
-
-Computes distances from all points to the first point and returns index 1.
-"""
 function (pivstrat::Union{Leja2Functor{D,F},FillDistanceFunctor{D,F}})() where {D,F}
     AdaptiveCrossApproximation.leja2_init!(pivstrat, pivstrat.idcs[1], pivstrat.nactive)
     return 1
 end
 
-"""
-    (pivstrat::FillDistanceFunctor{D,F})(::AbstractArray)
-
-Select the next pivot minimizing the fill distance with respect to the selected points and
-updates the distance vector `h` for subsequent iterations.
-
-# Arguments
-
-  - `::AbstractArray`: Row/column data (unused, selection is purely geometric)
-
-# Returns
-
-  - `nextidx::Int`: Index of the point maximizing fill distance
-"""
 function (pivstrat::FillDistanceFunctor{D,F})(::AbstractArray) where {D,F}
     nactive = pivstrat.nactive
     pos = pivstrat.pivoting.pos

@@ -3,10 +3,10 @@
 
 Incomplete Adaptive Cross Approximation (iACA) compressor.
 
-Unlike standard ACA, iACA computes only half of the factorization.
-It uses geometric pivoting strategies (e.g., mimicry or tree mimicry) to select row or column
-pivots based solely on spatial information, making it super efficient for hierarchical matrix
-construction where only row or column samples are requiered.
+Unlike standard ACA, iACA computes only one side per iteration and relies on geometric
+pivoting strategies (for example mimicry or tree mimicry) to select pivots from spatial
+information. This reduces matrix entry evaluations in hierarchical matrix construction,
+where only selected row or column samples are required.
 
 # Fields
 
@@ -26,6 +26,21 @@ struct iACA{RowPivType,ColPivType,ConvCritType}
     end
 end
 
+"""
+    iACA(tpos, spos)
+
+Create a default incomplete ACA compressor for geometrically indexed row/column sets.
+
+# Arguments
+- `tpos::Vector{SVector{D,F}}`: geometric positions for test indices
+- `spos::Vector{SVector{D,F}}`: geometric positions for trial indices
+
+# Returns
+An `iACA` instance using `MaximumValue`/`MimicryPivoting` with `FNormExtrapolator`.
+
+# See also
+`iACA`, `MimicryPivoting`, `FNormExtrapolator`
+"""
 function iACA(tpos::Vector{SVector{D,F}}, spos::Vector{SVector{D,F}}) where {D,F<:Real}
     return iACA(
         MaximumValue(),

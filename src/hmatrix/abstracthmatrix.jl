@@ -53,6 +53,39 @@ include("nearinteractions.jl")
 include("skeleton.jl")
 include("farinteractions.jl")
 
+"""
+    HMatrix(operator, testspace, trialspace, tree; kwargs...)
+
+Assemble a hierarchical matrix approximation of an operator on test and trial spaces.
+
+# Arguments
+
+  - `operator`: bilinear form or kernel operator used for matrix entry evaluation
+  - `testspace`: test space used for row indexing
+  - `trialspace`: trial space used for column indexing
+  - `tree`: hierarchical clustering/tree structure controlling block partitioning
+  - `tol`: compression tolerance (default `1e-4`)
+  - `compressor`: ACA-style compressor, e.g. `ACA(; tol=tol)`
+  - `isnear`: near-field predicate controlling admissibility
+  - `maxrank`: maximum rank for far-field block compression
+  - `spaceordering`: strategy for applying tree permutations to spaces
+  - `nearmatrixdata`: optional data passed to near-field assembly
+  - `farmatrixdata`: optional data passed to far-field assembly
+  - `scheduler`: thread scheduler used for assembly
+
+# Returns
+
+An `HMatrix` containing assembled near and far interactions.
+
+# Notes
+
+Use this constructor as the main entry point when you already have a tree. For a convenience
+entry point, use `H.assemble`.
+
+# See also
+
+`H.assemble`, `ACA`, `iACA`, `farmatrix`, `nearmatrix`
+"""
 function HMatrix(
     operator,
     testspace,
@@ -110,6 +143,23 @@ function HMatrix(
     return error("Symmetric version not implemented yet")
 end
 
+"""
+    farmatrix(hmat::HMatrix)
+
+Extract the far-field (low-rank compressed) contributions from a hierarchical matrix.
+
+Returns a new `HMatrix` containing only the low-rank far-field blocks, with all
+near-field blocks removed. Useful for analyzing the rank structure or applying
+operations that exploit low-rank properties.
+
+# Arguments
+
+  - `hmat::HMatrix`: Source hierarchical matrix
+
+# Returns
+
+  - `HMatrix`: New matrix with identical far-field interactions but empty near-field
+"""
 function farmatrix(hmat::HMatrix)
     blocks = Matrix{eltype(hmat)}[]
     nears = BlockSparseMatrix(blocks, Vector{Int}[], Vector{Int}[], hmat.dim)
@@ -117,10 +167,52 @@ function farmatrix(hmat::HMatrix)
     return HMatrix{eltype(hmat)}(nears, hmat.farinteractions, hmat.dim)
 end
 
+"""
+    nearmatrix(hmat::HMatrix)
+
+Extract the near-field (dense block) contributions from a hierarchical matrix.
+
+Returns only the block-sparse near-field interactions, removing all low-rank
+far-field blocks. Useful for analyzing near-field structure or applying
+operations specific to dense blocks.
+
+# Arguments
+
+  - `hmat::HMatrix`: Source hierarchical matrix
+
+# Returns
+
+  - `BlockSparseMatrix`: Near-field interactions as block-sparse matrix
+"""
 function nearmatrix(hmat::HMatrix)
     return hmat.nearinteractions
 end
 
+"""
+    storage(hmat::HMatrix)
+
+Analyze and report memory storage requirements of a hierarchical matrix.
+
+Prints detailed statistics (to stdout) comparing the actual storage needed
+for the hierarchical representation versus dense storage, including compression
+ratio. Also reports total memory footprint via Julia's `summarysize`.
+
+# Arguments
+
+  - `hmat::HMatrix`: Hierarchical matrix to analyze
+
+# Returns
+
+  - `Float64`: Total storage in GB used by hierarchical blocks
+
+# Output
+
+Prints to stdout:
+
+  - `storage`: Total block storage in GB
+  - `summary size`: Total memory footprint including Julia object overhead (GB)
+  - `compression ratio`: Ratio of hierarchical storage to dense storage
+"""
 function storage(hmat::HMatrix)
     refsize = size(hmat, 1) * size(hmat, 2) * sizeof(eltype(hmat))
     matsize = 0
