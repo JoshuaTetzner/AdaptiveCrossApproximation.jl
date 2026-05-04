@@ -1,13 +1,15 @@
 """
     ConvCrit
 
-Abstract base type for convergence criteria used by ACA and iACA compressors.
+Abstract base type for convergence criteria used by ACA and IACA compressors.
 
 # Notes
+
 Concrete subtypes define how stopping decisions are made and are converted into
 stateful `ConvCritFunctor` objects during block compression.
 
 # See also
+
 `ConvCritFunctor`, `FNormEstimator`, `iFNormEstimator`, `FNormExtrapolator`, `RandomSampling`
 """
 abstract type ConvCrit end
@@ -18,10 +20,12 @@ abstract type ConvCrit end
 Abstract base type for stateful convergence criterion functors.
 
 # Notes
+
 Instances are called during ACA iterations and return `(npivot, continue::Bool)`.
 Subtypes should implement `reset!` to reinitialize internal state for a new block.
 
 # See also
+
 `ConvCrit`, `reset!`, `normF!`
 """
 abstract type ConvCritFunctor end
@@ -49,10 +53,12 @@ end
 Reset a convergence functor before starting compression of a new block.
 
 # Notes
+
 Concrete subtypes should overload this method. The default fallback throws
 `ArgumentError`.
 
 # See also
+
 `ConvCritFunctor`
 """
 function reset!(convcrit::ConvCritFunctor)
@@ -76,8 +82,7 @@ function normF!(
 
     for j in 1:(npivot - 1)
         @views convcrit.normUV² +=
-            2 *
-            real.(
+            2 * real.(
                 dot(colbuffer[1:maxrows, npivot], colbuffer[1:maxrows, j]) *
                 dot(rowbuffer[npivot, 1:maxcolumns], rowbuffer[j, 1:maxcolumns]),
             )

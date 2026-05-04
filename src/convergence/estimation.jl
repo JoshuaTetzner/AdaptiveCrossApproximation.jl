@@ -51,7 +51,7 @@ end
 """
     iFNormEstimator{F} <: ConvCrit
 
-Frobenius norm-based convergence criterion for incomplete ACA (iACA).
+Frobenius norm-based convergence criterion for incomplete ACA (IACA).
 Uses moving average norm estimate for geometric pivoting scenarios.
 
 # Fields

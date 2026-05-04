@@ -15,8 +15,9 @@ mutable struct MaximumValueFunctor <: ValuePivStratFunctor
     usedidcs::Vector{Bool}
 end
 
-(::MaximumValue)(idcs::AbstractVector{<:Integer}) =
-    MaximumValueFunctor(length(idcs), zeros(Bool, length(idcs)))
+(::MaximumValue)(idcs::AbstractVector{<:Integer}) = MaximumValueFunctor(
+    length(idcs), zeros(Bool, length(idcs))
+)
 (::MaximumValue)(nidcs::Int) = MaximumValueFunctor(nidcs, zeros(Bool, nidcs))
 
 function Base.resize!(pivstrat::MaximumValueFunctor, nactive::Int)
