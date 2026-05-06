@@ -86,6 +86,7 @@ include("pivoting/lejapoints.jl")
 include("pivoting/filldistance.jl")
 include("pivoting/mimicrypivoting.jl")
 include("pivoting/treemimicrypivoting.jl")
+include("pivoting/treemimicrypivoting2.jl")
 
 include("convergence/estimation.jl")
 include("convergence/extrapolation.jl")

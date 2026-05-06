@@ -102,6 +102,7 @@ function _fillrest!(
     nactive::Int,
 )
     length(rest) < nactive && resize!(rest, nactive)
+    fill!(view(rest, 1:nactive), zero(eltype(rest)))
     @inbounds for i in 1:nactive
         rc = indices[i]
         @views K(rest[i:i], rowidcs[rc[1]:rc[1]], colidcs[rc[2]:rc[2]])
@@ -155,7 +156,6 @@ function (convcrit::RandomSamplingFunctor{F,K,M})(
     maxrows::Int,
     maxcolumns::Int,
 ) where {F<:Real,K,M}
-
     @views rnorm = norm(rowbuffer[npivot, 1:maxcolumns])
     @views cnorm = norm(colbuffer[1:maxrows, npivot])
     nactive = convcrit.nactive

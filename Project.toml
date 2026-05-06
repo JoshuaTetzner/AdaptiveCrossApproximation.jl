@@ -36,12 +36,12 @@ CompScienceMeshes = "3e66a162-7b8c-5da0-b8f8-124ecd2c3ae1"
 H2Trees = "9db26ae3-82ff-4374-85e9-9ed87405fd16"
 JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
 JuliaFormatter = "98e50ef6-434e-11e9-1051-2b60c6c9e899"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 ParallelKMeans = "42b8e9d4-006b-409a-8472-7f34b3fb58af"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 TestItemRunner = "f8b46487-2199-4994-9208-9a1283c18c0a"
 TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
-LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [targets]
 test = ["Aqua", "JET", "JuliaFormatter", "Test", "TestItemRunner", "TestItems", "Random", "ParallelKMeans", "BEAST", "H2Trees", "CompScienceMeshes", "LinearAlgebra"]

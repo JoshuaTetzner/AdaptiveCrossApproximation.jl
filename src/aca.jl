@@ -196,6 +196,7 @@ function (aca::ACA)(
         end
         npivot, conv = aca.convergence(rowbuffer, colbuffer, npivot, maxrows, maxcols)
     end
+    # println(rows[1:npivot], cols[1:npivot])
     return npivot
 end
 
