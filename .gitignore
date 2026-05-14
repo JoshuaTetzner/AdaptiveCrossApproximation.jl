@@ -6,3 +6,4 @@
 /docs/build/
 lcov.info
 *.vscode
+/dev/
