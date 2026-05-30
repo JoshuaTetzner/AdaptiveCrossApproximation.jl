@@ -49,6 +49,7 @@ function (aca::ACA{RP,CP,C})(
 
     return ACA(rowpiv, colpiv, convcrit)
 end
+
 function (aca::ACA{RP,CP,C})(
     A, nrowidcs::Int, ncolidcs::Int, maxrank::Int
 ) where {RP<:PivStrat,CP<:PivStrat,C<:ConvCrit}
@@ -196,7 +197,6 @@ function (aca::ACA)(
         end
         npivot, conv = aca.convergence(rowbuffer, colbuffer, npivot, maxrows, maxcols)
     end
-    # println(rows[1:npivot], cols[1:npivot])
     return npivot
 end
 
