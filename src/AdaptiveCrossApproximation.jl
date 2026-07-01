@@ -77,6 +77,7 @@ include("utils.jl")
 
 include("hmatrix/kernelmatrix/abstractkernelmatrix.jl")
 include("hmatrix/kernelmatrix/beastkernelmatrix.jl")
+include("hmatrix/kernelmatrix/gpubeastkernelmatrix.jl")
 include("hmatrix/kernelmatrix/pointmatrix.jl")
 
 include("pivoting/abstractpivoting.jl")
@@ -187,5 +188,5 @@ export FNormEstimator, iFNormEstimator, FNormExtrapolator, OversampIFNormEst
 export MaximumValue, Leja2, FillDistance
 export MimicryPivoting, TreeMimicryPivoting
 export reset!
-export AbstractKernelMatrix
+export AbstractKernelMatrix, GPUMatrixData
 end

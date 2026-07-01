@@ -14,8 +14,18 @@ function (isnear::AdaptiveCrossApproximation.IsNearFunctor{F})(
     ths = H2Trees.radius(treea, nodea)
     shs = H2Trees.radius(treeb, nodeb)
     dist = norm(H2Trees.center(treea, nodea) - H2Trees.center(treeb, nodeb)) - (ths + shs)
+    maxhs = max(ths, shs)
+    sep = max(dist, 0.0)
 
-    (2 * max(ths, shs) <= isnear.η * max(dist, 0.0)) ? (return false) : (return true)
+    # A leaf containing a single point (or coincident points) has radius 0. Two
+    # such leaves at zero separation (e.g. a node against itself) then satisfy
+    # 2*maxhs <= η*sep as 0 <= 0, so they get classified as admissible (far)
+    # rather than near.
+    if iszero(maxhs) && iszero(sep)
+        @warn("Zero-radius node pair at zero separation classified as far.", maxlog = 1)
+    end
+
+    (2 * maxhs <= isnear.η * sep) ? (return false) : (return true)
 end
 
 function nears_consecutive!(
