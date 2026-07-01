@@ -70,6 +70,7 @@ y = hmat * x  # Matrix-vector product
 module AdaptiveCrossApproximation
 
 using LinearAlgebra
+using ProgressMeter
 using StaticArrays
 
 include("utils.jl")
@@ -88,9 +89,12 @@ include("pivoting/mimicrypivoting.jl")
 include("pivoting/treemimicrypivoting.jl")
 
 include("convergence/estimation.jl")
+include("convergence/oversamp_ifnorm_est.jl")
 include("convergence/extrapolation.jl")
 include("convergence/randomsampling.jl")
 include("convergence/combinedconvcrit.jl")
+
+include("pivoting/treemimicrypivoting2.jl")
 
 include("pivoting/combinedpivstrat.jl")
 include("pivoting/randomsampling.jl")
@@ -179,7 +183,7 @@ export H
 export HMatrix
 export ACA
 export IACA
-export FNormEstimator, iFNormEstimator, FNormExtrapolator
+export FNormEstimator, iFNormEstimator, FNormExtrapolator, OversampIFNormEst
 export MaximumValue, Leja2, FillDistance
 export MimicryPivoting, TreeMimicryPivoting
 export reset!

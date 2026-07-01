@@ -49,6 +49,7 @@ function (aca::ACA{RP,CP,C})(
 
     return ACA(rowpiv, colpiv, convcrit)
 end
+
 function (aca::ACA{RP,CP,C})(
     A, nrowidcs::Int, ncolidcs::Int, maxrank::Int
 ) where {RP<:PivStrat,CP<:PivStrat,C<:ConvCrit}

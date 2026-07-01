@@ -26,6 +26,11 @@ struct IACA{RowPivType,ColPivType,ConvCritType}
     end
 end
 
+@inline _iaca_normF!(convcrit::ConvCritFunctor, rcbuffer, npivot) =
+    normF!(convcrit.estimator, rcbuffer, npivot)
+@inline _iaca_normF!(convcrit::OversampIFNormEstFunctor, rcbuffer, npivot) =
+    normF!(convcrit, rcbuffer, npivot)
+
 """
     IACA(tpos, spos)
 
@@ -57,6 +62,14 @@ function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
 ) where {RowPivType<:GeoPivStrat,ColPivType<:MaximumValue,ConvCritType<:ConvCrit}
     rowpivstrat = _buildpivstrat(iaca.rowpivoting, colidcs, rowidcs, maxrank)
     return IACA(rowpivstrat, iaca.columnpivoting(colidcs), iaca.convergence(maxrank))
+end
+
+function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
+    rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}, maxrank::Int
+) where {RowPivType<:TreeMimicryPivoting2,ColPivType<:MaximumValue,ConvCritType<:ConvCrit}
+    convcrit = iaca.convergence(maxrank)
+    rowpivstrat = _buildpivstrat(convcrit, iaca.rowpivoting, colidcs, rowidcs, maxrank)
+    return IACA(rowpivstrat, iaca.columnpivoting(colidcs), convcrit)
 end
 
 function reset!(
@@ -131,7 +144,7 @@ function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
         view(rowpivs, npivot:npivot),
         view(colidcs, 1:maxcolumn),
     )
-    normF!(iaca.convergence.estimator, rowbuffer[npivot, 1:maxcolumn], npivot)
+    _iaca_normF!(iaca.convergence, rowbuffer[npivot, 1:maxcolumn], npivot)
     colbuffer[1, 1] = K(1.0)
     colpivs[npivot] = iaca.columnpivoting(rowbuffer[npivot, 1:maxcolumn])
 
@@ -149,7 +162,7 @@ function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
         )
 
         # Norm update
-        normF!(iaca.convergence.estimator, rowbuffer[npivot, 1:maxcolumn], npivot)
+        _iaca_normF!(iaca.convergence, rowbuffer[npivot, 1:maxcolumn], npivot)
 
         colbuffer[npivot, npivot] = K(1.0)
         for k in 1:(npivot - 1)
@@ -171,6 +184,14 @@ function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
 ) where {RowPivType<:MaximumValue,ColPivType<:GeoPivStrat,ConvCritType<:ConvCrit}
     colpivstrat = _buildpivstrat(iaca.columnpivoting, rowidcs, colidcs, maxrank)
     return IACA(iaca.rowpivoting(rowidcs), colpivstrat, iaca.convergence(maxrank))
+end
+
+function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
+    rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}, maxrank::Int
+) where {RowPivType<:MaximumValue,ColPivType<:TreeMimicryPivoting2,ConvCritType<:ConvCrit}
+    convcrit = iaca.convergence(maxrank)
+    colpivstrat = _buildpivstrat(convcrit, iaca.columnpivoting, rowidcs, colidcs, maxrank)
+    return IACA(iaca.rowpivoting(rowidcs), colpivstrat, convcrit)
 end
 
 function reset!(
@@ -245,7 +266,7 @@ function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
         view(rowidcs, 1:maxrow),
         view(colpivs, npivot:npivot),
     )
-    normF!(iaca.convergence.estimator, colbuffer[1:maxrow, npivot], npivot)
+    _iaca_normF!(iaca.convergence, colbuffer[1:maxrow, npivot], npivot)
     rowbuffer[1, 1] = K(1.0)
     rowpivs[npivot] = iaca.rowpivoting(colbuffer[1:maxrow, npivot])
 
@@ -264,7 +285,7 @@ function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
         )
 
         # Norm update
-        normF!(iaca.convergence.estimator, colbuffer[1:maxrow, npivot], npivot)
+        _iaca_normF!(iaca.convergence, colbuffer[1:maxrow, npivot], npivot)
 
         rowbuffer[npivot, npivot] = K(1.0)
         for k in 1:(npivot - 1)

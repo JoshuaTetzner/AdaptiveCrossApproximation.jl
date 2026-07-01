@@ -221,7 +221,7 @@ function storage(hmat::HMatrix)
     end
     for farmat in hmat.farinteractions
         for blk in farmat.blocks
-            matsize += length(blk)
+            matsize += length(blk.U) + length(blk.V)
         end
     end
     println("storage: ", matsize * sizeof(eltype(hmat)) * 10^-9, " GB")

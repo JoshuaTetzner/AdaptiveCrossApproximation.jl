@@ -102,6 +102,7 @@ block-sparse matrix stores these near-field interactions.
   - `isnear`: Admissibility predicate (default: `isnear()`)
   - `scheduler`: Thread scheduler (default: `SerialScheduler()`)
   - `matrixdata`: Assembly data passed to kernel matrix (optional)
+  - `verbose`: Show a progress bar over near-field blocks (default: `false`)
 
 # Returns
 
@@ -121,6 +122,7 @@ function assemblenears(
     isnear=isnear(),
     scheduler=SerialScheduler(),
     matrixdata=defaultmatrixdata(operator, testspace, trialspace),
+    verbose::Bool=false,
 )
     nearmatrix = AbstractKernelMatrix(
         operator, testspace, trialspace; matrixdata=matrixdata
@@ -132,12 +134,15 @@ function assemblenears(
     )
 
     blocks = Vector{Matrix{eltype(nearmatrix)}}(undef, length(values))
+    pbar = Progress(length(blocks); desc="Assembling near interactions: ", enabled=verbose)
     @tasks for i in eachindex(blocks)
         @set scheduler = scheduler
         blk = zeros(eltype(nearmatrix), length(values[i]), length(nearvalues[i]))
         nearmatrix(blk, values[i], nearvalues[i])
         blocks[i] = blk
+        next!(pbar)
     end
+    finish!(pbar)
 
     nears = BlockSparseMatrix(
         blocks, values, nearvalues, size(nearmatrix); scheduler=scheduler
@@ -172,6 +177,7 @@ block storage format optimized for the reordered layout.
   - `isnear`: Admissibility predicate (default: `isnear()`)
   - `scheduler`: Thread scheduler (default: `SerialScheduler()`)
   - `matrixdata`: Assembly data passed to kernel matrix (optional)
+  - `verbose`: Show a progress bar over near-field blocks (default: `false`)
 
 # Returns
 
@@ -192,6 +198,7 @@ function assemblenears(
     isnear=isnear(),
     scheduler=SerialScheduler(),
     matrixdata=defaultmatrixdata(operator, testspace, trialspace),
+    verbose::Bool=false,
 )
     nearmatrix = AbstractKernelMatrix(
         operator, testspace, trialspace; matrixdata=matrixdata
@@ -214,11 +221,14 @@ function assemblenears(
     }(
         undef, length(blocks)
     )
+    pbar = Progress(length(blocks); desc="Assembling near interactions: ", enabled=verbose)
     @tasks for i in eachindex(blocks)
         @set scheduler = scheduler
         nearmatrix(blocks[i], values[i], Iterators.flatten(nearvalues[i]))
         viewblocks[i] = splitblock(blocks[i], length.(nearvalues[i]))
+        next!(pbar)
     end
+    finish!(pbar)
     mat = VariableBlockCompressedRowStorage{
         eltype(nearmatrix),eltype(Iterators.flatten(viewblocks)),Int,typeof(scheduler)
     }(

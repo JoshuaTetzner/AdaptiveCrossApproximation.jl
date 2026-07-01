@@ -77,7 +77,7 @@ function (convcrit::FNormExtrapolatorFunctor{F})(
     if conv
         return npivot, true
     else
-        f2 = fit(Vector(1:(npivot - 1)), log10.(convcrit.lastnorms[1:(npivot - 1)]), 2)
+        f2 = fit(Vector(1:(npivot)), log10.(convcrit.lastnorms[1:(npivot)]), 2)
         return npivot, f2(npivot) > log10(tolerance(convcrit) * convcrit.estimator.normUV)
     end
 end
