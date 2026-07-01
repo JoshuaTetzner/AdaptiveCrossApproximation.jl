@@ -20,7 +20,7 @@ makedocs(;
         ],
         "Further Details" => Any[
             "ACA" => "./details/aca.md",
-            "IACA" => "./details/iaca.md",
+            "iACA" => "./details/iaca.md",
             "Pivoting Strategies" => "./details/pivoting.md",
             "Convergence Criteria" => "./details/convergence.md",
         ],

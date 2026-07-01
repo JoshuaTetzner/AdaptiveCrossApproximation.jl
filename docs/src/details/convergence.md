@@ -19,7 +19,7 @@ $$|\bm u_r| |\bm v_r| < \varepsilon \cdot \|\bm U \bm V^T\|_F\,.$$
 
 API: [`FNormEstimator`](@ref)
 
-### Incomplete ACA (IACA)
+### Incomplete ACA (iACA)
 
 For incomplete ACA less entries of the matrix are sampled, therefore, in the case of the the Frobenius norm of the full matrix is estimated following [[7]](@ref refs) by
 
@@ -63,3 +63,4 @@ API: [`AdaptiveCrossApproximation.CombinedConvCrit`](@ref)
 The choice of convergence criterion should be guided by the specific characteristics of the problem and computational constraints.
 The standard Frobenius norm estimation is in the case of the ACA suitable for most applications.
 For the IACA the Extrapolation based criterion is recommended.
+

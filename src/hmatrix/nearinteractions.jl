@@ -102,7 +102,6 @@ block-sparse matrix stores these near-field interactions.
   - `isnear`: Admissibility predicate (default: `isnear()`)
   - `scheduler`: Thread scheduler (default: `SerialScheduler()`)
   - `matrixdata`: Assembly data passed to kernel matrix (optional)
-  - `verbose`: Show a progress bar over near-field blocks (default: `false`)
 
 # Returns
 
@@ -177,7 +176,6 @@ block storage format optimized for the reordered layout.
   - `isnear`: Admissibility predicate (default: `isnear()`)
   - `scheduler`: Thread scheduler (default: `SerialScheduler()`)
   - `matrixdata`: Assembly data passed to kernel matrix (optional)
-  - `verbose`: Show a progress bar over near-field blocks (default: `false`)
 
 # Returns
 

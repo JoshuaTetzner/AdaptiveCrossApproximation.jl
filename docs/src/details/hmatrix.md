@@ -123,7 +123,7 @@ HMatrix(operator, testspace, trialspace, tree;
 | `trialspace` | — | Column basis or evaluation points |
 | `tree` | — | Hierarchical tree controlling block partitioning |
 | `tol` | `1e-4` | Compression tolerance for ACA |
-| `compressor` | `ACA(tol=1e-4)` | Compression algorithm (ACA, ACAᵀ, IACA) |
+| `compressor` | `ACA(tol=1e-4)` | Compression algorithm (ACA, ACAᵀ, iACA) |
 | `isnear` | `isnear(1.0)` | Admissibility predicate with `η = 1.0` |
 | `maxrank` | `40` | Hard limit on compressed block rank |
 | `spaceordering` | `PermuteSpaceInPlace()` | Strategy for space reordering |
