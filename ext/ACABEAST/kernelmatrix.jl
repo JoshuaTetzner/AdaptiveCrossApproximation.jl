@@ -4,21 +4,20 @@ function AdaptiveCrossApproximation.AbstractKernelMatrix(
     trialspace::BEAST.Space;
     matrixdata=BEAST.defaultquadstrat(operator, testspace, trialspace),
 )
-    return beastkernelmatrix(operator, testspace, trialspace, matrixdata)
+    return AdaptiveCrossApproximation.beastkernelmatrix(
+        operator, testspace, trialspace, matrixdata
+    )
 end
 
-function beastkernelmatrix(operator, testspace, trialspace, quadstrat)
+function AdaptiveCrossApproximation.beastkernelmatrix(
+    operator::BEAST.IntegralOperator,
+    testspace::BEAST.Space,
+    trialspace::BEAST.Space,
+    quadstrat,
+)
     assembler = BEAST.blockassembler(operator, testspace, trialspace; quadstrat)
 
     return AdaptiveCrossApproximation.BEASTKernelMatrix{scalartype(operator)}(assembler)
-end
-
-function beastkernelmatrix(
-    operator, testspace, trialspace, data::AdaptiveCrossApproximation.GPUMatrixData
-)
-    assembler = BEAST.blockassembler(operator, testspace, trialspace; data.quadstrat)
-
-    return AdaptiveCrossApproximation.GPUBEASTKernelMatrix{scalartype(operator)}(assembler)
 end
 
 struct BlockStoreFunctor{M}

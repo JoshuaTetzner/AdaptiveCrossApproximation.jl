@@ -48,6 +48,8 @@ specialized methods for specific operator/space types.
 """
 function AbstractKernelMatrix(operator, testspace, trialspace; args...) end
 
+function beastkernelmatrix end
+
 function (::AbstractKernelMatrix)(matrixblock, tdata, sdata) end
 
 Base.eltype(::AbstractKernelMatrix{T}) where {T} = T
