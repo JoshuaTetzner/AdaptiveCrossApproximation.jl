@@ -60,7 +60,7 @@ end
         op, x, y; matrixdata=AdaptiveCrossApproximation.GPUMatrixData(quadstrat, 1)
     )
 
-    @test gpu_matrix isa extension_module.GPUBEASTKernelMatrix
+    @test gpu_matrix isa AdaptiveCrossApproximation.GPUBEASTKernelMatrix
     @test size(gpu_matrix) == size(cpu_matrix) == (length(x), length(y))
     @test eltype(gpu_matrix) == eltype(cpu_matrix) == Float64
 

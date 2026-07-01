@@ -77,6 +77,7 @@ include("utils.jl")
 
 include("hmatrix/kernelmatrix/abstractkernelmatrix.jl")
 include("hmatrix/kernelmatrix/beastkernelmatrix.jl")
+include("hmatrix/kernelmatrix/gpubeastkernelmatrix.jl")
 include("hmatrix/kernelmatrix/gpumatrixdata.jl")
 include("hmatrix/kernelmatrix/pointmatrix.jl")
 
