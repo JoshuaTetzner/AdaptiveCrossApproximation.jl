@@ -70,6 +70,7 @@ y = hmat * x  # Matrix-vector product
 module AdaptiveCrossApproximation
 
 using LinearAlgebra
+using ProgressMeter
 using StaticArrays
 
 include("utils.jl")
@@ -131,8 +132,11 @@ module H
       - `op`: Operator/kernel for matrix entry evaluation
 
       - `testspace`: Test space (row basis/points)
+
       - `trialspace`: Trial space (column basis/points)
+
       - `tree`: Hierarchical tree structure (auto-generated if not provided)
+
       - `kwargs...`: Additional parameters passed to [`HMatrix`](@ref):
 
           + `tol`: Convergence tolerance (default `1e-4`)
