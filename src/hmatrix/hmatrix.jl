@@ -19,11 +19,11 @@ via `Matrix`.
 # Notes
 
 `HMatrix` is typically created through the high-level constructor
-`HMatrix(operator, testspace, trialspace, tree; kwargs...)` or `H.assemble(...)`.
+`HMatrix(operator, testspace, trialspace, tree; kwargs...)` or `assemble(...)`.
 
 # See also
 
-`HMatrix`, `H.assemble`, `farmatrix`, `nearmatrix`
+`HMatrix`, `assemble`, `farmatrix`, `nearmatrix`
 """
 struct HMatrix{K,NearInteractionType,FarInteractionType} <: LinearMaps.LinearMap{K}
     nearinteractions::NearInteractionType

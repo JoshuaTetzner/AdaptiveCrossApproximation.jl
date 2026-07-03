@@ -117,8 +117,8 @@ x = rand(eltype(DLop), size(DLop, 2))
 norm(DLop * x - DL2_op * x) / norm(DL2_op * x)
 println("HMatnorm = ", norm(DL * x - DL2 * x) / norm(DL2 * x))
 
-@testset "H.assemble default tree (BEAST spaces)" begin
-    # H.assemble's default `tree` keyword builds an H2Trees.TwoNTree straight from
+@testset "assemble default tree (BEAST spaces)" begin
+    # assemble's default `tree` keyword builds an H2Trees.TwoNTree straight from
     # the BEAST space (via the H2BEASTTrees extension), unlike every other test in
     # this file which passes a pre-built tree explicitly. Regression test for the
     # `testminvalues`/`trialminvalues` keyword names expected by that call.
@@ -127,7 +127,7 @@ println("HMatnorm = ", norm(DL * x - DL2 * x) / norm(DL2 * x))
         Xhassemble = raviartthomas(Γhassemble)
         ophassemble = Maxwell3D.singlelayer(; wavenumber=1.0)
 
-        Tcompressed = AdaptiveCrossApproximation.H.assemble(
+        Tcompressed = AdaptiveCrossApproximation.assemble(
             ophassemble, Xhassemble, Xhassemble; tol=1e-3, maxrank=40
         )
         Tdense = assemble(ophassemble, Xhassemble, Xhassemble)
@@ -136,9 +136,9 @@ println("HMatnorm = ", norm(DL * x - DL2 * x) / norm(DL2 * x))
     end
 end
 
-@testset "H.assemble KMeans tree backend (ParallelKMeans loaded)" begin
+@testset "assemble KMeans tree backend (ParallelKMeans loaded)" begin
     # ParallelKMeans is loaded above (for the KMeansTree/BlockTree cell earlier in
-    # this file), so H.assemble's default tree backend should now resolve to the
+    # this file), so assemble's default tree backend should now resolve to the
     # k-means clustered tree (ACAParallelKMeansTrees extension) instead of TwoNTree.
     let
         Γkmeans = CompScienceMeshes.meshsphere(1.0, 0.3)
@@ -148,7 +148,7 @@ end
         @test AdaptiveCrossApproximation.defaulttreebackend() isa
             AdaptiveCrossApproximation.KMeansTreeBackend
 
-        Tcompressed = AdaptiveCrossApproximation.H.assemble(
+        Tcompressed = AdaptiveCrossApproximation.assemble(
             opkmeans, Xkmeans, Xkmeans; tol=1e-3, maxrank=40
         )
         Tdense = assemble(opkmeans, Xkmeans, Xkmeans)
@@ -157,7 +157,7 @@ end
     end
 end
 
-@testset "H.assemble quadstrat resolves into near/far" begin
+@testset "assemble quadstrat resolves into near/far" begin
     let
         Γq = CompScienceMeshes.meshsphere(1.0, 0.3)
         Xq = raviartthomas(Γq)
@@ -169,9 +169,31 @@ end
 
         # An explicit quadstrat override propagates to both near and far by default.
         customqs = BEAST.DoubleNumWiltonSauterQStrat(1, 1, 3, 3, 2, 2, 2, 2)
-        hmat = AdaptiveCrossApproximation.H.assemble(
+        hmat = AdaptiveCrossApproximation.assemble(
             opq, Xq, Xq; tol=1e-3, maxrank=40, quadstrat=customqs
         )
         @test hmat isa AdaptiveCrossApproximation.HMatrix
+    end
+end
+
+@testset "assemble bypasses tree/ACA for BEAST.LocalOperator" begin
+    let
+        Γl = CompScienceMeshes.meshsphere(1.0, 0.3)
+        Xl = raviartthomas(Γl)
+
+        # BEAST.Identity/NCross only couple overlapping basis functions, so
+        # `assemble` should dispatch straight to `BEAST.assemble` instead of
+        # building a tree and compressing via ACA. `tol`/`maxrank` are
+        # meaningless here and must be silently ignored rather than erroring.
+        direct = AdaptiveCrossApproximation.assemble(
+            BEAST.Identity(), Xl, Xl; tol=1e-3, maxrank=40
+        )
+        reference = BEAST.assemble(BEAST.Identity(), Xl, Xl)
+        @test direct == reference
+        @test !(direct isa AdaptiveCrossApproximation.HMatrix)
+
+        direct_ncross = AdaptiveCrossApproximation.assemble(BEAST.NCross(), Xl, Xl)
+        reference_ncross = BEAST.assemble(BEAST.NCross(), Xl, Xl)
+        @test direct_ncross == reference_ncross
     end
 end

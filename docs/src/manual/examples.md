@@ -2,7 +2,7 @@
 
 This section contains end-to-end examples that show how AdaptiveCrossApproximation
 is used in realistic BEAST scattering workflows. Each example assembles a boundary
-integral operator as a compressed H-matrix through `AdaptiveCrossApproximation.H.assemble`,
+integral operator as a compressed H-matrix through `AdaptiveCrossApproximation.assemble`,
 solves the resulting linear system, and produces two plots: a near-field heatmap and a
 bistatic radar cross section (RCS) pattern, alongside the induced surface current.
 
@@ -14,7 +14,7 @@ docs build; run the scripts directly to reproduce the plots.
 ## EFIE Scattering from a PEC Sphere
 
 Solves a PEC sphere scattering problem with the Electric Field Integral Equation
-(EFIE). `H.assemble` builds the H2Trees cluster tree automatically from the RWG
+(EFIE). `assemble` builds the H2Trees cluster tree automatically from the RWG
 basis positions, so no manual tree construction is needed.
 
 ```julia
@@ -38,9 +38,9 @@ t = Maxwell3D.singlelayer(; wavenumber=κ)
 E = Maxwell3D.planewave(; direction=ẑ, polarization=x̂, wavenumber=κ)
 
 # Assemble the compressed EFIE operator directly through ACA's high-level entry
-# point. `H.assemble` builds an H2Trees cluster tree from the RWG basis positions
+# point. `assemble` builds an H2Trees cluster tree from the RWG basis positions
 # and compresses admissible (far) blocks with ACA -- no manual tree needed.
-T = ACA.H.assemble(t, X, X; tol=1e-3, maxrank=60)
+T = ACA.assemble(t, X, X; tol=1e-3, maxrank=60)
 e = assemble((n × E) × n, X)
 
 u, stats = Krylov.gmres(T, e; rtol=1e-4)
@@ -69,7 +69,7 @@ plt = Plot(
         Subplots(;
             rows=2, cols=2, specs=[Spec() Spec(; rowspan=2); Spec(; kind="mesh3d") missing]
         ),
-        title_text="EFIE: PEC sphere scattering (ACA.H.assemble)",
+        title_text="EFIE: PEC sphere scattering (ACA.assemble)",
     ),
 )
 add_trace!(plt, scatter(; x=rad2deg.(Θ), y=rcs_dB, name="bistatic RCS [dB]"); row=1, col=1)
@@ -86,7 +86,7 @@ savefig(plt, "efie_results.html")
 
 ### Notes
 
-- `H.assemble(t, X, X; tol=..., maxrank=...)` returns an `HMatrix` compatible with
+- `assemble(t, X, X; tol=..., maxrank=...)` returns an `HMatrix` compatible with
   `Krylov.gmres` directly (no BEAST `materialize` callback needed for a single operator).
 - The same workflow can be adapted to larger meshes by tuning `tol`, `maxrank`, and
   the H2Trees cluster-splitting thresholds.
@@ -96,8 +96,10 @@ savefig(plt, "efie_results.html")
 Solves the same PEC sphere problem with the (better-conditioned, second-kind)
 Magnetic Field Integral Equation. The system combines a compressible integral
 operator (`K`, the Maxwell double layer) with a local operator (`N`, the surface
-cross product) — `H.assemble` is only useful for the former, so a `materialize`
-callback routes each block to the right assembly path.
+cross product). BEAST needs a `materialize` callback to route each block to the
+right assembly routine; `ACA.assemble` dispatches on the operator type itself
+(tree + ACA compression for `K`, direct `BEAST.assemble` for the local `N`), so
+the callback is a thin pass-through rather than a manual branch.
 
 ```julia
 using LinearAlgebra
@@ -124,22 +126,13 @@ E = Maxwell3D.planewave(; direction=ẑ, polarization=x̂, wavenumber=κ)
 H = -1 / (im * μ * ω) * curl(E)
 h = (n × H) × n
 
-# Route integral-operator blocks through ACA's compressed H-matrix assembly and
-# leave the local (identity-like) NCross block to BEAST's own dense assembly.
-function materialize(op, testspace, trialspace; kwargs...)
-    if op isa BEAST.IntegralOperator
-        return ACA.H.assemble(op, testspace, trialspace; tol=1e-3, maxrank=60)
-    end
-    return BEAST.assemble(op, testspace, trialspace; kwargs...)
-end
-
 @hilbertspace j
 @hilbertspace m
 
 a = K[m, j] + 0.5 * N[m, j]
 l = h[m]
 
-A = assemble(a, ∏(Y), ∏(X); materialize=materialize)
+A = assemble(a, ∏(Y), ∏(X); materialize=ACA.assemble)
 b = assemble(l, ∏(Y))
 
 A⁻¹ = BEAST.GMRESSolver(A; reltol=1e-4, maxiter=1000)
@@ -166,7 +159,7 @@ plt = Plot(
         Subplots(;
             rows=2, cols=2, specs=[Spec() Spec(; rowspan=2); Spec(; kind="mesh3d") missing]
         ),
-        title_text="MFIE: PEC sphere scattering (ACA.H.assemble)",
+        title_text="MFIE: PEC sphere scattering (ACA.assemble)",
     ),
 )
 add_trace!(plt, scatter(; x=rad2deg.(Θ), y=rcs_dB, name="bistatic RCS [dB]"); row=1, col=1)
@@ -184,8 +177,8 @@ savefig(plt, "mfie_results.html")
 ### Notes
 
 - `assemble(a, ∏(Y), ∏(X); materialize=materialize)` calls `materialize` once per
-  bilinear-form block (`K` and `N` here); the callback dispatches on
-  `op isa BEAST.IntegralOperator` to decide whether ACA compression applies.
+  bilinear-form block (`K` and `N` here); `ACA.assemble` itself decides whether
+  ACA compression applies, based on the operator's type.
 - MFIE converges in far fewer GMRES iterations than EFIE since it is a well-conditioned
   second-kind formulation.
 
@@ -225,14 +218,11 @@ H = -1 / (im * κ * η) * curl(E)
 e = (n × E) × n
 h = (n × H) × n
 
-# All PMCHWT operator blocks (T, T′, K, K′) are integral operators, so this
-# routes the entire system through ACA's compressed H-matrix assembly.
-function materialize(op, testspace, trialspace; kwargs...)
-    if op isa BEAST.IntegralOperator
-        return ACA.H.assemble(op, testspace, trialspace; tol=1e-3, maxrank=60)
-    end
-    return BEAST.assemble(op, testspace, trialspace; kwargs...)
-end
+# Routes every operator block through ACA's compressed H-matrix assembly (all of
+# T, T′, K, K′ are integral operators here); `ACA.assemble` dispatches any local
+# operator straight to BEAST's own dense assembly instead, without a manual check.
+materialize(op, testspace, trialspace; kwargs...) =
+    ACA.assemble(op, testspace, trialspace; tol=1e-3, maxrank=60, kwargs...)
 
 @hilbertspace j m
 @hilbertspace k l
@@ -252,56 +242,6 @@ b = assemble(rhs, 𝕏)
 
 A⁻¹ = BEAST.GMRESSolver(A; reltol=1e-4, maxiter=1000)
 u = A⁻¹ * b
-
-# Bistatic RCS in the plane φ=0. The far field has two contributions (electric
-# current j and magnetic current m), combined as in the standard PMCHWT far-field
-# formula: σ(θ) = 4π|E_far(θ)|² for unit-amplitude incidence.
-Θ = range(0; stop=π, length=181)
-pts = [point(sin(θ), 0, cos(θ)) for θ in Θ]
-ffm = potential(MWFarField3D(; wavenumber=κ), pts, u[m], X)
-ffj = potential(MWFarField3D(; wavenumber=κ), pts, u[j], X)
-ff = -η * im * κ * ffj + im * κ * cross.(pts, ffm)
-rcs_dB = 10 .* log10.(4π .* abs2.(norm.(ff)))
-
-# Near-field heatmap: total-field magnitude in the y-z plane. Uses the
-# equivalence-principle superposition trick: the exterior representation is
-# correct (and vanishes) outside (inside) Γ, the interior one vice versa, so
-# simply adding both gives the physically correct field everywhere.
-function nearfield_E(um, uj, Xm, Xj, κ, η, points, Einc=(x -> point(0, 0, 0)))
-    Kfield = MWDoubleLayerField3D(; wavenumber=κ)
-    Tfield = MWSingleLayerField3D(; wavenumber=κ)
-    Em = potential(Kfield, points, um, Xm)
-    Ej = potential(Tfield, points, uj, Xj)
-    return -Em + η * Ej + Einc.(points)
-end
-
-ys = range(-2; stop=2, length=60)
-zs = range(-3; stop=3, length=120)
-gridpoints = [point(0, y, z) for y in ys, z in zs]
-E_ex = nearfield_E(u[m], u[j], X, X, κ, η, gridpoints, E)
-E_in = nearfield_E(-u[m], -u[j], X, X, κ′, η′, gridpoints)
-Etot = norm.(E_ex + E_in)
-
-fcr, geo = facecurrents(u[j], X)
-
-plt = Plot(
-    Layout(
-        Subplots(;
-            rows=2, cols=2, specs=[Spec() Spec(; rowspan=2); Spec(; kind="mesh3d") missing]
-        ),
-        title_text="PMCHWT: dielectric sphere scattering (ACA.H.assemble)",
-    ),
-)
-add_trace!(plt, scatter(; x=rad2deg.(Θ), y=rcs_dB, name="bistatic RCS [dB]"); row=1, col=1)
-add_trace!(
-    plt,
-    contour(; x=zs, y=ys, z=Etot, colorscale="Viridis", showscale=true, name="|E_total|");
-    row=1,
-    col=2,
-)
-add_trace!(plt, patch(geo, norm.(fcr); caxis=(0, 2)); row=2, col=1)
-
-savefig(plt, "pmchwt_results.html")
 ```
 
 ### Notes

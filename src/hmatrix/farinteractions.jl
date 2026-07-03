@@ -73,6 +73,7 @@ original space ordering. Produces a collection of level-by-level block-sparse ma
   - `matrixdata`: Assembly data passed to kernel matrix (optional)
   - `maxrank = 50`: Maximum rank for compressed blocks
   - `scheduler`: Thread scheduler (default: `SerialScheduler()`)
+  - `verbose`: enable progress output (default `true`)
 
 # Returns
 
@@ -95,6 +96,7 @@ function assemblefars(
     matrixdata=defaultfarmatrixdata(operator, testspace, trialspace),
     maxrank=50,
     scheduler=SerialScheduler(),
+    verbose::Bool=true,
 )
     kernelmatrix = AbstractKernelMatrix(
         operator, testspace, trialspace; matrixdata=matrixdata
@@ -115,7 +117,9 @@ function assemblefars(
         j in farptr[i]:(farptr[i + 1] - 1);
         init=0,
     )
-    progress = Progress(total_work; desc="Assembling far interactions: ", showspeed=true)
+    progress = Progress(
+        total_work; desc="Assembling far interactions: ", showspeed=true, enabled=verbose
+    )
 
     blocks = Vector{LowRankMatrix{eltype(kernelmatrix)}}(undef, length(farvalues))
     colbuffer = zeros(eltype(kernelmatrix), length(testspace), maxrank)
@@ -189,6 +193,7 @@ format optimized for the reordered layout.
   - `matrixdata`: Assembly data passed to kernel matrix (optional)
   - `maxrank = 50`: Maximum rank for compressed blocks
   - `scheduler`: Thread scheduler (default: `SerialScheduler()`)
+  - `verbose`: enable progress output (default `true`)
 
 # Returns
 
@@ -211,6 +216,7 @@ function assemblefars(
     matrixdata=defaultfarmatrixdata(operator, testspace, trialspace),
     maxrank=50,
     scheduler=SerialScheduler(),
+    verbose::Bool=true,
 )
     kernelmatrix = AbstractKernelMatrix(
         operator, testspace, trialspace; matrixdata=matrixdata
@@ -222,7 +228,9 @@ function assemblefars(
         j in farptr[i]:(farptr[i + 1] - 1);
         init=0,
     )
-    progress = Progress(total_work; desc="Assembling far interactions: ", showspeed=true)
+    progress = Progress(
+        total_work; desc="Assembling far interactions: ", showspeed=true, enabled=verbose
+    )
 
     blocks = Vector{LowRankMatrix{eltype(kernelmatrix)}}(undef, length(farvalues))
     colbuffer = zeros(eltype(kernelmatrix), length(testspace), maxrank)

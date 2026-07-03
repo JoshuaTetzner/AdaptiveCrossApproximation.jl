@@ -47,12 +47,12 @@ end
 """
     defaulttreebackend()
 
-Return the tree backend `H.assemble` uses when no `tree` is given explicitly.
+Return the tree backend `assemble` uses when no `tree` is given explicitly.
 
 Resolved at call time from which packages are loaded: [`KMeansTreeBackend`](@ref)
 if `ParallelKMeans.jl` is loaded alongside `H2Trees.jl` (via the `ACAParallelKMeansTrees`
 extension), otherwise [`H2Tree`](@ref) if `H2Trees.jl` alone is loaded (via `ACAH2Trees`).
-Errors if neither is loaded, since `H.assemble` then has no way to build a tree.
+Errors if neither is loaded, since `assemble` then has no way to build a tree.
 """
 function defaulttreebackend()
     if !isnothing(Base.get_extension(AdaptiveCrossApproximation, :ACAParallelKMeansTrees))
@@ -61,7 +61,7 @@ function defaulttreebackend()
         return H2Tree()
     else
         return error(
-            "H.assemble needs a clustering tree backend: load H2Trees.jl (optionally " *
+            "assemble needs a clustering tree backend: load H2Trees.jl (optionally " *
             "with ParallelKMeans.jl for k-means clustering), or pass `tree=` explicitly.",
         )
     end
@@ -204,7 +204,7 @@ Assemble a hierarchical matrix approximation of an operator on test and trial sp
   - `nearmatrixdata`: optional data passed to near-field assembly
   - `farmatrixdata`: optional data passed to far-field assembly
   - `scheduler`: thread scheduler used for assembly
-  - `verbose`: enable progress output for near-field assembly (default `false`)
+  - `verbose`: enable progress output for near- and far-field assembly (default `true`)
 
 # Returns
 
@@ -213,11 +213,11 @@ An `HMatrix` containing assembled near and far interactions.
 # Notes
 
 Use this constructor as the main entry point when you already have a tree. For a convenience
-entry point, use `H.assemble`.
+entry point, use `assemble`.
 
 # See also
 
-`H.assemble`, `ACA`, `IACA`, `farmatrix`, `nearmatrix`
+`assemble`, `ACA`, `IACA`, `farmatrix`, `nearmatrix`
 """
 function HMatrix(
     operator,
@@ -232,7 +232,7 @@ function HMatrix(
     nearmatrixdata=defaultmatrixdata(operator, testspace, trialspace),
     farmatrixdata=defaultfarmatrixdata(operator, testspace, trialspace),
     scheduler=DynamicScheduler(),
-    verbose::Bool=false,
+    verbose::Bool=true,
 )
     testspace, trialspace = spaceordering(tree, testspace, trialspace)
 
@@ -259,6 +259,7 @@ function HMatrix(
         isnear=isnear,
         matrixdata=farmatrixdata,
         scheduler=scheduler,
+        verbose=verbose,
     )
 
     return HMatrix{eltype(nears)}(nears, fars, (length(testspace), length(trialspace)))
@@ -276,7 +277,7 @@ function HMatrix(
     nearmatrixdata=defaultmatrixdata(operator, space, space),
     farmatrixdata=defaultfarmatrixdata(operator, space, space),
     scheduler=DynamicScheduler(),
-    verbose::Bool=false,
+    verbose::Bool=true,
 )
     return error("Symmetric version not implemented yet")
 end

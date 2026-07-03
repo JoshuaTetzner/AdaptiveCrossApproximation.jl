@@ -3,7 +3,7 @@
 ## High-Level API
 
 ```@docs
-AdaptiveCrossApproximation.H.assemble
+AdaptiveCrossApproximation.assemble
 ```
 
 ```@autodocs

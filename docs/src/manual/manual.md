@@ -179,7 +179,7 @@ norm(Awave[:, cols] * inv(Awave[rows, cols]) * Awave[rows, :] - Awave) / norm(Aw
 High-level entry point:
 
 ```julia
-hmat = H.assemble(
+hmat = AdaptiveCrossApproximation.assemble(
 	operator,
 	testspace,
 	trialspace;
@@ -190,13 +190,18 @@ hmat = H.assemble(
 )
 ```
 
-`H.assemble` picks its tree backend automatically from what's loaded: a
+`AdaptiveCrossApproximation.assemble` picks its tree backend automatically from what's loaded: a
 `H2Trees.TwoNTree` when only H2Trees.jl is loaded, or a k-means clustered tree
 when ParallelKMeans.jl is loaded alongside it. It also accepts a `quadstrat`
 keyword (matching `BEAST.assemble`'s convention), which resolves into
 `nearquadstrat=quadstrat` for dense near-field blocks and
 `farquadstrat=tofarquadstrat(quadstrat)` for compressed far-field blocks —
 override either independently for finer control.
+
+For operators whose matrix is cheap to build directly and never benefits from
+low-rank compression (e.g. BEAST's local operators `Identity`/`NCross`), the
+`ACABEAST` extension adds a more specific `assemble` method that bypasses tree
+construction and ACA entirely, calling `BEAST.assemble` directly.
 
 If you already have a tree, use the explicit constructor:
 

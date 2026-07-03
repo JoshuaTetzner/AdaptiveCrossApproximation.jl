@@ -1,13 +1,13 @@
 using LinearAlgebra
 using CompScienceMeshes
 using BEAST
+using ParallelKMeans
 using H2Trees
 using AdaptiveCrossApproximation
 using Krylov
 using PlotlyJS
 
 const ACA = AdaptiveCrossApproximation
-
 # Geometry and function space: PEC sphere
 Γ = meshsphere(1.0, 0.1)
 X = raviartthomas(Γ)
@@ -18,14 +18,13 @@ t = Maxwell3D.singlelayer(; wavenumber=κ)
 E = Maxwell3D.planewave(; direction=ẑ, polarization=x̂, wavenumber=κ)
 
 # Assemble the compressed EFIE operator directly through ACA's high-level entry
-# point. `H.assemble` builds an H2Trees cluster tree from the RWG basis positions
+# point. `assemble` builds an H2Trees cluster tree from the RWG basis positions
 # and compresses admissible (far) blocks with ACA -- no manual tree needed.
-T = ACA.H.assemble(t, X, X; tol=1e-3, maxrank=60)
+T = ACA.assemble(t, X, X; tol=1e-3, maxrank=60)
 e = assemble((n × E) × n, X)
 
 u, stats = Krylov.gmres(T, e; rtol=1e-4)
 @assert stats.solved "GMRES failed to converge"
-
 ACA.storage(T); #hide
 
 # Bistatic RCS in the plane φ=0: σ(θ) = 4π|E_far(θ)|² for unit-amplitude incidence
@@ -49,7 +48,7 @@ plt = Plot(
         Subplots(;
             rows=2, cols=2, specs=[Spec() Spec(; rowspan=2); Spec(; kind="mesh3d") missing]
         );
-        title_text="EFIE: PEC sphere scattering (ACA.H.assemble)",
+        title_text="EFIE: PEC sphere scattering (ACA.assemble)",
     ),
 )
 add_trace!(plt, scatter(; x=rad2deg.(Θ), y=rcs_dB, name="bistatic RCS [dB]"); row=1, col=1)

@@ -25,7 +25,7 @@ boundary integral operators and other kernel-based matrices. Key features:
 **Hierarchical matrices:**
 
   - [`HMatrix`](@ref): Hierarchical matrix type
-  - [`AdaptiveCrossApproximation.H.assemble`](@ref): Automatic assembly with tree-based blocking
+  - [`AdaptiveCrossApproximation.assemble`](@ref): Automatic assembly with tree-based blocking
   - [`nearmatrix`](@ref), [`farmatrix`](@ref): Extract system components
 
 **Pivoting strategies:**
@@ -59,7 +59,7 @@ U, V = aca(M; tol=1e-4, maxrank=50)
 approx = U * V
 
 # Or build an HMatrix with automatic tree-based blocking
-hmat = H.assemble(operator, testspace, trialspace)
+hmat = AdaptiveCrossApproximation.assemble(operator, testspace, trialspace)
 y = hmat * x  # Matrix-vector product
 ```
 
@@ -128,100 +128,99 @@ end
 
 include("hmatrix/abstracthmatrix.jl")
 
-module H
-    using ..AdaptiveCrossApproximation:
-        HMatrix, _tree, defaulttreebackend, defaultmatrixdata, tofarquadstrat
+"""
+    assemble(op, testspace, trialspace; tree=..., quadstrat=..., kwargs...)
 
-    """
-        H.assemble(op, testspace, trialspace; tree=..., quadstrat=..., kwargs...)
+Assemble a hierarchical matrix with automatic tree-based blocking.
 
-    Assemble a hierarchical matrix with automatic tree-based blocking.
+High-level convenience function that automatically constructs a hierarchical
+clustering tree and assembles the complete HMatrix with near and far-field blocks.
+This is the recommended entry point for most applications.
 
-    High-level convenience function that automatically constructs a hierarchical
-    clustering tree and assembles the complete HMatrix with near and far-field blocks.
-    This is the recommended entry point for most applications.
+# Arguments
 
-    # Arguments
+  - `op`: Operator/kernel for matrix entry evaluation
 
-      - `op`: Operator/kernel for matrix entry evaluation
+  - `testspace`: Test space (row basis/points)
 
-      - `testspace`: Test space (row basis/points)
+  - `trialspace`: Trial space (column basis/points)
 
-      - `trialspace`: Trial space (column basis/points)
+  - `tree`: Hierarchical tree structure. Auto-generated from
+    `AdaptiveCrossApproximation.defaulttreebackend()` if not provided: a
+    `H2Trees.TwoNTree` when only H2Trees.jl is loaded, or a k-means clustered
+    tree when ParallelKMeans.jl is loaded alongside it.
 
-      - `tree`: Hierarchical tree structure. Auto-generated from
-        `AdaptiveCrossApproximation.defaulttreebackend()` if not provided: a
-        `H2Trees.TwoNTree` when only H2Trees.jl is loaded, or a k-means clustered
-        tree when ParallelKMeans.jl is loaded alongside it.
+  - `treekwargs`: Keyword arguments forwarded to the automatic tree construction
+    (e.g. `minvalues`, `numberofclusters` for the k-means backend); ignored if
+    `tree` is given explicitly.
 
-      - `treekwargs`: Keyword arguments forwarded to the automatic tree construction
-        (e.g. `minvalues`, `numberofclusters` for the k-means backend); ignored if
-        `tree` is given explicitly.
+  - `quadstrat`: Quadrature strategy, matching `BEAST.assemble`'s keyword of the
+    same name. Defaults like `BEAST.defaultquadstrat(op, testspace, trialspace)`
+    for BEAST operators (via the `ACABEAST` extension).
 
-      - `quadstrat`: Quadrature strategy, matching `BEAST.assemble`'s keyword of the
-        same name. Defaults like `BEAST.defaultquadstrat(op, testspace, trialspace)`
-        for BEAST operators (via the `ACABEAST` extension).
+  - `nearquadstrat`: Quadrature strategy for near-field (dense) blocks. Defaults
+    to `quadstrat`.
 
-      - `nearquadstrat`: Quadrature strategy for near-field (dense) blocks. Defaults
-        to `quadstrat`.
+  - `farquadstrat`: Quadrature strategy for far-field (compressed, admissible)
+    blocks. Defaults to `tofarquadstrat(quadstrat)`, which strips singular-quadrature
+    handling since far blocks are always well-separated.
 
-      - `farquadstrat`: Quadrature strategy for far-field (compressed, admissible)
-        blocks. Defaults to `tofarquadstrat(quadstrat)`, which strips singular-quadrature
-        handling since far blocks are always well-separated.
+  - `kwargs...`: Additional parameters passed to [`HMatrix`](@ref):
 
-      - `kwargs...`: Additional parameters passed to [`HMatrix`](@ref):
+      + `tol`: Convergence tolerance (default `1e-4`)
+      + `maxrank`: Maximum rank for compression (default `40`)
+      + `compressor`: ACA or IACA instance (default `ACA(tol=tol)`)
+      + `isnear`: Admissibility predicate (default `isnear()`)
+      + `spaceordering`: Space ordering strategy (default `PreserveSpaceOrder()`)
+      + `verbose`: Enable progress output (default `true`)
 
-          + `tol`: Convergence tolerance (default `1e-4`)
-          + `maxrank`: Maximum rank for compression (default `40`)
-          + `compressor`: ACA or IACA instance (default `ACA(tol=tol)`)
-          + `isnear`: Admissibility predicate (default `isnear()`)
-          + `spaceordering`: Space ordering strategy (default `PreserveSpaceOrder()`)
+# Returns
 
-    # Returns
+  - `HMatrix`: Assembled hierarchical matrix ready for matrix-vector products
 
-      - `HMatrix`: Assembled hierarchical matrix ready for matrix-vector products
+# Notes
 
-    # Notes
+Requires H2Trees.jl to be loaded for automatic tree generation. If providing
+a custom tree, ensure it implements the tree interface expected by HMatrix assembly.
+For operators whose matrix is cheap to build directly and never benefits from
+low-rank compression (e.g. BEAST's local operators `Identity`/`NCross`), the
+`ACABEAST` extension adds a more specific `assemble` method that bypasses tree
+construction and ACA entirely, calling `BEAST.assemble` directly.
 
-    Requires H2Trees.jl to be loaded for automatic tree generation. If providing
-    a custom tree, ensure it implements the tree interface expected by HMatrix assembly.
+# Examples
 
-    # Examples
+```julia
+# With BEAST boundary integral operators
+hmat = AdaptiveCrossApproximation.assemble(op, testspace, trialspace; tol=1e-5, maxrank=100)
+y = hmat * x  # Efficient matrix-vector product
+```
 
-    ```julia
-    # With BEAST boundary integral operators
-    hmat = H.assemble(op, testspace, trialspace; tol=1e-5, maxrank=100)
-    y = hmat * x  # Efficient matrix-vector product
-    ```
+# See also
 
-    # See also
-
-    [`HMatrix`](@ref)
-    """
-    function assemble(
+[`HMatrix`](@ref)
+"""
+function assemble(
+    op,
+    testspace,
+    trialspace;
+    treekwargs=(;),
+    tree=_tree(defaulttreebackend(), testspace, trialspace; treekwargs...),
+    quadstrat=defaultmatrixdata(op, testspace, trialspace),
+    nearquadstrat=quadstrat,
+    farquadstrat=tofarquadstrat(quadstrat),
+    kwargs...,
+)
+    return HMatrix(
         op,
         testspace,
-        trialspace;
-        treekwargs=(;),
-        tree=_tree(defaulttreebackend(), testspace, trialspace; treekwargs...),
-        quadstrat=defaultmatrixdata(op, testspace, trialspace),
-        nearquadstrat=quadstrat,
-        farquadstrat=tofarquadstrat(quadstrat),
+        trialspace,
+        tree;
+        nearmatrixdata=nearquadstrat,
+        farmatrixdata=farquadstrat,
         kwargs...,
     )
-        return HMatrix(
-            op,
-            testspace,
-            trialspace,
-            tree;
-            nearmatrixdata=nearquadstrat,
-            farmatrixdata=farquadstrat,
-            kwargs...,
-        )
-    end
 end
 
-export H
 export HMatrix
 export ACA
 export ACAᵀ

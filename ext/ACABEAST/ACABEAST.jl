@@ -46,6 +46,28 @@ function AdaptiveCrossApproximation.defaultcompressor(
     return compressor
 end
 
+"""
+    assemble(operator::BEAST.LocalOperator, testspace::BEAST.Space, trialspace::BEAST.Space; kwargs...)
+
+Assemble a BEAST local operator (e.g. `Identity`, `NCross`) directly, bypassing
+tree construction and ACA compression.
+
+`LocalOperator`s only couple overlapping basis functions, so their Galerkin
+matrix is cheap to build and never benefits from low-rank approximation.
+Compression-only keywords (`tol`, `maxrank`, `tree`, ...) accepted by the
+generic `assemble` are ignored here; only `quadstrat` is forwarded to
+`BEAST.assemble`.
+"""
+function AdaptiveCrossApproximation.assemble(
+    operator::BEAST.LocalOperator,
+    testspace::BEAST.Space,
+    trialspace::BEAST.Space;
+    quadstrat=BEAST.defaultquadstrat(operator, testspace, trialspace),
+    kwargs...,
+)
+    return BEAST.assemble(operator, testspace, trialspace; quadstrat=quadstrat)
+end
+
 function AdaptiveCrossApproximation.scalartype(operator::BEAST.IntegralOperator)
     return BEAST.scalartype(operator)
 end
