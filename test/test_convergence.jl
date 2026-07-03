@@ -13,13 +13,13 @@ using Test
     npivot1, conv1 = functor(rowbuffer, colbuffer, 1, 2, 3)
     @test npivot1 == 1
     @test conv1
-    @test isapprox(functor.normUV², 9.0)
+    @test isapprox(functor.normUV, 3.0)
     @test AdaptiveCrossApproximation.tolerance(cc) == 0.5
 
     npivot2, conv2 = functor(rowbuffer, colbuffer, 2, 2, 3)
     @test npivot2 == 2
     @test conv2
-    @test isapprox(functor.normUV², 73.0)
+    @test isapprox(functor.normUV, sqrt(73))
 
     rowzero = zeros(1, 2)
     colnonzero = ones(1, 1)
@@ -33,17 +33,17 @@ using Test
     @test !convb
 
     reset!(functor)
-    @test iszero(functor.normUV²)
+    @test iszero(functor.normUV)
 end
 
-@testset "iFNormEstimatorFunctor" begin
-    cc = AdaptiveCrossApproximation.iFNormEstimator(0.8)
+@testset "FNormEstimatorFunctor (iACA)" begin
+    cc = AdaptiveCrossApproximation.FNormEstimator(0.8)
     functor = cc()
 
     buf1 = [3.0, 4.0]
     AdaptiveCrossApproximation.normF!(functor, buf1, 1)
     @test isapprox(functor.normUV, 5.0)
-    @test AdaptiveCrossApproximation.tolerance(functor) == 0.8
+    @test AdaptiveCrossApproximation.tolerance(cc) == 0.8
 
     npivot1, conv1 = functor(buf1, 1)
     @test npivot1 == 1
@@ -79,10 +79,10 @@ end
 
     reset!(functor)
     @test all(iszero, functor.lastnorms)
-    @test iszero(functor.estimator.normUV²)
+    @test iszero(functor.estimator.normUV)
 
     cc_iaca = AdaptiveCrossApproximation.FNormExtrapolator(
-        AdaptiveCrossApproximation.iFNormEstimator(0.5)
+        AdaptiveCrossApproximation.FNormEstimator(0.5)
     )
     functor_iaca = cc_iaca(5)
     buf = [3.0, 4.0]
@@ -133,13 +133,13 @@ end
     @test npivot == 1
     @test conv == (lhs > rhs)
     @test all(isapprox.(functor.rest, expected_after))
-    @test isapprox(functor.normUV², (rnorm * cnorm)^2)
+    @test isapprox(functor.normUV, rnorm * cnorm)
 
     rowidcs2 = [1, 3]
     colidcs2 = [2, 4]
     Random.seed!(22)
     reset!(functor, rowidcs2, colidcs2)
-    @test iszero(functor.normUV²)
+    @test iszero(functor.normUV)
     @test length(functor.indices) >= 4
     @test length(functor.rest) >= 4
     @test functor.nactive == 4
@@ -168,7 +168,6 @@ end
 
     functor = combined(K, rowidcs, colidcs)
     @test length(functor.crits) == 2
-    @test all(functor.isconverged)
 
     rowbuffer = zeros(1, 3)
     colbuffer = zeros(3, 1)
@@ -177,12 +176,11 @@ end
 
     npivot, conv = functor(rowbuffer, colbuffer, 1, 3, 3)
     @test npivot == 1
-    @test conv == any(functor.isconverged)
+    @test conv
 
     reset!(functor, [1, 2], [1, 2, 3])
-    @test all(functor.isconverged)
-    @test iszero(functor.crits[1].normUV²)
-    @test iszero(functor.crits[2].normUV²)
+    @test iszero(functor.crits[1].normUV)
+    @test iszero(functor.crits[2].normUV)
     @test functor.crits[2].nactive == 3
     @test length(functor.crits[2].indices) >= 3
     @test length(functor.crits[2].rest) >= 3
