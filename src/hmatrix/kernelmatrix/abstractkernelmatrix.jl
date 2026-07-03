@@ -46,10 +46,36 @@ specialized methods for specific operator/space types.
 
 `AbstractKernelMatrix`, `nextrc!`
 """
-function AbstractKernelMatrix(operator, testspace, trialspace; args...) end
+function AbstractKernelMatrix(operator, testspace, trialspace; args...)
+    return error(
+        "AbstractKernelMatrix is not implemented for operator::$(typeof(operator)), " *
+        "testspace::$(typeof(testspace)), trialspace::$(typeof(trialspace)).",
+    )
+end
 
+"""
+    beastkernelmatrix(operator, testspace, trialspace, matrixdata)
+
+Build a BEAST-backed kernel matrix (e.g. [`BEASTKernelMatrix`](@ref) or
+[`GPUBEASTKernelMatrix`](@ref)) from a BEAST operator, spaces, and `matrixdata`
+(a quadrature strategy, or a [`GPUMatrixData`](@ref) for GPU assembly).
+
+No default method is provided here; it is implemented by the `ACABEAST` and
+`ACABEASTCUDA` package extensions and dispatched to from
+`AbstractKernelMatrix(operator, testspace, trialspace; matrixdata=...)` when BEAST
+types are detected.
+"""
 function beastkernelmatrix end
 
-function (::AbstractKernelMatrix)(matrixblock, tdata, sdata) end
+function (M::AbstractKernelMatrix)(_, _, _)
+    return throw(ArgumentError("callable is not implemented for $(typeof(M))."))
+end
 
 Base.eltype(::AbstractKernelMatrix{T}) where {T} = T
+
+function _kernelmatrix_size(ntest::Int, ntrial::Int, dim)
+    dim === nothing && return (ntest, ntrial)
+    dim == 1 && return ntest
+    dim == 2 && return ntrial
+    return error("dim must be either 1 or 2")
+end

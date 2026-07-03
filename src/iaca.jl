@@ -53,7 +53,7 @@ function IACA(tpos::Vector{SVector{D,F}}, spos::Vector{SVector{D,F}}) where {D,F
     return IACA(
         MaximumValue(),
         MimicryPivoting(tpos, spos),
-        FNormExtrapolator(iFNormEstimator(F(1e-4))),
+        FNormExtrapolator(FNormEstimator(F(1e-4))),
     )
 end
 

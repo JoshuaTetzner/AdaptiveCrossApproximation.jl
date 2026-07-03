@@ -61,7 +61,6 @@ function (pivstrat::CombinedPivStratFunctor)(rc::AbstractArray)
         push!(pivstrat.convcrit.isconverged, false)
     for (i, conv) in enumerate(pivstrat.convcrit.isconverged)
         !conv && continue
-        i > length(pivstrat.convcrit.crits) && pivstrat.convcrit.isconverged[i] == true
         nextidx = pivstrat.strats[i](rc)
 
         if !(pivstrat.strats[i] isa MaximumValueFunctor)
@@ -71,4 +70,5 @@ function (pivstrat::CombinedPivStratFunctor)(rc::AbstractArray)
 
         return nextidx
     end
+    return throw(ArgumentError("No converged strategy found in CombinedPivStratFunctor."))
 end

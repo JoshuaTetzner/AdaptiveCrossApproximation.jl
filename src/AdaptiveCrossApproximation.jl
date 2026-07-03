@@ -18,6 +18,7 @@ boundary integral operators and other kernel-based matrices. Key features:
 **Compressors:**
 
   - [`ACA`](@ref): Standard row-first variant
+  - [`ACAᵀ`](@ref): Column-first variant (dual of `ACA`)
   - [`IACA`](@ref): Incomplete variant for geometric pivoting and hierarchical matrices
   - [`aca`](@ref): Convenience function for matrix compression
 
@@ -37,9 +38,9 @@ boundary integral operators and other kernel-based matrices. Key features:
 
 **Convergence criteria:**
 
-  - [`FNormEstimator`](@ref), [`iFNormEstimator`](@ref): Frobenius norm-based stopping
+  - [`FNormEstimator`](@ref): Frobenius norm-based stopping (ACA and IACA paths)
   - [`FNormExtrapolator`](@ref): Extrapolation-enhanced convergence detection
-  - [`RandomSampling`](@ref): Random sampling-based convergence (convergence module)
+  - [`RandomSampling`](@ref): Random sampling-based convergence
 
 **Kernel matrices:**
 
@@ -70,6 +71,7 @@ y = hmat * x  # Matrix-vector product
 module AdaptiveCrossApproximation
 
 using LinearAlgebra
+using Polynomials
 using ProgressMeter
 using StaticArrays
 
@@ -101,10 +103,21 @@ include("pivoting/treemimicrypivoting2.jl")
 include("pivoting/combinedpivstrat.jl")
 include("pivoting/randomsampling.jl")
 
+"""
+    nextrc!(buf, A, i, j)
+
+Fill `buf` in place with the entries `A[i, j]` (a sampled row/column block).
+
+Interface method used by [`ACA`](@ref), [`ACAᵀ`](@ref) and [`IACA`](@ref) to pull the
+row/column samples they pivot on, so `A` need not materialize as a dense matrix.
+The fallback here covers any `AbstractArray`; kernel-matrix backends
+([`AbstractKernelMatrix`](@ref) subtypes such as `BEASTKernelMatrix` or
+[`PointMatrix`](@ref)) provide their own methods that evaluate entries on demand.
+"""
 nextrc!(buf, A::AbstractArray, i, j) = (buf .= view(A, i, j))
 
 include("aca.jl")
-#include("acaT.jl")
+include("acaT.jl")
 include("iaca.jl")
 
 if !isdefined(Base, :get_extension) # for julia version < 1.9
@@ -114,14 +127,11 @@ end
 include("hmatrix/abstracthmatrix.jl")
 
 module H
-    using ..AdaptiveCrossApproximation: HMatrix, _tree, H2Tree
-
-    function assemble(op, space; args...)
-        return error("Not implemented")
-    end
+    using ..AdaptiveCrossApproximation:
+        HMatrix, _tree, defaulttreebackend, defaultmatrixdata, tofarquadstrat
 
     """
-        H.assemble(op, testspace, trialspace; tree=..., kwargs...)
+        H.assemble(op, testspace, trialspace; tree=..., quadstrat=..., kwargs...)
 
     Assemble a hierarchical matrix with automatic tree-based blocking.
 
@@ -137,7 +147,25 @@ module H
 
       - `trialspace`: Trial space (column basis/points)
 
-      - `tree`: Hierarchical tree structure (auto-generated if not provided)
+      - `tree`: Hierarchical tree structure. Auto-generated from
+        `AdaptiveCrossApproximation.defaulttreebackend()` if not provided: a
+        `H2Trees.TwoNTree` when only H2Trees.jl is loaded, or a k-means clustered
+        tree when ParallelKMeans.jl is loaded alongside it.
+
+      - `treekwargs`: Keyword arguments forwarded to the automatic tree construction
+        (e.g. `minvalues`, `numberofclusters` for the k-means backend); ignored if
+        `tree` is given explicitly.
+
+      - `quadstrat`: Quadrature strategy, matching `BEAST.assemble`'s keyword of the
+        same name. Defaults like `BEAST.defaultquadstrat(op, testspace, trialspace)`
+        for BEAST operators (via the `ACABEAST` extension).
+
+      - `nearquadstrat`: Quadrature strategy for near-field (dense) blocks. Defaults
+        to `quadstrat`.
+
+      - `farquadstrat`: Quadrature strategy for far-field (compressed, admissible)
+        blocks. Defaults to `tofarquadstrat(quadstrat)`, which strips singular-quadrature
+        handling since far blocks are always well-separated.
 
       - `kwargs...`: Additional parameters passed to [`HMatrix`](@ref):
 
@@ -145,7 +173,7 @@ module H
           + `maxrank`: Maximum rank for compression (default `40`)
           + `compressor`: ACA or IACA instance (default `ACA(tol=tol)`)
           + `isnear`: Admissibility predicate (default `isnear()`)
-          + `spaceordering`: Space ordering strategy (default `PermuteSpaceInPlace()`)
+          + `spaceordering`: Space ordering strategy (default `PreserveSpaceOrder()`)
 
     # Returns
 
@@ -172,20 +200,31 @@ module H
         op,
         testspace,
         trialspace;
-        tree=_tree(
-            H2Tree(), testspace, trialspace, 1 / 2^10; minvaluestest=200, minvaluestrial=200
-        ),
+        treekwargs=(;),
+        tree=_tree(defaulttreebackend(), testspace, trialspace; treekwargs...),
+        quadstrat=defaultmatrixdata(op, testspace, trialspace),
+        nearquadstrat=quadstrat,
+        farquadstrat=tofarquadstrat(quadstrat),
         kwargs...,
     )
-        return HMatrix(op, testspace, trialspace, tree; kwargs...)
+        return HMatrix(
+            op,
+            testspace,
+            trialspace,
+            tree;
+            nearmatrixdata=nearquadstrat,
+            farmatrixdata=farquadstrat,
+            kwargs...,
+        )
     end
 end
 
 export H
 export HMatrix
 export ACA
+export ACAᵀ
 export IACA
-export FNormEstimator, iFNormEstimator, FNormExtrapolator, OversampIFNormEst
+export FNormEstimator, FNormExtrapolator, OversampIFNormEst
 export MaximumValue, Leja2, FillDistance
 export MimicryPivoting, TreeMimicryPivoting
 export reset!

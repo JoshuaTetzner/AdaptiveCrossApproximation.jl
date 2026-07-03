@@ -25,7 +25,7 @@ For well-separated clusters (distance > η × cluster diameter), the interaction
 is computed via ACA compression; otherwise, via direct near-field assembly.
 Typical values: `η ≈ 1.0` to `3.0` depending on required accuracy.
 """
-function isnear(η::Real=Float64(1.0))
+function isnear(η::Real=1.0)
     return IsNearFunctor{typeof(η)}(η)
 end
 

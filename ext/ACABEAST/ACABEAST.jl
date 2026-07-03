@@ -1,14 +1,13 @@
 module ACABEAST
 
 using BEAST
+using LinearAlgebra
 using AdaptiveCrossApproximation
 
 include("kernelmatrix.jl")
 
-function AdaptiveCrossApproximation.defaultfarmatrixdata(
-    operator::BEAST.IntegralOperator, testspace::BEAST.Space, trialspace::BEAST.Space
-)
-    return BEAST.DoubleNumQStrat(2, 3)
+function AdaptiveCrossApproximation.tofarquadstrat(qs::BEAST.DoubleNumWiltonSauterQStrat)
+    return BEAST.DoubleNumQStrat(qs.outer_rule_far, qs.inner_rule_far)
 end
 
 function AdaptiveCrossApproximation.defaultmatrixdata(
@@ -18,7 +17,7 @@ function AdaptiveCrossApproximation.defaultmatrixdata(
 end
 
 function AdaptiveCrossApproximation.defaultcompressor(
-    ::BEAST.IntegralOperator, ::BEAST.Space, ::BEAST.Space; tol::Float64=1e-4
+    ::BEAST.IntegralOperator, ::BEAST.Space, ::BEAST.Space; tol::Real=1e-4
 )
     return AdaptiveCrossApproximation.ACA(; tol=tol)
 end
@@ -32,7 +31,7 @@ function AdaptiveCrossApproximation.defaultcompressor(
     },
     ::BEAST.Space,
     ::BEAST.Space;
-    tol::Float64=1e-4,
+    tol::Real=1e-4,
 )
     c1 = AdaptiveCrossApproximation.FNormEstimator(tol)
     c2 = AdaptiveCrossApproximation.RandomSampling(; tol=tol)

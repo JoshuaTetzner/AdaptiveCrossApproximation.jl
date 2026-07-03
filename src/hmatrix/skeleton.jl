@@ -28,9 +28,11 @@ struct LowRankMatrix{K} <: LinearMaps.LinearMap{K}
     z::Vector{K}
 end
 
-function LowRankMatrix(U::T, V::T) where {K,T<:AbstractMatrix{K}}
+function LowRankMatrix(U::AbstractMatrix{K}, V::AbstractMatrix{K}) where {K}
     @assert size(V, 1) == size(U, 2)
-    return LowRankMatrix{K}(U, V, zeros(K, size(U, 2)))
+    return LowRankMatrix{K}(
+        convert(Matrix{K}, U), convert(Matrix{K}, V), zeros(K, size(U, 2))
+    )
 end
 
 Base.eltype(::Type{<:LowRankMatrix{K}}) where {K} = K

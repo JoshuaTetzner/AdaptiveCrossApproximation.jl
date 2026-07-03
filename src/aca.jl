@@ -25,6 +25,24 @@ struct ACA{RowPivType,ColPivType,ConvCritType}
     end
 end
 
+"""
+    ACA(; tol=1e-4, rowpivoting=MaximumValue(), columnpivoting=MaximumValue(),
+        convergence=FNormEstimator(tol))
+
+Build an [`ACA`](@ref) compressor from keyword arguments.
+
+This is the constructor most users call directly (e.g. `ACA(tol=1e-4)` or
+`ACA(rowpivoting=Leja2(pos))`); `convergence` defaults to `FNormEstimator(tol)` so
+passing `tol` alone is usually enough.
+
+# Keyword Arguments
+
+  - `tol::Real = 1e-4`: Tolerance used to build the default `convergence` criterion.
+    Ignored if `convergence` is passed explicitly.
+  - `rowpivoting = MaximumValue()`: Row pivot selection strategy.
+  - `columnpivoting = MaximumValue()`: Column pivot selection strategy.
+  - `convergence = FNormEstimator(tol)`: Convergence criterion to stop iterations.
+"""
 function ACA(;
     tol=1e-4,
     rowpivoting=MaximumValue(),
