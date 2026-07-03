@@ -1,10 +1,12 @@
 module ACABEAST
 
 using BEAST
+using BEAST.CompScienceMeshes: cells, vertices
 using LinearAlgebra
 using AdaptiveCrossApproximation
 
 include("kernelmatrix.jl")
+include("rwgorientations.jl")
 
 function AdaptiveCrossApproximation.tofarquadstrat(qs::BEAST.DoubleNumWiltonSauterQStrat)
     return BEAST.DoubleNumQStrat(qs.outer_rule_far, qs.inner_rule_far)

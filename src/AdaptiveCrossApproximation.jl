@@ -40,6 +40,7 @@ boundary integral operators and other kernel-based matrices. Key features:
 
   - [`FNormEstimator`](@ref): Frobenius norm-based stopping (ACA and IACA paths)
   - [`FNormExtrapolator`](@ref): Extrapolation-enhanced convergence detection
+  - [`PhaseExtrapolator`](@ref): Multi-phase extrapolation for geometric pivoting
   - [`RandomSampling`](@ref): Random sampling-based convergence
 
 **Kernel matrices:**
@@ -91,10 +92,11 @@ include("pivoting/lejapoints.jl")
 include("pivoting/filldistance.jl")
 include("pivoting/mimicrypivoting.jl")
 include("pivoting/treemimicrypivoting.jl")
+include("pivoting/orientations.jl")
 
 include("convergence/estimation.jl")
-include("convergence/oversamp_ifnorm_est.jl")
 include("convergence/extrapolation.jl")
+include("convergence/phaseextrapolation.jl")
 include("convergence/randomsampling.jl")
 include("convergence/combinedconvcrit.jl")
 
@@ -224,7 +226,7 @@ export HMatrix
 export ACA
 export ACAᵀ
 export IACA
-export FNormEstimator, FNormExtrapolator, OversampIFNormEst
+export FNormEstimator, FNormExtrapolator, PhaseExtrapolator
 export MaximumValue, Leja2, FillDistance
 export MimicryPivoting, TreeMimicryPivoting
 export reset!

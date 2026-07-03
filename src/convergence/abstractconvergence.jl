@@ -10,7 +10,7 @@ stateful `ConvCritFunctor` objects during block compression.
 
 # See also
 
-`ConvCritFunctor`, `FNormEstimator`, `FNormExtrapolator`, `RandomSampling`
+`ConvCritFunctor`, `FNormEstimator`, `FNormExtrapolator`, `PhaseExtrapolator`, `RandomSampling`
 """
 abstract type ConvCrit end
 

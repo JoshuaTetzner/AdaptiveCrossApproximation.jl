@@ -28,8 +28,6 @@ end
 
 @inline _iaca_normF!(convcrit::ConvCritFunctor, rcbuffer, npivot) =
     normF!(convcrit.estimator, rcbuffer, npivot)
-@inline _iaca_normF!(convcrit::OversampIFNormEstFunctor, rcbuffer, npivot) =
-    normF!(convcrit, rcbuffer, npivot)
 
 """
     IACA(tpos, spos)
@@ -66,7 +64,11 @@ end
 
 function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
     rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}, maxrank::Int
-) where {RowPivType<:TreeMimicryPivoting2,ColPivType<:MaximumValue,ConvCritType<:ConvCrit}
+) where {
+    RowPivType<:TreeMimicryPivoting{<:Any,<:Any,<:Any,<:DirectionFilter},
+    ColPivType<:MaximumValue,
+    ConvCritType<:ConvCrit,
+}
     convcrit = iaca.convergence(maxrank)
     rowpivstrat = _buildpivstrat(convcrit, iaca.rowpivoting, colidcs, rowidcs, maxrank)
     return IACA(rowpivstrat, iaca.columnpivoting(colidcs), convcrit)
@@ -188,7 +190,11 @@ end
 
 function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
     rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}, maxrank::Int
-) where {RowPivType<:MaximumValue,ColPivType<:TreeMimicryPivoting2,ConvCritType<:ConvCrit}
+) where {
+    RowPivType<:MaximumValue,
+    ColPivType<:TreeMimicryPivoting{<:Any,<:Any,<:Any,<:DirectionFilter},
+    ConvCritType<:ConvCrit,
+}
     convcrit = iaca.convergence(maxrank)
     colpivstrat = _buildpivstrat(convcrit, iaca.columnpivoting, rowidcs, colidcs, maxrank)
     return IACA(iaca.rowpivoting(rowidcs), colpivstrat, convcrit)
