@@ -97,9 +97,10 @@ where:
 - `\mathcal{Z}_f` are previously selected pivots,
 - `c` is the cluster center.
 
-This strategy 
+This strategy combines the three principles above to reproduce the pivot distribution of a
+fully pivoted ACA using only geometric information about the rows and columns.
 
-*Note: this strategy should be used only either for the rows or the columns, not both simultaneously and be combined with partial pivoting.*
+*Note: this strategy should be used only either for the rows or the columns, not both simultaneously and be combined with partial pivoting. It is also only valid over the full (identity) row/column range, not a nested sub-block — see [`TreeMimicryPivoting`](@ref) for the tree-aware variant that supports sub-blocks.*
 
 API: [`MimicryPivoting`](@ref)
 

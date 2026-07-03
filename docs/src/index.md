@@ -8,7 +8,7 @@ Further more this package contains an incomplete adaptive cross approximation al
 Installing AdaptiveCrossApproximation is done by entering the package manager (enter `]` at the julia REPL) and issuing:
 
 ```
-pkg> add https://github.com/FastBEAST/AdaptiveCrossApproximation.jl.git
+pkg> add https://github.com/JoshuaTetzner/AdaptiveCrossApproximation.jl.git
 ```
 
 

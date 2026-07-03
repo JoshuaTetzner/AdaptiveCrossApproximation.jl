@@ -1,6 +1,6 @@
 # Contributing
 
-In order to contribute to this package directly create a pull request against the `main` branch. Before doing so please: 
+In order to contribute to this package directly create a pull request against the `dev` branch (the integration branch; `main` is the stable/release branch, updated only by merging `dev` into it). Before doing so please: 
 
 - Follow the style of the surrounding code.
 - Supplement the documentation.

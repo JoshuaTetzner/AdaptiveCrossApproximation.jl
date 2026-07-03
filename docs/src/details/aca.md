@@ -27,10 +27,12 @@ The ACA algorithm proceeds as follows:
 API: [`ACA`](@ref)
 
 **ACAᵀ**:
-The column-first variant starts by selecting a column, then a row, reversing the standard order. 
-This can be advantageous when the matrix structure favors column operations.
+The column-first variant starts by selecting a column, then a row, reversing the standard order.
+This can be advantageous when the matrix structure favors column operations. It is the exact
+dual of `ACA`: applying `ACA` to $\bm A$ and `ACAᵀ` to $\bm A^\text{T}$ pick transposed pivots
+and yield transposed factors.
 
-API: `acaᵀ` 
+API: [`ACAᵀ`](@ref)
 
 ### Pivoting
 To select the row and column indices $i_r$ and $j_r$ different pivoting strategies can be employed. 

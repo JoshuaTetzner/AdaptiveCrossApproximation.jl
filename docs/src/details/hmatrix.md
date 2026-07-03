@@ -94,8 +94,8 @@ API: [`AdaptiveCrossApproximation.farinteractions`](@ref), [`AdaptiveCrossApprox
 
 The assembly process can optionally reorder the test and trial spaces to align with tree partitioning, improving block structure and cache locality.
 
-- **`PermuteSpaceInPlace()`** (default): Reorders spaces in-place via tree permutation
-- **`PreserveSpaceOrder()`**: Maintains original space ordering
+- **`PreserveSpaceOrder()`** (default): Maintains original space ordering
+- **`PermuteSpaceInPlace()`**: Reorders spaces in-place via tree permutation
 
 ## High-Level Interface
 
@@ -107,7 +107,7 @@ HMatrix(operator, testspace, trialspace, tree;
     compressor=ACA(; tol=tol),
     isnear=isnear(1.0),
     maxrank=40,
-    spaceordering=PermuteSpaceInPlace(),
+    spaceordering=PreserveSpaceOrder(),
     nearmatrixdata=nothing,
     farmatrixdata=nothing,
     scheduler=DynamicScheduler()
@@ -123,10 +123,10 @@ HMatrix(operator, testspace, trialspace, tree;
 | `trialspace` | — | Column basis or evaluation points |
 | `tree` | — | Hierarchical tree controlling block partitioning |
 | `tol` | `1e-4` | Compression tolerance for ACA |
-| `compressor` | `ACA(tol=1e-4)` | Compression algorithm (ACA, ACAᵀ, iACA) |
+| `compressor` | `ACA(tol=1e-4)` | Compression algorithm (ACA or IACA) |
 | `isnear` | `isnear(1.0)` | Admissibility predicate with `η = 1.0` |
 | `maxrank` | `40` | Hard limit on compressed block rank |
-| `spaceordering` | `PermuteSpaceInPlace()` | Strategy for space reordering |
+| `spaceordering` | `PreserveSpaceOrder()` | Strategy for space reordering |
 
 ## Access and Analysis
 
