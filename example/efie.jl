@@ -6,8 +6,9 @@ using H2Trees
 using AdaptiveCrossApproximation
 using Krylov
 using PlotlyJS
+using OhMyThreads
 
-Γ = meshsphere(1.0, 0.08);
+Γ = meshsphere(1.0, 0.07);
 X = raviartthomas(Γ);
 
 κ, η = 1.0, 1.0;
@@ -18,9 +19,32 @@ ttree = KMeansTree(X.pos, 2; minvalues=100)
 tree = BlockTree(ttree, ttree)
 
 # Here we permute the space in place, if not familiar with this hmatrix routine be careful
-T = HMatrix(t, X, X, tree; tol=1e-3, maxrank=40, isnear=AdaptiveCrossApproximation.isnear())
+T = HMatrix(
+    t,
+    X,
+    X,
+    tree;
+    spaceordering=AdaptiveCrossApproximation.PreserveSpaceOrder(),
+    tol=1e-3,
+    maxrank=40,
+    isnear=isnear,#AdaptiveCrossApproximation.isnear(),
+)
+##
+size(T)
+@profview_allocs T = HMatrix(
+    t,
+    X,
+    X,
+    tree;
+    spaceordering=AdaptiveCrossApproximation.PreserveSpaceOrder(),
+    tol=1e-3,
+    maxrank=40,
+    isnear=AdaptiveCrossApproximation.isnear(),
+    scheduler=SerialScheduler(),
+)
+##
 e = assemble((n × E) × n, X);
-
+##
 u, stats = Krylov.gmres(T, e; rtol=1e-4, verbose=1)
 Φ, Θ = [0.0], range(0; stop=π, length=100);
 pts = [point(cos(ϕ) * sin(θ), sin(ϕ) * sin(θ), cos(θ)) for ϕ in Φ for θ in Θ];

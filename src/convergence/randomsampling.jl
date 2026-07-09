@@ -156,8 +156,8 @@ function (convcrit::RandomSamplingFunctor{F,K,M})(
     maxrows::Int,
     maxcolumns::Int,
 ) where {F<:Real,K,M}
-    @views rnorm = norm(rowbuffer[npivot, 1:maxcolumns])
-    @views cnorm = norm(colbuffer[1:maxrows, npivot])
+    rnorm = rownorm(rowbuffer, npivot, maxcolumns)
+    cnorm = colnorm(colbuffer, npivot, maxrows)
     nactive = convcrit.nactive
 
     sumrest2 = zero(real(K))

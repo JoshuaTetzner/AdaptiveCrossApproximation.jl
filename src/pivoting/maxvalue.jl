@@ -27,7 +27,9 @@ end
 
 function reset!(pivstrat::MaximumValueFunctor, idcs::AbstractVector{<:Integer})
     resize!(pivstrat, length(idcs))
-    fill!(view(pivstrat.usedidcs, 1:(pivstrat.nactive)), false)
+    @inbounds for i in 1:(pivstrat.nactive)
+        pivstrat.usedidcs[i] = false
+    end
     return nothing
 end
 
@@ -39,20 +41,26 @@ end
 
 function (pivstrat::MaximumValueFunctor)(rc::AbstractArray)
     nactive = pivstrat.nactive
-    used = view(pivstrat.usedidcs, 1:nactive)
 
-    if all(used)
-        absrx = abs.(view(rc, 1:nactive))
-        maximum(absrx) != 0.0 && (return argmax(absrx))
-    end
-
-    nextidx = 1
+    nextidx = 0
     maxval = 0.0
-    for i in 1:nactive
+    @inbounds for i in 1:nactive
         if (!pivstrat.usedidcs[i]) && abs(rc[i]) >= maxval
             nextidx = i
             maxval = abs(rc[i])
         end
+    end
+
+    if nextidx == 0
+        nextidx = 1
+        maxval = abs(rc[1])
+        @inbounds for i in 2:nactive
+            if abs(rc[i]) >= maxval
+                nextidx = i
+                maxval = abs(rc[i])
+            end
+        end
+        maxval != 0.0 && return nextidx
     end
 
     pivstrat.usedidcs[nextidx] = true

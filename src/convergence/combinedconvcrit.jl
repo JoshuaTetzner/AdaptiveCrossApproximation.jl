@@ -12,8 +12,16 @@ mutable struct CombinedConvCrit <: ConvCrit
     crits::Vector{ConvCrit}
 end
 
-mutable struct CombinedConvCritFunctor <: ConvCritFunctor
-    crits::Vector{ConvCritFunctor}
+# `crits` is a Tuple (not Vector) of the *concrete* per-criterion functors, so
+# iterating it and calling each criterion is type-stable: the per-pivot
+# convergence call returns a concrete `Tuple{Int,Bool}`. With a
+# `Vector{ConvCritFunctor}` (abstract eltype) that return widens to
+# `Tuple{Any,Bool}`, which makes `npivot` ::Any in the ACA main loop and boxes
+# every deflation inner-loop iteration - billions of allocations on large
+# far-field assemblies. The construction below (once per task) materializes the
+# tuple; the hot path is then fully concrete.
+mutable struct CombinedConvCritFunctor{T<:Tuple} <: ConvCritFunctor
+    crits::T
     isconverged::Vector{Bool}
 end
 
@@ -33,7 +41,7 @@ function (convcrit::CombinedConvCrit)(
             curr_crits[i] = crit()
         end
     end
-    return CombinedConvCritFunctor(curr_crits, ones(Bool, length(curr_crits)))
+    return CombinedConvCritFunctor(tuple(curr_crits...), ones(Bool, length(curr_crits)))
 end
 
 _buildconvcrit(cc::CombinedConvCrit, A, rowidcs, colidcs, maxrank) =

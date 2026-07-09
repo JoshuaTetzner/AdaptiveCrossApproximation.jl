@@ -38,7 +38,7 @@ tolerance(cc::OversampIFNormEst) = cc.tol
 function normF!(
     convcrit::OversampIFNormEstFunctor, rcbuffer::AbstractVector{K}, npivot::Int
 ) where {K}
-    convcrit.normUV = ((npivot - 1) * convcrit.normUV + norm(rcbuffer)) / npivot
+    convcrit.normUV = ((npivot - 1) * convcrit.normUV + vecnorm(rcbuffer)) / npivot
     return nothing
 end
 
@@ -94,7 +94,7 @@ end
 function (convcrit::OversampIFNormEstFunctor{F})(
     rcbuffer::AbstractVector{K}, npivot::Int
 ) where {F<:Real,K}
-    rcnorm = norm(rcbuffer)
+    rcnorm = vecnorm(rcbuffer)
     isapprox(rcnorm, 0.0) && return npivot - 1, false
     length(convcrit.lastnorms) < npivot && resize!(convcrit.lastnorms, npivot)
     length(convcrit.normdirections) < npivot && resize!(convcrit.normdirections, npivot)

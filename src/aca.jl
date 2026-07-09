@@ -149,7 +149,11 @@ function (aca::ACA)(
     cols[npivot] = colidcs[nextcolumn]
 
     if rowbuffer[npivot, nextcolumn] != 0.0
-        view(rowbuffer, npivot, 1:maxcols) ./= view(rowbuffer, npivot, nextcolumn)
+        let piv = rowbuffer[npivot, nextcolumn]
+            @inbounds @simd for kk in 1:maxcols
+                rowbuffer[npivot, kk] /= piv
+            end
+        end
     end
     nextrc!(
         view(colbuffer, 1:maxrows, npivot:npivot),
@@ -181,7 +185,11 @@ function (aca::ACA)(
         @views nextcolumn = aca.columnpivoting(rowbuffer[npivot, 1:maxcols])
         cols[npivot] = colidcs[nextcolumn]
         if rowbuffer[npivot, nextcolumn] != 0.0
-            view(rowbuffer, npivot, 1:maxcols) ./= view(rowbuffer, npivot, nextcolumn)
+            let piv = rowbuffer[npivot, nextcolumn]
+                @inbounds @simd for kk in 1:maxcols
+                    rowbuffer[npivot, kk] /= piv
+                end
+            end
             nextrc!(
                 view(colbuffer, 1:maxrows, npivot:npivot),
                 A,

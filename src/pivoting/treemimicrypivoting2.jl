@@ -231,9 +231,22 @@ function _available_direction(pivstrat::TreeMimicryPivotingFunctor2, dir::Int32,
     return false
 end
 
+function _farfield_has_node_directions(pivstrat::TreeMimicryPivotingFunctor2)
+    hasactive = false
+    @inbounds for i in 1:(pivstrat.nactive)
+        node = pivstrat.farfield[i]
+        _emptycluster(pivstrat, node) && continue
+        hasactive = true
+        isempty(pivstrat.pivoting.nodedirectionids[node]) && return false
+    end
+    return hasactive
+end
+
 function _next_unfinished_direction(
     pivstrat::TreeMimicryPivotingFunctor2, nused::Int, lastdir::Int32
 )
+    _farfield_has_node_directions(pivstrat) || return _nodirection()
+
     bestafter = Int32(0)
     bestwrap = Int32(0)
 
@@ -259,6 +272,8 @@ end
 function _all_dominant_directions_finished(
     pivstrat::TreeMimicryPivotingFunctor2, nused::Int
 )
+    _farfield_has_node_directions(pivstrat) || return true
+
     @inbounds for i in 1:(pivstrat.nactive)
         node = pivstrat.farfield[i]
         _emptycluster(pivstrat, node) && continue
@@ -449,7 +464,6 @@ end
 
 function (pivstrat::TreeMimicryPivotingFunctor2)(npivot::Int)
     direction = _active_direction(pivstrat, npivot - 1)
-    #println(direction)
     reset_phase!(pivstrat.convcrit, direction, npivot)
     while true
         target = _findcluster(

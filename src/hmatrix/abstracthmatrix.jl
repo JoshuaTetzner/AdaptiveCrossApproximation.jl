@@ -102,7 +102,7 @@ function HMatrix(
 )
     spaceordering(tree, testspace, trialspace)
 
-    nears = assemblenears(
+    @time nears = assemblenears(
         operator,
         testspace,
         trialspace,
@@ -113,7 +113,7 @@ function HMatrix(
         scheduler=scheduler,
     )
 
-    fars = assemblefars(
+    @time fars = assemblefars(
         operator,
         testspace,
         trialspace,
