@@ -118,7 +118,7 @@ function assemblenears(
     testspace,
     trialspace,
     tree,
-    ::PreserveSpaceOrder;
+    spaceordering::SpaceOrderingStyle;
     isnear=isnear(),
     scheduler=SerialScheduler(),
     matrixdata=defaultmatrixdata(operator, testspace, trialspace),
@@ -127,28 +127,36 @@ function assemblenears(
     nearmatrix = AbstractKernelMatrix(
         operator, testspace, trialspace; matrixdata=matrixdata
     )
+    return assemblenears(
+        nearmatrix, tree, spaceordering; isnear=isnear, scheduler=scheduler, verbose=verbose
+    )
+end
+
+function assemblenears(
+    nearmatrix::AbstractKernelMatrix,
+    tree,
+    ::PreserveSpaceOrder;
+    isnear=isnear(),
+    scheduler=SerialScheduler(),
+    verbose::Bool=true,
+)
     values, nearvalues = nearinteractions(tree; isnear=isnear)
 
     isempty(values) && return BlockSparseMatrix(
         Matrix{eltype(nearmatrix)}[], Vector{Int}[], Vector{Int}[], size(nearmatrix)
     )
 
-    blocks = Vector{Matrix{eltype(nearmatrix)}}(undef, length(values))
+    blocks = [
+        zeros(eltype(nearmatrix), length(values[i]), length(nearvalues[i])) for
+        i in eachindex(values)
+    ]
     pbar = Progress(length(blocks); desc="Assembling near interactions: ", enabled=verbose)
-    @tasks for i in eachindex(blocks)
-        @set scheduler = scheduler
-        blk = zeros(eltype(nearmatrix), length(values[i]), length(nearvalues[i]))
-        nearmatrix(blk, values[i], nearvalues[i])
-        blocks[i] = blk
-        next!(pbar)
-    end
+    assemble_blocks_sparse(
+        nearmatrix, blocks, values, nearvalues; scheduler=scheduler, pbar=pbar
+    )
     finish!(pbar)
 
-    nears = BlockSparseMatrix(
-        blocks, values, nearvalues, size(nearmatrix); scheduler=scheduler
-    )
-
-    return nears
+    return BlockSparseMatrix(blocks, values, nearvalues, size(nearmatrix))
 end
 
 function splitblock(block::Matrix{T}, lens::Vector{Int}) where {T}
@@ -190,19 +198,13 @@ spaces are reordered to match tree leaf ordering before block assembly, improvin
 cache locality and reducing block fragmentation.
 """
 function assemblenears(
-    operator,
-    testspace,
-    trialspace,
+    nearmatrix::AbstractKernelMatrix,
     tree,
     ::PermuteSpaceInPlace;
     isnear=isnear(),
     scheduler=SerialScheduler(),
-    matrixdata=defaultmatrixdata(operator, testspace, trialspace),
     verbose::Bool=true,
 )
-    nearmatrix = AbstractKernelMatrix(
-        operator, testspace, trialspace; matrixdata=matrixdata
-    )
     values, nearvalues = nearinteractions_consecutive(tree; isnear=isnear)
     blocks = zeros.(
         eltype(nearmatrix), length.(values), [sum(length.(n)) for n in nearvalues]

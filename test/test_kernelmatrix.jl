@@ -72,3 +72,50 @@ end
     gpu_matrix(gpu_block, rows, columns)
     @test gpu_block ≈ cpu_block
 end
+
+@testset "GPU BEAST KernelMatrix batched block assembly" begin
+    # `assemble_blocks_sparse`/`assemble_blocks` at the ACA level were never
+    # directly exercised before (only the plain call operator above) - this
+    # closes that gap, since assemble_blocks_sparse's generic default now
+    # forwards straight to assemble_blocks, which is the one batched GPU
+    # entry point (see ext/ACABEASTCUDA/nearinteractions.jl).
+    Γ = meshicosphere(3, 1.0)
+    x = lagrangec0d1(Γ)
+    y = lagrangec0d1(Γ)
+    op = Helmholtz3D.singlelayer()
+    quadstrat = BEAST.DoubleNumQStrat(1, 2)
+
+    cpu_matrix = AdaptiveCrossApproximation.AbstractKernelMatrix(
+        op, x, y; matrixdata=quadstrat
+    )
+    gpu_matrix = AdaptiveCrossApproximation.AbstractKernelMatrix(
+        op, x, y; matrixdata=AdaptiveCrossApproximation.GPUMatrixData(quadstrat)
+    )
+
+    n = min(numfunctions(x), 24)
+    a = collect(1:n÷2)
+    b = collect(n÷2+1:n)
+    rowidcs = [a, a, b]
+    colidcs = [a, b, b]
+
+    T = eltype(gpu_matrix)
+    cpu_blocks = [zeros(T, length(rowidcs[i]), length(colidcs[i])) for i in eachindex(rowidcs)]
+    gpu_blocks = [zeros(T, length(rowidcs[i]), length(colidcs[i])) for i in eachindex(rowidcs)]
+
+    for i in eachindex(rowidcs)
+        cpu_matrix(cpu_blocks[i], rowidcs[i], colidcs[i])
+    end
+    AdaptiveCrossApproximation.assemble_blocks_sparse(gpu_matrix, gpu_blocks, rowidcs, colidcs)
+
+    for i in eachindex(rowidcs)
+        @test gpu_blocks[i] ≈ cpu_blocks[i]
+    end
+
+    # assemble_blocks itself (called directly, as NestedCrossApproximation's
+    # far-field batched-bottom-up/coupling-matrix code does) must agree too.
+    gpu_blocks2 = [zeros(T, length(rowidcs[i]), length(colidcs[i])) for i in eachindex(rowidcs)]
+    AdaptiveCrossApproximation.assemble_blocks(gpu_matrix, gpu_blocks2, rowidcs, colidcs)
+    for i in eachindex(rowidcs)
+        @test gpu_blocks2[i] ≈ cpu_blocks[i]
+    end
+end

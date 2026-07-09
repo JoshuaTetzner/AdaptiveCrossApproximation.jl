@@ -81,13 +81,13 @@ include("utils.jl")
 include("hmatrix/kernelmatrix/abstractkernelmatrix.jl")
 include("hmatrix/kernelmatrix/beastkernelmatrix.jl")
 include("hmatrix/kernelmatrix/gpubeastkernelmatrix.jl")
-include("hmatrix/kernelmatrix/gpumatrixdata.jl")
 include("hmatrix/kernelmatrix/pointmatrix.jl")
 
 include("pivoting/abstractpivoting.jl")
 include("convergence/abstractconvergence.jl")
 
 include("pivoting/maxvalue.jl")
+include("pivoting/fullpivoting.jl")
 include("pivoting/lejapoints.jl")
 include("pivoting/filldistance.jl")
 include("pivoting/mimicrypivoting.jl")
@@ -119,6 +119,7 @@ The fallback here covers any `AbstractArray`; kernel-matrix backends
 nextrc!(buf, A::AbstractArray, i, j) = (buf .= view(A, i, j))
 
 include("aca.jl")
+include("fullpivotedaca.jl")
 include("acaT.jl")
 include("iaca.jl")
 
@@ -226,8 +227,9 @@ export ACA
 export ACAᵀ
 export IACA
 export FNormEstimator, FNormExtrapolator, PhaseExtrapolator
-export MaximumValue, Leja2, FillDistance
+export MaximumValue, FullPivoting, Leja2, FillDistance
 export MimicryPivoting, TreeMimicryPivoting
 export reset!
 export AbstractKernelMatrix, GPUMatrixData
+export assemble_blocks, assemble_blocks_sparse
 end

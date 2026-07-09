@@ -1,0 +1,1 @@
+struct FullPivoting <: ValuePivStrat end
