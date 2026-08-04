@@ -80,6 +80,7 @@ include("utils.jl")
 
 include("hmatrix/kernelmatrix/abstractkernelmatrix.jl")
 include("hmatrix/kernelmatrix/beastkernelmatrix.jl")
+include("hmatrix/kernelmatrix/gpubeastkernelmatrix.jl")
 include("hmatrix/kernelmatrix/pointmatrix.jl")
 
 include("pivoting/abstractpivoting.jl")
@@ -303,6 +304,6 @@ export MaximumValue, FullPivoting, Leja2, FillDistance
 export MimicryPivoting, TreeMimicryPivoting
 export PivotingFilter, NoFilter, EFIEDirectionalFilter
 export reset!
-export AbstractKernelMatrix
+export AbstractKernelMatrix, GPUMatrixData
 export assemble_blocks
 end
