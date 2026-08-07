@@ -1,7 +1,7 @@
 # General Usage
 
 This page shows how to configure AdaptiveCrossApproximation components in practice.
-The examples focus on building blocks that you can combine for ACA, iACA, and
+The examples focus on building blocks that you can combine for ACA, IACA, and
 hierarchical matrix assembly.
 
 ## ACA Setup
@@ -27,7 +27,7 @@ conv = FNormEstimator(1e-5)
 compressor = ACA(convergence=conv)
 ```
 
-### Incomplete Frobenius Norm Estimator (for iACA workflows)
+### Incomplete Frobenius Norm Estimator (for IACA workflows)
 
 ```julia
 iconv = iFNormEstimator(1e-5)
@@ -95,18 +95,18 @@ piv_combined = AdaptiveCrossApproximation.CombinedPivStrat([
 ])
 ```
 
-## 4. iACA Setup
+## 4. IACA Setup
 
-The package provides a convenience constructor for iACA:
+The package provides a convenience constructor for IACA:
 
 ```julia
-iaca_default = iACA(tpos, spos)
+iaca_default = IACA(tpos, spos)
 ```
 
-You can also build a custom iACA configuration:
+You can also build a custom IACA configuration:
 
 ```julia
-iaca_custom = iACA(
+iaca_custom = IACA(
 	MaximumValue(),
 	MimicryPivoting(tpos, spos),
 	FNormExtrapolator(iFNormEstimator(1e-4)),
@@ -154,13 +154,13 @@ s = storage(hmat)         # storage stats in GB
 ## 6. Recommended Starting Configurations
 
 - Standard ACA: `ACA(rowpivoting=MaximumValue(), columnpivoting=MaximumValue(), convergence=FNormEstimator(1e-4))`
-- iACA for geometric problems: `iACA(MaximumValue(), MimicryPivoting(spos, tpos), FNormExtrapolator(iFNormEstimator(1e-4)))`
+- IACA for geometric problems: `IACA(MaximumValue(), MimicryPivoting(spos, tpos), FNormExtrapolator(iFNormEstimator(1e-4)))`
 - Robust stopping on noisy kernels: combine `FNormEstimator` and `RandomSampling` in `CombinedConvCrit`
 
 For detailed background and theory, see:
 
 - [ACA](../details/aca.md)
-- [iACA](../details/iaca.md)
+- [IACA](../details/iaca.md)
 - [Pivoting Strategies](../details/pivoting.md)
 - [Convergence Criteria](../details/convergence.md)
 - [Hierarchical Matrices](../details/hmatrix.md)

@@ -1,9 +1,9 @@
 """
-    iACA{RowPivType,ColPivType,ConvCritType}
+    IACA{RowPivType,ColPivType,ConvCritType}
 
-Incomplete Adaptive Cross Approximation (iACA) compressor.
+Incomplete Adaptive Cross Approximation (IACA) compressor.
 
-Unlike standard ACA, iACA computes only one side per iteration and relies on geometric
+Unlike standard ACA, IACA computes only one side per iteration and relies on geometric
 pivoting strategies (for example mimicry or tree mimicry) to select pivots from spatial
 information. This reduces matrix entry evaluations in hierarchical matrix construction,
 where only selected row or column samples are required.
@@ -14,12 +14,12 @@ where only selected row or column samples are required.
   - `columnpivoting::ColPivType`: Strategy for selecting column pivots
   - `convergence::ConvCritType`: Convergence criterion
 """
-struct iACA{RowPivType,ColPivType,ConvCritType}
+struct IACA{RowPivType,ColPivType,ConvCritType}
     rowpivoting::RowPivType
     columnpivoting::ColPivType
     convergence::ConvCritType
 
-    function iACA(rowpivoting, columnpivoting, convergence)
+    function IACA(rowpivoting, columnpivoting, convergence)
         return new{typeof(rowpivoting),typeof(columnpivoting),typeof(convergence)}(
             rowpivoting, columnpivoting, convergence
         )
@@ -32,7 +32,7 @@ end
     normF!(convcrit, rcbuffer, npivot)
 
 """
-    iACA(tpos, spos)
+    IACA(tpos, spos)
 
 Create a default incomplete ACA compressor for geometrically indexed row/column sets.
 
@@ -43,37 +43,37 @@ Create a default incomplete ACA compressor for geometrically indexed row/column 
 
 # Returns
 
-An `iACA` instance using `MaximumValue`/`MimicryPivoting` with `FNormExtrapolator`.
+An `IACA` instance using `MaximumValue`/`MimicryPivoting` with `FNormExtrapolator`.
 
 # See also
 
-`iACA`, `MimicryPivoting`, `FNormExtrapolator`
+`IACA`, `MimicryPivoting`, `FNormExtrapolator`
 """
-function iACA(tpos::Vector{SVector{D,F}}, spos::Vector{SVector{D,F}}) where {D,F<:Real}
-    return iACA(
+function IACA(tpos::Vector{SVector{D,F}}, spos::Vector{SVector{D,F}}) where {D,F<:Real}
+    return IACA(
         MaximumValue(),
         MimicryPivoting(tpos, spos),
         FNormExtrapolator(iFNormEstimator(F(1e-4))),
     )
 end
 
-function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
+function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
     rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}, maxrank::Int
 ) where {RowPivType<:GeoPivStrat,ColPivType<:MaximumValue,ConvCritType<:ConvCrit}
     rowpivstrat = _buildpivstrat(iaca.rowpivoting, colidcs, rowidcs, maxrank)
-    return iACA(rowpivstrat, iaca.columnpivoting(colidcs), iaca.convergence(maxrank))
+    return IACA(rowpivstrat, iaca.columnpivoting(colidcs), iaca.convergence(maxrank))
 end
 
-function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
+function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
     rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}, maxrank::Int
 ) where {RowPivType<:TreeMimicryPivoting2,ColPivType<:MaximumValue,ConvCritType<:ConvCrit}
     convcrit = iaca.convergence(maxrank)
     rowpivstrat = _buildpivstrat(convcrit, iaca.rowpivoting, colidcs, rowidcs, maxrank)
-    return iACA(rowpivstrat, iaca.columnpivoting(colidcs), convcrit)
+    return IACA(rowpivstrat, iaca.columnpivoting(colidcs), convcrit)
 end
 
 function reset!(
-    iaca::iACA{RP,CP,CC}, rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}
+    iaca::IACA{RP,CP,CC}, rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}
 ) where {RP<:GeoPivStratFunctor,CP<:MaximumValueFunctor,CC<:ConvCritFunctor}
     reset!(iaca.rowpivoting, colidcs, rowidcs)
     reset!(iaca.columnpivoting, colidcs)
@@ -81,7 +81,7 @@ function reset!(
     return nothing
 end
 
-function (iaca::iACA{RP,CP,CC})(
+function (iaca::IACA{RP,CP,CC})(
     A,
     colbuffer::AbstractArray{K},
     rowbuffer::AbstractArray{K},
@@ -98,9 +98,9 @@ function (iaca::iACA{RP,CP,CC})(
 end
 
 """
-    (iaca::iACA{GeoPivStratFunctor,ValuePivStratFunctor,ConvCritFunctor})(A, colbuffer, rowbuffer, maxrank, rows, cols, colidcs)
+    (iaca::IACA{GeoPivStratFunctor,ValuePivStratFunctor,ConvCritFunctor})(A, colbuffer, rowbuffer, maxrank, rows, cols, colidcs)
 
-Main computational routine for row matrix iACA (geometric row pivoting, value-based column pivoting).
+Main computational routine for row matrix IACA (geometric row pivoting, value-based column pivoting).
 Performs incomplete ACA compression where rows are selected geometrically and columns by maximum value.
 
 # Arguments
@@ -119,7 +119,7 @@ Performs incomplete ACA compression where rows are selected geometrically and co
   - `rows::Vector{Int}`: Selected row indices
   - `cols::Vector{Int}`: Selected column indices (global)
 """
-function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
+function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
     A,
     colbuffer::AbstractMatrix{K},
     rowbuffer::AbstractMatrix{K},
@@ -179,23 +179,23 @@ function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
     return npivot, rowpivs[1:npivot], colidcs[colpivs[1:npivot]]
 end
 
-function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
+function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
     rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}, maxrank::Int
 ) where {RowPivType<:MaximumValue,ColPivType<:GeoPivStrat,ConvCritType<:ConvCrit}
     colpivstrat = _buildpivstrat(iaca.columnpivoting, rowidcs, colidcs, maxrank)
-    return iACA(iaca.rowpivoting(rowidcs), colpivstrat, iaca.convergence(maxrank))
+    return IACA(iaca.rowpivoting(rowidcs), colpivstrat, iaca.convergence(maxrank))
 end
 
-function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
+function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
     rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}, maxrank::Int
 ) where {RowPivType<:MaximumValue,ColPivType<:TreeMimicryPivoting2,ConvCritType<:ConvCrit}
     convcrit = iaca.convergence(maxrank)
     colpivstrat = _buildpivstrat(convcrit, iaca.columnpivoting, rowidcs, colidcs, maxrank)
-    return iACA(iaca.rowpivoting(rowidcs), colpivstrat, convcrit)
+    return IACA(iaca.rowpivoting(rowidcs), colpivstrat, convcrit)
 end
 
 function reset!(
-    iaca::iACA{RP,CP,CC}, rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}
+    iaca::IACA{RP,CP,CC}, rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}
 ) where {RP<:MaximumValueFunctor,CP<:GeoPivStratFunctor,CC<:ConvCritFunctor}
     reset!(iaca.rowpivoting, rowidcs)
     reset!(iaca.columnpivoting, rowidcs, colidcs)
@@ -203,7 +203,7 @@ function reset!(
     return nothing
 end
 
-function (iaca::iACA{RP,CP,CC})(
+function (iaca::IACA{RP,CP,CC})(
     A,
     colbuffer::AbstractArray{K},
     rowbuffer::AbstractArray{K},
@@ -220,9 +220,9 @@ function (iaca::iACA{RP,CP,CC})(
 end
 
 """
-    (iaca::iACA{ValuePivStratFunctor,GeoPivStratFunctor,ConvCritFunctor})(A, colbuffer, rowbuffer, maxrank, rows, cols, rowidcs)
+    (iaca::IACA{ValuePivStratFunctor,GeoPivStratFunctor,ConvCritFunctor})(A, colbuffer, rowbuffer, maxrank, rows, cols, rowidcs)
 
-Main computational routine for column matrix iACA (value-based row pivoting, geometric column pivoting).
+Main computational routine for column matrix IACA (value-based row pivoting, geometric column pivoting).
 Performs incomplete ACA compression where columns are selected geometrically and rows by maximum value.
 
 # Arguments
@@ -241,7 +241,7 @@ Performs incomplete ACA compression where columns are selected geometrically and
   - `rows::Vector{Int}`: Selected row indices (global)
   - `cols::Vector{Int}`: Selected column indices
 """
-function (iaca::iACA{RowPivType,ColPivType,ConvCritType})(
+function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
     A,
     colbuffer::AbstractArray{K},
     rowbuffer::AbstractArray{K},

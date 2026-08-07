@@ -84,7 +84,7 @@ entry point, use `H.assemble`.
 
 # See also
 
-`H.assemble`, `ACA`, `iACA`, `farmatrix`, `nearmatrix`
+`H.assemble`, `ACA`, `IACA`, `farmatrix`, `nearmatrix`
 """
 function HMatrix(
     operator,

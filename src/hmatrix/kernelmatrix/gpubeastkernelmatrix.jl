@@ -1,4 +1,3 @@
-
 struct GPUBEASTKernelMatrix{T,NearBlockAssemblerType} <: AbstractKernelMatrix{T}
     nearassembler::NearBlockAssemblerType
     function GPUBEASTKernelMatrix{T}(nearassembler) where {T}
@@ -6,24 +5,18 @@ struct GPUBEASTKernelMatrix{T,NearBlockAssemblerType} <: AbstractKernelMatrix{T}
     end
 end
 
-struct GPUMatrixData{QuadStratType}
-    quadstrat::QuadStratType
-    ndevices::Int
-    function GPUMatrixData(quadstrat, ndevices::Int)
-        return new{typeof(quadstrat)}(quadstrat, ndevices)
-    end
-end
-
-function Base.size(M::GPUBEASTKernelMatrix, dim=nothing)
+function Base.size(matrix::GPUBEASTKernelMatrix, dim=nothing)
     if dim === nothing
-        return (length(M.nearassembler.tfs), length(M.nearassembler.bfs))
+        return (length(matrix.nearassembler.tfs), length(matrix.nearassembler.bfs))
     elseif dim == 1
-        return length(M.nearassembler.tfs)
+        return length(matrix.nearassembler.tfs)
     elseif dim == 2
-        return length(M.nearassembler.bfs)
+        return length(matrix.nearassembler.bfs)
     else
         error("dim must be either 1 or 2")
     end
 end
 
-nextrc!(buf, A::GPUBEASTKernelMatrix, i, j) = A(buf, i, j)
+function nextrc!(buffer, matrix::GPUBEASTKernelMatrix, rows, columns)
+    return matrix(buffer, rows, columns)
+end

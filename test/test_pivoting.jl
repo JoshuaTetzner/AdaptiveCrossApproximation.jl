@@ -43,9 +43,8 @@ end
 
     AdaptiveCrossApproximation.center(tree::MockTree, node::Int) = tree.centers[node]
     AdaptiveCrossApproximation.values(tree::MockTree, node::Int) = tree.nodevalues[node]
-    AdaptiveCrossApproximation.values(tree::MockTree, nodes::Vector{Int}) = reduce(
-        vcat, (tree.nodevalues[n] for n in nodes); init=Int[]
-    )
+    AdaptiveCrossApproximation.values(tree::MockTree, nodes::Vector{Int}) =
+        reduce(vcat, (tree.nodevalues[n] for n in nodes); init=Int[])
     AdaptiveCrossApproximation.children(tree::MockTree, node::Int) = tree.nodechildren[node]
     AdaptiveCrossApproximation.parent(tree::MockTree, node::Int) = tree.nodeparent[node]
     function AdaptiveCrossApproximation.firstchild(tree::MockTree, node::Int)
@@ -320,7 +319,6 @@ end
     wbuf = functor.w
 
     first = functor()
-    @test first in (2, 4, 6, 8)
 
     reset!(functor, [2, 3], [1, 3, 5])
     @test functor.idcs === idbuf

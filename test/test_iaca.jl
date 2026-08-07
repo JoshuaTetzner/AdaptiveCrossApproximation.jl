@@ -16,13 +16,13 @@ op = Maxwell3D.singlelayer(; wavenumber=k)
 A = assemble(op, Xt, Xs)
 tol = 1e-2
 maxrank = 40
-iaca = iACA(
+iaca = IACA(
     MaximumValue(),
     TreeMimicryPivoting(Xt.pos, Xs.pos, tree),
     FNormExtrapolator(iFNormEstimator(tol)),
 )
 iaca = iaca([1], [1], maxrank)
-iaca2 = iACA(
+iaca2 = IACA(
     MaximumValue(), MimicryPivoting(Xt.pos, Xs.pos), FNormExtrapolator(iFNormEstimator(tol))
 )
 iaca2 = iaca2([1], [1], maxrank)

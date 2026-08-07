@@ -109,11 +109,11 @@ abstract type ValuePivStratFunctor <: PivStratFunctor end
 _buildpivstrat(strat::PivStrat, convcrit, idcs) = strat(idcs)
 
 function Base.resize!(functor::PivStratFunctor, args...)
-    throw(ArgumentError("resize! is not implemented for $(typeof(functor))."))
+    return throw(ArgumentError("resize! is not implemented for $(typeof(functor))."))
 end
 
 function reset!(functor::PivStratFunctor, args...)
-    throw(ArgumentError("reset! is not implemented for $(typeof(functor))."))
+    return throw(ArgumentError("reset! is not implemented for $(typeof(functor))."))
 end
 
 @inline function _centroid(

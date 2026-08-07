@@ -1,7 +1,7 @@
 """
     ConvCrit
 
-Abstract base type for convergence criteria used by ACA and iACA compressors.
+Abstract base type for convergence criteria used by ACA and IACA compressors.
 
 # Notes
 
@@ -62,7 +62,7 @@ Concrete subtypes should overload this method. The default fallback throws
 `ConvCritFunctor`
 """
 function reset!(convcrit::ConvCritFunctor)
-    throw(ArgumentError("reset! is not implemented for $(typeof(convcrit))."))
+    return throw(ArgumentError("reset! is not implemented for $(typeof(convcrit))."))
 end
 
 function reset!(convcrit::ConvCritFunctor, args...)
@@ -82,8 +82,7 @@ function normF!(
 
     for j in 1:(npivot - 1)
         @views convcrit.normUV² +=
-            2 *
-            real.(
+            2 * real.(
                 dot(colbuffer[1:maxrows, npivot], colbuffer[1:maxrows, j]) *
                 dot(rowbuffer[npivot, 1:maxcolumns], rowbuffer[j, 1:maxcolumns]),
             )

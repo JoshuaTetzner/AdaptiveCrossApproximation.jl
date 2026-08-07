@@ -7,7 +7,7 @@ Provides full-rank and incomplete adaptive cross approximation algorithms optimi
 boundary integral operators and other kernel-based matrices. Key features:
 
   - **ACA**: Standard adaptive cross approximation selecting pivots by alternating rows/columns
-  - **iACA**: Incomplete variant for geometric pivoting in hierarchical matrix construction
+  - **IACA**: Incomplete variant for geometric pivoting in hierarchical matrix construction
   - **HMatrix**: Hierarchical matrix representation combining dense near-field and low-rank far-field blocks
   - **Pivoting strategies**: Maximum value, geometric (Leja, Fill Distance, Mimicry), random sampling
   - **Convergence criteria**: Frobenius norm estimation, random sampling, extrapolation, combined criteria
@@ -18,7 +18,7 @@ boundary integral operators and other kernel-based matrices. Key features:
 **Compressors:**
 
   - [`ACA`](@ref): Standard row-first variant
-  - [`iACA`](@ref): Incomplete variant for geometric pivoting and hierarchical matrices
+  - [`IACA`](@ref): Incomplete variant for geometric pivoting and hierarchical matrices
   - [`aca`](@ref): Convenience function for matrix compression
 
 **Hierarchical matrices:**
@@ -70,12 +70,15 @@ y = hmat * x  # Matrix-vector product
 module AdaptiveCrossApproximation
 
 using LinearAlgebra
+using ProgressMeter
 using StaticArrays
 
 include("utils.jl")
 
 include("hmatrix/kernelmatrix/abstractkernelmatrix.jl")
 include("hmatrix/kernelmatrix/beastkernelmatrix.jl")
+include("hmatrix/kernelmatrix/gpubeastkernelmatrix.jl")
+include("hmatrix/kernelmatrix/gpumatrixdata.jl")
 include("hmatrix/kernelmatrix/pointmatrix.jl")
 
 include("pivoting/abstractpivoting.jl")
@@ -131,13 +134,16 @@ module H
       - `op`: Operator/kernel for matrix entry evaluation
 
       - `testspace`: Test space (row basis/points)
+
       - `trialspace`: Trial space (column basis/points)
+
       - `tree`: Hierarchical tree structure (auto-generated if not provided)
+
       - `kwargs...`: Additional parameters passed to [`HMatrix`](@ref):
 
           + `tol`: Convergence tolerance (default `1e-4`)
           + `maxrank`: Maximum rank for compression (default `40`)
-          + `compressor`: ACA or iACA instance (default `ACA(tol=tol)`)
+          + `compressor`: ACA or IACA instance (default `ACA(tol=tol)`)
           + `isnear`: Admissibility predicate (default `isnear()`)
           + `spaceordering`: Space ordering strategy (default `PermuteSpaceInPlace()`)
 
@@ -178,10 +184,10 @@ end
 export H
 export HMatrix
 export ACA
-export iACA
+export IACA
 export FNormEstimator, iFNormEstimator, FNormExtrapolator, OversampIFNormEst
 export MaximumValue, Leja2, FillDistance
 export MimicryPivoting, TreeMimicryPivoting
 export reset!
-export AbstractKernelMatrix
+export AbstractKernelMatrix, GPUMatrixData
 end

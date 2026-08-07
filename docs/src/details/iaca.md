@@ -14,7 +14,7 @@ The IACA constructs a factorization of the form
 
 but only evaluates a subset of entries corresponding to selected pivot indices. This makes it particularly suitable for hierarchical methods such as the NCA.
 
-API: [`iACA`](@ref)
+API: [`IACA`](@ref)
 
 ---
 

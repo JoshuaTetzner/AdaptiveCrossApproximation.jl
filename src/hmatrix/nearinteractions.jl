@@ -121,6 +121,7 @@ function assemblenears(
     isnear=isnear(),
     scheduler=SerialScheduler(),
     matrixdata=defaultmatrixdata(operator, testspace, trialspace),
+    verbose::Bool=false,
 )
     nearmatrix = AbstractKernelMatrix(
         operator, testspace, trialspace; matrixdata=matrixdata
@@ -132,12 +133,15 @@ function assemblenears(
     )
 
     blocks = Vector{Matrix{eltype(nearmatrix)}}(undef, length(values))
+    pbar = Progress(length(blocks); desc="Assembling near interactions: ", enabled=verbose)
     @tasks for i in eachindex(blocks)
         @set scheduler = scheduler
         blk = zeros(eltype(nearmatrix), length(values[i]), length(nearvalues[i]))
         nearmatrix(blk, values[i], nearvalues[i])
         blocks[i] = blk
+        next!(pbar)
     end
+    finish!(pbar)
 
     nears = BlockSparseMatrix(
         blocks, values, nearvalues, size(nearmatrix); scheduler=scheduler
@@ -192,13 +196,15 @@ function assemblenears(
     isnear=isnear(),
     scheduler=SerialScheduler(),
     matrixdata=defaultmatrixdata(operator, testspace, trialspace),
+    verbose::Bool=false,
 )
     nearmatrix = AbstractKernelMatrix(
         operator, testspace, trialspace; matrixdata=matrixdata
     )
     values, nearvalues = nearinteractions_consecutive(tree; isnear=isnear)
-    blocks =
-        zeros.(eltype(nearmatrix), length.(values), [sum(length.(n)) for n in nearvalues])
+    blocks = zeros.(
+        eltype(nearmatrix), length.(values), [sum(length.(n)) for n in nearvalues]
+    )
     # There should be a prettier not hardcoded way to do this, but it works for now
     viewblocks = Vector{
         Vector{
@@ -213,11 +219,14 @@ function assemblenears(
     }(
         undef, length(blocks)
     )
+    pbar = Progress(length(blocks); desc="Assembling near interactions: ", enabled=verbose)
     @tasks for i in eachindex(blocks)
         @set scheduler = scheduler
         nearmatrix(blocks[i], values[i], Iterators.flatten(nearvalues[i]))
         viewblocks[i] = splitblock(blocks[i], length.(nearvalues[i]))
+        next!(pbar)
     end
+    finish!(pbar)
     mat = VariableBlockCompressedRowStorage{
         eltype(nearmatrix),eltype(Iterators.flatten(viewblocks)),Int,typeof(scheduler)
     }(
