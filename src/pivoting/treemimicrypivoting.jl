@@ -81,6 +81,7 @@ mutable struct TreeMimicryPivotingFunctor{D,T,TreeType,Filter,FState} <: GeoPivS
     nempty::Int
     usednodes::Vector{Int}
     usedidcs::Vector{Int}
+    candidatebuffers::Vector{Vector{Int}}
 end
 
 function _functor(
@@ -100,6 +101,7 @@ function _functor(
         0,
         zeros(Int, maxrank),
         zeros(Int, maxrank),
+        Vector{Int}[],
     )
 end
 
@@ -299,9 +301,25 @@ function _best_node(pivstrat::TreeMimicryPivotingFunctor, nodes, npivot::Int)
     end]
 end
 
-function _candidate_nodes(pivstrat::TreeMimicryPivotingFunctor, nodes, dir::Int32)
+# Reusable per-recursion-depth candidate buffer, pooled on the functor so tree
+# descent doesn't allocate a fresh `Vector{Int}` at every level, for every pivot,
+# on every backtrack (this was the dominant allocation source in Phase 1: ~65% of
+# wall time was GC at 32 threads / 1M dofs before this change).
+function _depth_buffer!(pivstrat::TreeMimicryPivotingFunctor, depth::Int)
+    buffers = pivstrat.candidatebuffers
+    while length(buffers) < depth
+        push!(buffers, Int[])
+    end
+    buf = buffers[depth]
+    empty!(buf)
+    return buf
+end
+
+function _candidate_nodes(
+    pivstrat::TreeMimicryPivotingFunctor, nodes, dir::Int32, depth::Int
+)
     fs = pivstrat.filterstate
-    out = Int[]
+    out = _depth_buffer!(pivstrat, depth)
     Base.haslength(nodes) && sizehint!(out, length(nodes))
     @inbounds for node in nodes
         inode = Int(node)
@@ -312,10 +330,12 @@ function _candidate_nodes(pivstrat::TreeMimicryPivotingFunctor, nodes, dir::Int3
     return out
 end
 
-function _findcluster(pivstrat::TreeMimicryPivotingFunctor, nodes, npivot::Int, dir::Int32)
+function _findcluster(
+    pivstrat::TreeMimicryPivotingFunctor, nodes, npivot::Int, dir::Int32, depth::Int=1
+)
     fs = pivstrat.filterstate
     tree = pivstrat.pivoting.tree
-    candidates = _candidate_nodes(pivstrat, nodes, dir)
+    candidates = _candidate_nodes(pivstrat, nodes, dir, depth)
     while !isempty(candidates)
         node = _best_node(pivstrat, candidates, npivot)
         if iszero(firstchild(tree, node))
@@ -331,7 +351,7 @@ function _findcluster(pivstrat::TreeMimicryPivotingFunctor, nodes, npivot::Int, 
             continue
         end
 
-        target = _findcluster(pivstrat, children(tree, node), npivot, dir)
+        target = _findcluster(pivstrat, children(tree, node), npivot, dir, depth + 1)
         !iszero(target) && return target
         filter!(!=(node), candidates)
     end

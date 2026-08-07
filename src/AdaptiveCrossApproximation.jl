@@ -230,4 +230,5 @@ export MaximumValue, Leja2, FillDistance
 export MimicryPivoting, TreeMimicryPivoting
 export reset!
 export AbstractKernelMatrix, GPUMatrixData
+export assemble_blocks, assemble_blocks_sparse
 end

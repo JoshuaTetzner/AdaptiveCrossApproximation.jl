@@ -92,6 +92,41 @@ function reset_phase!(convcrit::PhaseExtrapolatorFunctor, direction::Integer)
     return nothing
 end
 
+# Least-squares degree-2 fit of the points (i, y[i]), i = 1..n (x = 1:n), evaluated
+# at n+1. Since the abscissae are always 1..n, the fit is a 3x3 symmetric normal-
+# equations solve done in scalars - same result as `Polynomials.fit(1:n, y, 2)`
+# but without the per-call Vandermonde/abscissa/Polynomial allocations.
+@inline function _quad_extrapolate_end(y, n::Int, ::Type{F}) where {F}
+    s1 = s2 = s3 = s4 = zero(F)
+    t0 = t1 = t2 = zero(F)
+    @inbounds for i in 1:n
+        fi = F(i)
+        fi2 = fi * fi
+        s1 += fi
+        s2 += fi2
+        s3 += fi2 * fi
+        s4 += fi2 * fi2
+        yi = y[i]
+        t0 += yi
+        t1 += fi * yi
+        t2 += fi2 * yi
+    end
+    s0 = F(n)
+    # adjugate of the symmetric normal matrix [s0 s1 s2; s1 s2 s3; s2 s3 s4]
+    m11 = s2 * s4 - s3 * s3
+    m12 = s3 * s2 - s1 * s4
+    m13 = s1 * s3 - s2 * s2
+    m22 = s0 * s4 - s2 * s2
+    m23 = s2 * s1 - s0 * s3
+    m33 = s0 * s2 - s1 * s1
+    det = s0 * m11 + s1 * m12 + s2 * m13
+    c0 = (m11 * t0 + m12 * t1 + m13 * t2) / det
+    c1 = (m12 * t0 + m22 * t1 + m23 * t2) / det
+    c2 = (m13 * t0 + m23 * t1 + m33 * t2) / det
+    x = F(n + 1)
+    return c0 + c1 * x + c2 * x * x
+end
+
 function _extrapolated_converged(
     convcrit::PhaseExtrapolatorFunctor{F}, npivot::Int
 ) where {F}
@@ -101,8 +136,8 @@ function _extrapolated_converged(
     @inbounds for i in 1:nfit
         convcrit.fitbuffer[i] = log10(convcrit.lastnorms[i])
     end
-    f2 = fit(F.(1:nfit), view(convcrit.fitbuffer, 1:nfit), 2)
-    return f2(F(nfit + 1)) <= log10(tolerance(convcrit) * convcrit.estimator.normUV)
+    extrap = _quad_extrapolate_end(convcrit.fitbuffer, nfit, F)
+    return extrap <= log10(tolerance(convcrit) * convcrit.estimator.normUV)
 end
 
 function _direction_extrapolated_converged(
@@ -119,8 +154,8 @@ function _direction_extrapolated_converged(
         convcrit.fitbuffer[j] = log10(convcrit.lastnorms[i])
     end
     j < 3 && return true
-    f2 = fit(F.(1:j), view(convcrit.fitbuffer, 1:j), 2)
-    return f2(F(j + 1)) <= log10(tolerance(convcrit) * convcrit.estimator.normUV)
+    extrap = _quad_extrapolate_end(convcrit.fitbuffer, j, F)
+    return extrap <= log10(tolerance(convcrit) * convcrit.estimator.normUV)
 end
 
 function (convcrit::PhaseExtrapolatorFunctor{F})(

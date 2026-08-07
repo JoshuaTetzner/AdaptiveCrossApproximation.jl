@@ -100,15 +100,73 @@ end
     return _matches_direction(dir, fs.basisdirections[idx])
 end
 
+# Non-allocating subtree traversal. `values(tree, node)` on an internal node
+# concatenates the whole subtree's indices into a fresh array; on a leaf it
+# returns the stored index vector by reference. So we descend via the abstract
+# tree interface (firstchild/children) and only call `values` on leaves. This
+# keeps the same work but removes the per-check subtree materialization that
+# dominated far-assembly allocations.
+function _subtree_has_zerodir(tree, node::Int, fs::DirectionFilterState)
+    if iszero(firstchild(tree, node))
+        @inbounds for idx in values(tree, node)
+            iszero(fs.basisdirections[idx]) && return true
+        end
+        return false
+    end
+    for child in children(tree, node)
+        _subtree_has_zerodir(tree, Int(child), fs) && return true
+    end
+    return false
+end
+
+function _subtree_has_unused_match(
+    functor::TreeMimicryPivotingFunctor,
+    tree,
+    node::Int,
+    fs::DirectionFilterState,
+    dir::Int32,
+    nused::Int,
+)
+    if iszero(firstchild(tree, node))
+        @inbounds for idx in values(tree, node)
+            _used_index(functor, idx, nused) && continue
+            _matches_direction(dir, fs.basisdirections[idx]) && return true
+        end
+        return false
+    end
+    for child in children(tree, node)
+        _subtree_has_unused_match(functor, tree, Int(child), fs, dir, nused) && return true
+    end
+    return false
+end
+
+function _subtree_has_unused_dir(
+    functor::TreeMimicryPivotingFunctor,
+    tree,
+    node::Int,
+    fs::DirectionFilterState,
+    dir::Int32,
+    nused::Int,
+)
+    if iszero(firstchild(tree, node))
+        @inbounds for idx in values(tree, node)
+            _used_index(functor, idx, nused) && continue
+            fs.basisdirections[idx] == dir && return true
+        end
+        return false
+    end
+    for child in children(tree, node)
+        _subtree_has_unused_dir(functor, tree, Int(child), fs, dir, nused) && return true
+    end
+    return false
+end
+
 function _accepts_node(
     fs::DirectionFilterState, functor::TreeMimicryPivotingFunctor, node::Int, dir::Int32
 )
     dir < 0 && return true
     if iszero(dir)
-        @inbounds for idx in values(functor.pivoting.tree, node)
-            fs.basisdirections[idx] == dir && return true
-        end
-        return false
+        return _subtree_has_zerodir(functor.pivoting.tree, node, fs)
     end
     return _contains(fs.nodedirectionids[node], dir)
 end
@@ -149,10 +207,7 @@ function _has_unused_basis_direction(
     @inbounds for i in 1:(functor.nactive)
         node = functor.farfield[i]
         _emptycluster(functor, node) && continue
-        for idx in values(tree, node)
-            _used_index(functor, idx, nused) && continue
-            _matches_direction(dir, fs.basisdirections[idx]) && return true
-        end
+        _subtree_has_unused_match(functor, tree, node, fs, dir, nused) && return true
     end
     return false
 end
@@ -165,10 +220,7 @@ function _available_direction(
         node = functor.farfield[i]
         _emptycluster(functor, node) && continue
         _accepts_node(fs, functor, node, dir) || continue
-        for idx in values(tree, node)
-            _used_index(functor, idx, nused) && continue
-            fs.basisdirections[idx] == dir && return true
-        end
+        _subtree_has_unused_dir(functor, tree, node, fs, dir, nused) && return true
     end
     return false
 end
