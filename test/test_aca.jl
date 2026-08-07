@@ -66,3 +66,32 @@ end
     @test size(U, 2) == 3
     @test size(V, 1) == 3
 end
+
+@testset "ACA maxrank cap" begin
+    Random.seed!(21)
+    M = randn(10, 10)  # generically full rank (10), so maxrank must bind
+    U, V = AdaptiveCrossApproximation.aca(M; tol=1e-14, maxrank=4)
+    @test size(U, 2) == 4
+    @test size(V, 1) == 4
+    @test norm(U * V - M) / norm(M) > 1e-8  # genuinely capped, not converged
+end
+
+@testset "ACA tie-break determinism (MaximumValue)" begin
+    # Columns 3 and 6 tie at |.|=2.0 in the first (unmodified) row scan;
+    # MaximumValueFunctor's `>=` scan means the LAST matching index wins.
+    M = zeros(6, 8)
+    M[1, 3] = 2.0
+    M[1, 6] = 2.0
+    M[1, 2] = 1.0
+
+    maxrank = 6
+    compressor = AdaptiveCrossApproximation.ACA(; tol=1e-12)
+    colbuffer = zeros(size(M, 1), maxrank)
+    rowbuffer = zeros(maxrank, size(M, 2))
+    rows = zeros(Int, maxrank)
+    cols = zeros(Int, maxrank)
+    compressor(M, colbuffer, rowbuffer, maxrank; rows=rows, cols=cols)
+
+    @test rows[1] == 1
+    @test cols[1] == 6
+end

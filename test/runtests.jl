@@ -57,6 +57,7 @@ end
     include("test_acaT.jl")
     include("test_iaca.jl")
     include("test_acabeast.jl")
+    include("test_batchedfullpivotaca.jl")
 
     include("test_hmatrix.jl")
 end

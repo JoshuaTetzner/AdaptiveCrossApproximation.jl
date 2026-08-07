@@ -20,7 +20,7 @@ ParallelKMeans = "42b8e9d4-006b-409a-8472-7f34b3fb58af"
 
 [extensions]
 ACABEAST = ["BEAST"]
-ACABEASTCUDA = ["BEAST", "CUDA"]
+ACACUDA = ["CUDA"]
 ACAH2Trees = ["H2Trees"]
 ACAParallelKMeansTrees = ["BEAST", "H2Trees", "ParallelKMeans"]
 

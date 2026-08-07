@@ -58,12 +58,11 @@ end
 """
     beastkernelmatrix(operator, testspace, trialspace, matrixdata)
 
-Build a BEAST-backed kernel matrix (e.g. [`BEASTKernelMatrix`](@ref) or
-[`GPUBEASTKernelMatrix`](@ref)) from a BEAST operator, spaces, and `matrixdata`
-(a quadrature strategy, or a [`GPUMatrixData`](@ref) for GPU assembly).
+Build a BEAST-backed kernel matrix (e.g. [`BEASTKernelMatrix`](@ref)) from a
+BEAST operator, spaces, and `matrixdata` (a quadrature strategy).
 
-No default method is provided here; it is implemented by the `ACABEAST` and
-`ACABEASTCUDA` package extensions and dispatched to from
+No default method is provided here; it is implemented by the `ACABEAST`
+package extension and dispatched to from
 `AbstractKernelMatrix(operator, testspace, trialspace; matrixdata=...)` when BEAST
 types are detected.
 """
@@ -116,14 +115,7 @@ Batched counterpart of [`assemble_blocks`](@ref): fills every preallocated
 
 Default (any `AbstractKernelMatrix`) implementation: just forwards to
 `assemble_blocks` (no batching benefit without a backend-specific override of
-`assemble_blocks` itself). For [`GPUBEASTKernelMatrix`](@ref) (`ACABEASTCUDA`
-extension), `assemble_blocks` is itself overridden to batch everything
-through one combined pass — see BEAST's `gpu_batched_blockassemble!`, which
-it wraps — so this generic method picks that up automatically without its
-own override. Works with either quadrature strategy the matrix was built
-with; a plain `BEAST.DoubleNumQStrat` matrix is only valid here for blocks
-guaranteed geometrically far (no singularity check at all in that case), same
-contract as evaluating such a matrix via the plain call operator.
+`assemble_blocks` itself).
 """
 function assemble_blocks_sparse(
     matrix::AbstractKernelMatrix, blocks, rowidcs, colidcs; kwargs...
