@@ -15,9 +15,8 @@ mutable struct MaximumValueFunctor <: ValuePivStratFunctor
     usedidcs::Vector{Bool}
 end
 
-(::MaximumValue)(idcs::AbstractVector{<:Integer}) = MaximumValueFunctor(
-    length(idcs), zeros(Bool, length(idcs))
-)
+(::MaximumValue)(idcs::AbstractVector{<:Integer}) =
+    MaximumValueFunctor(length(idcs), zeros(Bool, length(idcs)))
 (::MaximumValue)(nidcs::Int) = MaximumValueFunctor(nidcs, zeros(Bool, nidcs))
 
 function Base.resize!(pivstrat::MaximumValueFunctor, nactive::Int)
@@ -33,7 +32,7 @@ function reset!(pivstrat::MaximumValueFunctor, idcs::AbstractVector{<:Integer})
 end
 
 function (pivstrat::MaximumValueFunctor)()
-    @assert pivstrat.nactive >= 1
+    pivstrat.nactive >= 1 || throw(ArgumentError("nactive must be positive."))
     pivstrat.usedidcs[1] = true
     return 1
 end
@@ -44,11 +43,11 @@ function (pivstrat::MaximumValueFunctor)(rc::AbstractArray)
 
     if all(used)
         absrx = abs.(view(rc, 1:nactive))
-        maximum(absrx) != 0.0 && (return argmax(absrx))
+        !iszero(maximum(absrx)) && (return argmax(absrx))
     end
 
     nextidx = 1
-    maxval = 0.0
+    maxval = zero(real(eltype(rc)))
     for i in 1:nactive
         if (!pivstrat.usedidcs[i]) && abs(rc[i]) >= maxval
             nextidx = i

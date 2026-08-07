@@ -10,7 +10,7 @@ stateful `ConvCritFunctor` objects during block compression.
 
 # See also
 
-`ConvCritFunctor`, `FNormEstimator`, `iFNormEstimator`, `FNormExtrapolator`, `RandomSampling`
+`ConvCritFunctor`, `FNormEstimator`, `FNormExtrapolator`, `PhaseExtrapolator`, `RandomSampling`
 """
 abstract type ConvCrit end
 
@@ -30,23 +30,6 @@ Subtypes should implement `reset!` to reinitialize internal state for a new bloc
 """
 abstract type ConvCritFunctor end
 
-function (cc::ConvCrit)(
-    K::Union{AbstractMatrix,AbstractKernelMatrix},
-    rowidcs::AbstractArray{Int},
-    colidcs::AbstractArray{Int};
-    maxrank::Int=40,
-)
-    if isa(cc, CombinedConvCrit)
-        return cc(K, rowidcs, colidcs; maxrank=maxrank)
-    elseif isa(cc, RandomSampling)
-        return cc(K, rowidcs, colidcs)
-    elseif isa(cc, FNormExtrapolator)
-        return cc(maxrank)
-    else
-        return cc()
-    end
-end
-
 """
     reset!(convcrit::ConvCritFunctor)
 
@@ -62,7 +45,7 @@ Concrete subtypes should overload this method. The default fallback throws
 `ConvCritFunctor`
 """
 function reset!(convcrit::ConvCritFunctor)
-    throw(ArgumentError("reset! is not implemented for $(typeof(convcrit))."))
+    return throw(ArgumentError("reset! is not implemented for $(typeof(convcrit))."))
 end
 
 function reset!(convcrit::ConvCritFunctor, args...)
@@ -77,20 +60,23 @@ function normF!(
     maxrows::Int,
     maxcolumns::Int,
 ) where {K}
-    @views convcrit.normUV² +=
-        (norm(rowbuffer[npivot, 1:maxcolumns]) * norm(colbuffer[1:maxrows, npivot]))^2
-
+    @views rnorm = norm(rowbuffer[npivot, 1:maxcolumns])
+    @views cnorm = norm(colbuffer[1:maxrows, npivot])
+    delta_sq = (rnorm * cnorm)^2
     for j in 1:(npivot - 1)
-        @views convcrit.normUV² +=
+        @views delta_sq +=
             2 * real.(
                 dot(colbuffer[1:maxrows, npivot], colbuffer[1:maxrows, j]) *
                 dot(rowbuffer[npivot, 1:maxcolumns], rowbuffer[j, 1:maxcolumns]),
             )
     end
+    convcrit.normUV = sqrt(convcrit.normUV^2 + delta_sq)
+    return nothing
 end
 
-function normF!(
-    convcrit::ConvCritFunctor, rcbuffer::AbstractVector{K}, npivot::Int
-) where {K}
-    return convcrit.normUV = ((npivot - 1) * convcrit.normUV + norm(rcbuffer)) / npivot
-end
+# Scale below which a residual is numerically zero and its pivot redundant. A
+# rank-deficient block drives the residual to ~eps relative to the block rather than
+# exactly zero, so `sqrt(eps)·normUV` catches it while staying below any real
+# tolerance-level residual.
+@inline _zeroresidualtol(convcrit::ConvCritFunctor) =
+    sqrt(eps(typeof(convcrit.normUV))) * convcrit.normUV

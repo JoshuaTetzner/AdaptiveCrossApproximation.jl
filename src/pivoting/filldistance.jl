@@ -55,7 +55,7 @@ function reset!(
 end
 
 function (pivstrat::Union{Leja2Functor{D,F},FillDistanceFunctor{D,F}})() where {D,F}
-    AdaptiveCrossApproximation.leja2_init!(pivstrat, pivstrat.idcs[1], pivstrat.nactive)
+    leja2_init!(pivstrat, pivstrat.idcs[1], pivstrat.nactive)
     return 1
 end
 
@@ -67,7 +67,7 @@ function (pivstrat::FillDistanceFunctor{D,F})(::AbstractArray) where {D,F}
     maxval = pivstrat.h[nextidx]
 
     for k in 1:nactive
-        pivstrat.h[k] == 0.0 && continue
+        iszero(pivstrat.h[k]) && continue
         newfd = zero(F)
         for ind in 1:nactive
             d = norm(pos[pivstrat.idcs[k]] - pos[pivstrat.idcs[ind]])
@@ -77,10 +77,13 @@ function (pivstrat::FillDistanceFunctor{D,F})(::AbstractArray) where {D,F}
                 newfd < pivstrat.h[ind] && (newfd = pivstrat.h[ind])
             end
         end
-        newfd <= maxval && (nextidx=k; maxval=newfd)
+        if newfd <= maxval
+            nextidx = k
+            maxval = newfd
+        end
     end
 
-    AdaptiveCrossApproximation.leja2!(pivstrat, pivstrat.idcs[nextidx], nactive)
+    leja2!(pivstrat, pivstrat.idcs[nextidx], nactive)
 
     return nextidx
 end

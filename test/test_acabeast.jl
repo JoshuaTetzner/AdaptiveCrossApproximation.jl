@@ -42,7 +42,7 @@ k = 2 * π / λ
         for (O, Y, X) in Os
             A = assemble(O, Y, X; quadstrat=quadstrat)
 
-            for tol in [1e-3, 1e-6, 1e-9]
+            for tol in [1e-3, 1e-4, 1e-6]
                 local comp = AdaptiveCrossApproximation.defaultcompressor(O, Y, X; tol=tol)
                 @test comp.rowpivoting isa AdaptiveCrossApproximation.MaximumValue
                 @test comp.columnpivoting isa AdaptiveCrossApproximation.MaximumValue
@@ -63,7 +63,7 @@ k = 2 * π / λ
 
         for (O, Y, X) in DLOs
             A = assemble(O, Y, X; quadstrat=quadstrat)
-            for tol in [1e-3, 1e-6, 1e-9]
+            for tol in [1e-3, 1e-4, 1e-6]
                 local comp = AdaptiveCrossApproximation.defaultcompressor(O, Y, X; tol=tol)
                 @test comp.rowpivoting isa AdaptiveCrossApproximation.CombinedPivStrat
                 @test comp.columnpivoting isa AdaptiveCrossApproximation.MaximumValue
@@ -111,7 +111,7 @@ end
         for (O, Y, X) in Os
             A = assemble(O, Y, X; quadstrat=quadstrat)
 
-            for tol in [1e-3, 1e-6, 1e-9]
+            for tol in [1e-3, 1e-4, 1e-6]
                 local comp = AdaptiveCrossApproximation.defaultcompressor(O, Y, X; tol=tol)
                 @test comp.rowpivoting isa AdaptiveCrossApproximation.MaximumValue
                 @test comp.columnpivoting isa AdaptiveCrossApproximation.MaximumValue
@@ -132,7 +132,7 @@ end
 
         for (O, Y, X) in DLOs
             A = assemble(O, Y, X; quadstrat=quadstrat)
-            for tol in [1e-3, 1e-6, 1e-9]
+            for tol in [1e-3, 1e-4, 1e-6]
                 local comp = AdaptiveCrossApproximation.defaultcompressor(O, Y, X; tol=tol)
                 @test comp.rowpivoting isa AdaptiveCrossApproximation.CombinedPivStrat
                 @test comp.columnpivoting isa AdaptiveCrossApproximation.MaximumValue

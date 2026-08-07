@@ -35,7 +35,7 @@ mutable struct RandomSamplingFunctor{F<:Real,K,M,T} <: ConvCritFunctor
     convergence::T
     mat::M
     nactive::Int
-    normUV²::F
+    normUV::F
     indices::Vector{Tuple{Int,Int}}
     rest::Vector{K}
 end
@@ -102,6 +102,7 @@ function _fillrest!(
     nactive::Int,
 )
     length(rest) < nactive && resize!(rest, nactive)
+    fill!(view(rest, 1:nactive), zero(eltype(rest)))
     @inbounds for i in 1:nactive
         rc = indices[i]
         @views K(rest[i:i], rowidcs[rc[1]:rc[1]], colidcs[rc[2]:rc[2]])
@@ -144,7 +145,7 @@ function reset!(
     _sampleindices!(convcrit.indices, rowlen, collen, nsamples)
     _fillrest!(convcrit.rest, convcrit.indices, convcrit.mat, rowidcs, colidcs, nsamples)
     convcrit.nactive = nsamples
-    convcrit.normUV² = zero(convcrit.normUV²)
+    convcrit.normUV = zero(convcrit.normUV)
     return nothing
 end
 
@@ -167,13 +168,14 @@ function (convcrit::RandomSamplingFunctor{F,K,M})(
     end
     meanrest = sumrest2 / nactive
 
-    (meanrest == 0.0 && rnorm == 0.0 && cnorm == 0.0) && (return npivot - 1, false)
+    zerotol = _zeroresidualtol(convcrit)
+    (meanrest == 0.0 && rnorm <= zerotol && cnorm <= zerotol) && (return npivot - 1, false)
 
     lhs = sqrt(meanrest * maxrows * maxcolumns)
-    rhs = tolerance(convcrit) * sqrt(convcrit.normUV²)
-    (rnorm == 0.0 || cnorm == 0.0) && (return npivot - 1, lhs > rhs)
+    rhs = tolerance(convcrit) * convcrit.normUV
+    (rnorm <= zerotol || cnorm <= zerotol) && (return npivot - 1, lhs > rhs)
 
     normF!(convcrit, rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
-    rhs = tolerance(convcrit) * sqrt(convcrit.normUV²)
+    rhs = tolerance(convcrit) * convcrit.normUV
     return npivot, lhs > rhs
 end

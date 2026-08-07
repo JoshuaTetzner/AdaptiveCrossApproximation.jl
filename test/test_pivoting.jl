@@ -1,5 +1,6 @@
 using AdaptiveCrossApproximation
 using LinearAlgebra
+using Random
 using StaticArrays
 using Test
 
@@ -43,9 +44,8 @@ end
 
     AdaptiveCrossApproximation.center(tree::MockTree, node::Int) = tree.centers[node]
     AdaptiveCrossApproximation.values(tree::MockTree, node::Int) = tree.nodevalues[node]
-    AdaptiveCrossApproximation.values(tree::MockTree, nodes::Vector{Int}) = reduce(
-        vcat, (tree.nodevalues[n] for n in nodes); init=Int[]
-    )
+    AdaptiveCrossApproximation.values(tree::MockTree, nodes::Vector{Int}) =
+        reduce(vcat, (tree.nodevalues[n] for n in nodes); init=Int[])
     AdaptiveCrossApproximation.children(tree::MockTree, node::Int) = tree.nodechildren[node]
     AdaptiveCrossApproximation.parent(tree::MockTree, node::Int) = tree.nodeparent[node]
     function AdaptiveCrossApproximation.firstchild(tree::MockTree, node::Int)
@@ -341,4 +341,120 @@ end
     @test collect(view(functor.idcs, 1:4)) == [2, 5, 8, 7]
     @test all(iszero, view(functor.h, 1:4))
     @test all(isone, view(functor.leja, 1:4))
+end
+
+@testset "RandomSamplingPivoting" begin
+    K = reshape(collect(1.0:12.0), 3, 4)
+    rowidcs = [1, 2, 3]
+    colidcs = [1, 2, 3, 4]
+
+    Random.seed!(11)
+    cc = AdaptiveCrossApproximation.RandomSampling(; nsamples=5, tol=0.2)
+    convcrit = cc(K, rowidcs, colidcs)
+
+    rowpiv = AdaptiveCrossApproximation.RandomSamplingPivoting(1)(convcrit)
+    colpiv = AdaptiveCrossApproximation.RandomSamplingPivoting(2)(convcrit)
+    @test rowpiv.rc == 1
+    @test colpiv.rc == 2
+    @test resize!(rowpiv) === nothing
+    @test reset!(rowpiv) === nothing
+
+    rowbuffer = zeros(2, 4)
+    colbuffer = zeros(3, 2)
+    rowbuffer[1, :] .= [1.0, 2.0, 0.0, 0.0]
+    colbuffer[:, 1] .= [1.0, 0.0, 1.0]
+    convcrit(rowbuffer, colbuffer, 1, 3, 4)
+
+    expected = convcrit.indices[argmax(abs.(view(convcrit.rest, 1:(convcrit.nactive))))]
+    @test rowpiv(Float64[]) == expected[1]
+    @test colpiv(Float64[]) == expected[2]
+
+    combined = AdaptiveCrossApproximation.CombinedConvCritFunctor(
+        AdaptiveCrossApproximation.ConvCritFunctor[convcrit], [true]
+    )
+    piv2 = AdaptiveCrossApproximation.RandomSamplingPivoting(1)(combined)
+    @test piv2(Float64[]) == expected[1]
+
+    badcombined = AdaptiveCrossApproximation.CombinedConvCritFunctor(
+        AdaptiveCrossApproximation.ConvCritFunctor[AdaptiveCrossApproximation.FNormEstimator(
+            1e-4
+        )()],
+        [true],
+    )
+    @test_throws ArgumentError AdaptiveCrossApproximation.RandomSamplingPivoting(1)(
+        badcombined
+    )
+end
+
+@testset "TreeMimicryPivoting (EFIEDirectionalFilter)" begin
+    struct DirTree
+        nodes::Vector{Int}
+        centers::Vector{SVector{3,Float64}}
+        nodevalues::Vector{Vector{Int}}
+        nodechildren::Vector{Vector{Int}}
+        nodeparent::Vector{Int}
+    end
+
+    AdaptiveCrossApproximation.center(tree::DirTree, node::Int) = tree.centers[node]
+    AdaptiveCrossApproximation.values(tree::DirTree, node::Int) = tree.nodevalues[node]
+    AdaptiveCrossApproximation.values(tree::DirTree, nodes::Vector{Int}) =
+        reduce(vcat, (tree.nodevalues[n] for n in nodes); init=Int[])
+    AdaptiveCrossApproximation.children(tree::DirTree, node::Int) = tree.nodechildren[node]
+    AdaptiveCrossApproximation.parent(tree::DirTree, node::Int) = tree.nodeparent[node]
+    function AdaptiveCrossApproximation.firstchild(tree::DirTree, node::Int)
+        isempty(tree.nodechildren[node]) && return 0
+        return first(tree.nodechildren[node])
+    end
+
+    # left half (nodes 2,4,5 / basis 1:4) carries direction 1 (ex), right half
+    # (nodes 3,6,7 / basis 5:8) carries direction 2 (ey); root sees both.
+    tree = DirTree(
+        collect(1:7),
+        [
+            SVector(4.5, 0.0, 0.0),
+            SVector(2.5, 0.0, 0.0),
+            SVector(6.5, 0.0, 0.0),
+            SVector(1.5, 0.0, 0.0),
+            SVector(3.5, 0.0, 0.0),
+            SVector(5.5, 0.0, 0.0),
+            SVector(7.5, 0.0, 0.0),
+        ],
+        [collect(1:8), collect(1:4), collect(5:8), [1, 2], [3, 4], [5, 6], [7, 8]],
+        [[2, 3], [4, 5], [6, 7], Int[], Int[], Int[], Int[]],
+        [0, 1, 1, 2, 2, 3, 3],
+    )
+
+    edges = fill(SVector(1.0, 0.0, 0.0), 8)
+    normals = vcat(fill(SVector(1.0, 0.0, 0.0), 4), fill(SVector(0.0, 1.0, 0.0), 4))
+    edgeids, normalids, nedgeids, nnormalids = AdaptiveCrossApproximation.basisfunction_orientation_ids(
+        edges, normals
+    )
+    nodesets, trialnormalids, ntrialnormalids = AdaptiveCrossApproximation.node_normal_orientation_sets(
+        normals, tree
+    )
+    @test normalids == trialnormalids
+
+    refpos = [@SVector [Float64(i), 0.0, 0.0] for i in 1:8]
+    pos = [@SVector [Float64(i), 1.0, 0.0] for i in 1:8]
+
+    filter = AdaptiveCrossApproximation.EFIEDirectionalFilter(edgeids, normalids, nodesets)
+    piv = AdaptiveCrossApproximation.TreeMimicryPivoting(refpos, pos, tree, filter)
+    maxrank = 5
+    convcrit = AdaptiveCrossApproximation.PhaseExtrapolator(1e-6)(maxrank)
+    functor = piv(convcrit, [1, 8], [2, 3], maxrank)
+
+    # with lastconverged never set (no residual data fed back), the direction
+    # filter round-robins between the two available directions every pivot
+    used = Int[functor()]
+    dirs = Int32[normalids[used[1]]]
+    for n in 2:4
+        p = functor(n)
+        push!(used, p)
+        push!(dirs, normalids[p])
+    end
+
+    @test length(unique(used)) == 4
+    @test dirs == Int32[1, 2, 1, 2]
+    @test all(in(1:4), used[1:2:end])
+    @test all(in(5:8), used[2:2:end])
 end

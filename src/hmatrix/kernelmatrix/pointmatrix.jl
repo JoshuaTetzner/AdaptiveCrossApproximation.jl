@@ -48,12 +48,10 @@ kernel evaluation.
 
   - `PointMatrix` with element type inferred from `operator`
 """
-function AdaptiveCrossApproximation.AbstractKernelMatrix(
+function AbstractKernelMatrix(
     operator, testspace::AbstractVector, trialspace::AbstractVector; args...
 )
-    return AdaptiveCrossApproximation.PointMatrix{eltype(operator)}(
-        operator, testspace, trialspace
-    )
+    return PointMatrix{eltype(operator)}(operator, testspace, trialspace)
 end
 
 """
@@ -76,14 +74,12 @@ preferred for better performance and correctness.
 
   - `PointMatrix` with element type inferred from function evaluation
 """
-function AdaptiveCrossApproximation.AbstractKernelMatrix(
+function AbstractKernelMatrix(
     operator::Function, testspace::AbstractVector, trialspace::AbstractVector; args...
 )
     @warn "Using a plain function as kernel is not recommended."
 
-    return AdaptiveCrossApproximation.PointMatrix{
-        typeof(operator(testspace[1], trialspace[1]))
-    }(
+    return PointMatrix{typeof(operator(testspace[1], trialspace[1]))}(
         operator, testspace, trialspace
     )
 end
@@ -97,21 +93,9 @@ function (blk::PointMatrix)(matrixblock, tdata, sdata)
 end
 
 function Base.size(M::PointMatrix, dim=nothing)
-    if dim === nothing
-        return (length(M.testpoints), length(M.trialpoints))
-    elseif dim == 1
-        return length(M.testpoints)
-    elseif dim == 2
-        return length(M.trialpoints)
-    else
-        error("dim must be either 1 or 2")
-    end
+    return _kernelmatrix_size(length(M.testpoints), length(M.trialpoints), dim)
 end
 
 function nextrc!(buf, A::PointMatrix, i, j)
-    for ii in eachindex(i)
-        for jj in eachindex(j)
-            buf[ii, jj] += A.functor(A.testpoints[i[ii]], A.trialpoints[j[jj]])
-        end
-    end
+    return A(buf, i, j)
 end

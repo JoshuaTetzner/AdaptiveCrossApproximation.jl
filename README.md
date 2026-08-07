@@ -8,7 +8,7 @@
 
 [![Docs-stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://JoshuaTetzner.github.io/AdaptiveCrossApproximation.jl/stable/)
 [![Docs-dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://JoshuaTetzner.github.io/AdaptiveCrossApproximation.jl/dev/)
-[![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/JoshuaTetzner/AdaptiveCrossApproximation.jl/blob/master/LICENSE)
+[![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/JoshuaTetzner/AdaptiveCrossApproximation.jl/blob/main/LICENSE)
 [![CI](https://github.com/JoshuaTetzner/AdaptiveCrossApproximation.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/JoshuaTetzner/AdaptiveCrossApproximation.jl/actions/workflows/CI.yml)
 [![codecov](https://codecov.io/gh/JoshuaTetzner/AdaptiveCrossApproximation.jl/graph/badge.svg?token=RDRQTBWQS3)](https://codecov.io/gh/JoshuaTetzner/AdaptiveCrossApproximation.jl)
 
@@ -22,7 +22,7 @@ Further more this package contains an incomplete adaptive cross approximation al
 Installing AdaptiveCrossApproximation is done by entering the package manager (enter `]` at the julia REPL) and issuing:
 
 ```
-pkg> add https://github.com/FastBEAST/AdaptiveCrossApproximation.jl.git
+pkg> add https://github.com/JoshuaTetzner/AdaptiveCrossApproximation.jl.git
 ```
 
 

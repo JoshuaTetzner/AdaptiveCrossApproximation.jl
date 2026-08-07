@@ -1,6 +1,6 @@
 # Contributing
 
-In order to contribute to this package directly create a pull request against the `main` branch. Before doing so please: 
+In order to contribute to this package directly create a pull request against the `dev` branch (the integration branch; `main` is the stable/release branch, updated only by merging `dev` into it). Before doing so please: 
 
 - Follow the style of the surrounding code.
 - Supplement the documentation.
@@ -24,6 +24,21 @@ format(pkgdir(AdaptiveCrossApproximation))
 ## Documentation
 
 Add documentation for any changes or new features following the style of the existing documentation. For more information you can have a look at the [Documenter.jl](https://documenter.juliadocs.org/stable/) documentation.
+
+
+---
+## Documentation plots
+
+The interactive plots on the [Application Examples](@ref) page are pre-rendered HTML
+files stored in `docs/src/assets/examples/` and committed to the repository; the docs
+build only serves these static files, it does not re-run the examples. After changing
+`example/efie.jl` or `example/mfie.jl`, regenerate them from the package root:
+
+```sh
+julia --project=docs docs/render_examples.jl
+```
+
+and commit the updated HTML files alongside your example changes.
 
 
 ---

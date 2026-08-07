@@ -73,6 +73,7 @@ original space ordering. Produces a collection of level-by-level block-sparse ma
   - `matrixdata`: Assembly data passed to kernel matrix (optional)
   - `maxrank = 50`: Maximum rank for compressed blocks
   - `scheduler`: Thread scheduler (default: `SerialScheduler()`)
+  - `verbose`: enable progress output (default `true`)
 
 # Returns
 
@@ -95,6 +96,7 @@ function assemblefars(
     matrixdata=defaultfarmatrixdata(operator, testspace, trialspace),
     maxrank=50,
     scheduler=SerialScheduler(),
+    verbose::Bool=true,
 )
     kernelmatrix = AbstractKernelMatrix(
         operator, testspace, trialspace; matrixdata=matrixdata
@@ -109,6 +111,15 @@ function assemblefars(
             size(kernelmatrix),
         ),
     ]
+
+    total_work = sum(
+        length(values[i]) * length(farvalues[j]) for i in eachindex(values) for
+        j in farptr[i]:(farptr[i + 1] - 1);
+        init=0,
+    )
+    progress = Progress(
+        total_work; desc="Assembling far interactions: ", showspeed=true, enabled=verbose
+    )
 
     blocks = Vector{LowRankMatrix{eltype(kernelmatrix)}}(undef, length(farvalues))
     colbuffer = zeros(eltype(kernelmatrix), length(testspace), maxrank)
@@ -139,6 +150,7 @@ function assemblefars(
                 )
                 colbuffer[values[node], 1:npivots] .= eltype(kernelmatrix)(0)
                 rowbuffer[1:npivots, 1:length(farvalues[faridx])] .= eltype(kernelmatrix)(0)
+                next!(progress; step=length(values[node]) * length(farvalues[faridx]))
             end
         end
         levelvals, levelfarvals, levelidcs = blockvalues(
@@ -155,6 +167,7 @@ function assemblefars(
             ),
         )
     end
+    finish!(progress)
 
     return farinteractionmatrix
 end
@@ -180,6 +193,7 @@ format optimized for the reordered layout.
   - `matrixdata`: Assembly data passed to kernel matrix (optional)
   - `maxrank = 50`: Maximum rank for compressed blocks
   - `scheduler`: Thread scheduler (default: `SerialScheduler()`)
+  - `verbose`: enable progress output (default `true`)
 
 # Returns
 
@@ -202,11 +216,21 @@ function assemblefars(
     matrixdata=defaultfarmatrixdata(operator, testspace, trialspace),
     maxrank=50,
     scheduler=SerialScheduler(),
+    verbose::Bool=true,
 )
     kernelmatrix = AbstractKernelMatrix(
         operator, testspace, trialspace; matrixdata=matrixdata
     )
     values, farptr, farvalues = farinteractions_consecutive(tree; isnear=isnear)
+
+    total_work = sum(
+        length(values[i]) * length(farvalues[j]) for i in eachindex(values) for
+        j in farptr[i]:(farptr[i + 1] - 1);
+        init=0,
+    )
+    progress = Progress(
+        total_work; desc="Assembling far interactions: ", showspeed=true, enabled=verbose
+    )
 
     blocks = Vector{LowRankMatrix{eltype(kernelmatrix)}}(undef, length(farvalues))
     colbuffer = zeros(eltype(kernelmatrix), length(testspace), maxrank)
@@ -235,6 +259,7 @@ function assemblefars(
                 )
                 colbuffer[values[node], 1:npivots] .= eltype(kernelmatrix)(0)
                 rowbuffer[1:npivots, 1:length(farvalues[faridx])] .= eltype(kernelmatrix)(0)
+                next!(progress; step=length(values[node]) * length(farvalues[faridx]))
             end
         end
 
@@ -258,6 +283,7 @@ function assemblefars(
             ),
         )
     end
+    finish!(progress)
 
     return farinteractionmatrix
 end

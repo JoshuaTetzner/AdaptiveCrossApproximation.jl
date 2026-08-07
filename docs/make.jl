@@ -23,6 +23,7 @@ makedocs(;
             "iACA" => "./details/iaca.md",
             "Pivoting Strategies" => "./details/pivoting.md",
             "Convergence Criteria" => "./details/convergence.md",
+            "Hierarchical Matrices" => "./details/hmatrix.md",
         ],
         "Contributing" => "contributing.md",
         "API Reference" => "apiref.md",

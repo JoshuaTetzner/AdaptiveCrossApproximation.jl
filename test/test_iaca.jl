@@ -5,50 +5,150 @@ using Random
 using StaticArrays
 using Test
 
-plate = meshrectangle(1.0, 1.0, 0.1)
+# IACA returns only pivot indices (rows, cols), never a materialized U/V factorization
+# (unlike ACA, whose colbuffer/rowbuffer buffers *are* the finished factors). To check
+# accuracy we therefore build the CUR-style skeleton factorization implied by those
+# pivots ourselves, mirroring how test_aca.jl checks norm(U*V - A)/norm(A).
+curerror(A, rows, cols) = norm(A[:, cols] * inv(A[rows, cols]) * A[rows, :] - A) / norm(A)
 
-Xs = raviartthomas(plate)
-Xt = raviartthomas(translate(plate, [0.0, 0.0, 3.0]))
+@testset "IACA MimicryPivoting (no tree)" begin
+    Random.seed!(1234)
 
-tree = TwoNTree(Xs.pos, 0.0; minvalues=40)
+    tpos = [@SVector rand(3) for _ in 1:36]
+    spos = [@SVector rand(3) for _ in 1:40] .+ Scalar(SVector(3.5, 0.0, 0.0))
+    kwave = 3.0
+    A = ComplexF64[(r=norm(tp - sp); cis(kwave * r) / r) for tp in tpos, sp in spos]
+    maxrank = 25
+    rowidcs = collect(1:size(A, 1))
+    colidcs = collect(1:size(A, 2))
+    tol = 1e-3
 
-op = Maxwell3D.singlelayer(; wavenumber=k)
-A = assemble(op, Xt, Xs)
-tol = 1e-2
-maxrank = 40
-iaca = IACA(
-    MaximumValue(),
-    TreeMimicryPivoting(Xt.pos, Xs.pos, tree),
-    FNormExtrapolator(iFNormEstimator(tol)),
-)
-iaca = iaca([1], [1], maxrank)
-iaca2 = IACA(
-    MaximumValue(), MimicryPivoting(Xt.pos, Xs.pos), FNormExtrapolator(iFNormEstimator(tol))
-)
-iaca2 = iaca2([1], [1], maxrank)
+    convergences = [
+        AdaptiveCrossApproximation.FNormExtrapolator(tol),
+        AdaptiveCrossApproximation.FNormExtrapolator(
+            AdaptiveCrossApproximation.FNormEstimator(tol)
+        ),
+    ]
 
-##
-rowbuffer = zeros(eltype(A), maxrank, maxrank)
-colbuffer = zeros(eltype(A), size(A, 1), maxrank)
-rowidcs = Vector(1:size(A, 1))
-colidcs = collect(H2Trees.LevelIterator(tree, 2))
-rowpivs = zeros(Int, maxrank)
-colpivs = zeros(Int, maxrank)
+    @testset "geometric columns, MaximumValue rows" begin
+        for convergence in convergences
+            iaca = IACA(MaximumValue(), MimicryPivoting(tpos, spos), convergence)
+            iaca = iaca([1], [1], maxrank)
+            rowbuffer = zeros(eltype(A), maxrank, size(A, 2))
+            colbuffer = zeros(eltype(A), size(A, 1), maxrank)
+            rowpivs = zeros(Int, maxrank)
+            colpivs = zeros(Int, maxrank)
 
-npivots, rows, cols = iaca(
-    A, colbuffer, rowbuffer, rowpivs, colpivs, rowidcs, colidcs, maxrank
-)
-norm(A[:, cols] * inv(A[rows, cols]) * A[rows, :] - A) / norm(A)
-##
-rowbuffer = zeros(eltype(A), maxrank, maxrank)
-colbuffer = zeros(eltype(A), size(A, 1), maxrank)
-rowidcs = Vector(1:size(A, 1))
-colidcs = Vector(1:size(A, 2))
-rowpivs = zeros(Int, maxrank)
-colpivs = zeros(Int, maxrank)
+            npivot, rows, cols = iaca(
+                A, colbuffer, rowbuffer, rowpivs, colpivs, rowidcs, colidcs, maxrank
+            )
 
-npivots, rows, cols = iaca2(
-    A, colbuffer, rowbuffer, rowpivs, colpivs, rowidcs, colidcs, maxrank
-)
-norm(A[:, cols] * inv(A[rows, cols]) * A[rows, :] - A) / norm(A)
-##
+            @test 0 < npivot <= maxrank
+            @test length(unique(rows)) == npivot
+            @test length(unique(cols)) == npivot
+            @test curerror(A, rows, cols) < 20tol
+        end
+    end
+
+    @testset "geometric rows, MaximumValue columns" begin
+        for convergence in convergences
+            iaca = IACA(MimicryPivoting(spos, tpos), MaximumValue(), convergence)
+            iaca = iaca([1], [1], maxrank)
+            rowbuffer = zeros(eltype(A), maxrank, size(A, 2))
+            colbuffer = zeros(eltype(A), size(A, 1), maxrank)
+            rowpivs = zeros(Int, maxrank)
+            colpivs = zeros(Int, maxrank)
+
+            npivot, rows, cols = iaca(
+                A, colbuffer, rowbuffer, rowpivs, colpivs, rowidcs, colidcs, maxrank
+            )
+
+            @test 0 < npivot <= maxrank
+            @test length(unique(rows)) == npivot
+            @test length(unique(cols)) == npivot
+            @test curerror(A, rows, cols) < 20tol
+        end
+    end
+
+    @testset "IACA(tpos, spos) convenience constructor" begin
+        iaca = IACA(tpos, spos)
+        iaca = iaca([1], [1], maxrank)
+        rowbuffer = zeros(eltype(A), maxrank, size(A, 2))
+        colbuffer = zeros(eltype(A), size(A, 1), maxrank)
+        rowpivs = zeros(Int, maxrank)
+        colpivs = zeros(Int, maxrank)
+
+        npivot, rows, cols = iaca(
+            A, colbuffer, rowbuffer, rowpivs, colpivs, rowidcs, colidcs, maxrank
+        )
+
+        @test 0 < npivot <= maxrank
+        @test length(unique(rows)) == npivot
+        @test length(unique(cols)) == npivot
+        @test curerror(A, rows, cols) < 20 * 1e-4
+    end
+end
+
+@testset "IACA TreeMimicryPivoting" begin
+    Random.seed!(4321)
+
+    tpos = [@SVector rand(3) for _ in 1:60]
+    spos = [@SVector rand(3) for _ in 1:64] .+ Scalar(SVector(3.5, 0.0, 0.0))
+    kwave = 3.0
+    A = ComplexF64[(r=norm(tp - sp); cis(kwave * r) / r) for tp in tpos, sp in spos]
+    maxrank = 25
+    rowidcs = collect(1:size(A, 1))
+    colidcs = collect(1:size(A, 2))
+    tol = 1e-3
+
+    treeoncols = TwoNTree(spos; builder=TwoNTreeBuilder(; minhalfsize=0.0, minvalues=8))
+    treeonrows = TwoNTree(tpos; builder=TwoNTreeBuilder(; minhalfsize=0.0, minvalues=8))
+
+    frontier(tree) = collect(H2Trees.LevelIterator(tree, 2))
+
+    @testset "geometric columns (tree), MaximumValue rows" begin
+        iaca = IACA(
+            MaximumValue(),
+            TreeMimicryPivoting(tpos, spos, treeoncols),
+            AdaptiveCrossApproximation.FNormExtrapolator(tol),
+        )
+        iaca = iaca([1], [1], maxrank)
+        rowbuffer = zeros(eltype(A), maxrank, size(A, 2))
+        colbuffer = zeros(eltype(A), size(A, 1), maxrank)
+        rowpivs = zeros(Int, maxrank)
+        colpivs = zeros(Int, maxrank)
+        colfrontier = frontier(treeoncols)
+
+        npivot, rows, cols = iaca(
+            A, colbuffer, rowbuffer, rowpivs, colpivs, rowidcs, colfrontier, maxrank
+        )
+
+        @test 0 < npivot <= maxrank
+        @test length(unique(rows)) == npivot
+        @test length(unique(cols)) == npivot
+        @test curerror(A, rows, cols) < 20tol
+    end
+
+    @testset "geometric rows (tree), MaximumValue columns" begin
+        iaca = IACA(
+            TreeMimicryPivoting(spos, tpos, treeonrows),
+            MaximumValue(),
+            AdaptiveCrossApproximation.FNormExtrapolator(tol),
+        )
+        iaca = iaca([1], [1], maxrank)
+        rowbuffer = zeros(eltype(A), maxrank, size(A, 2))
+        colbuffer = zeros(eltype(A), size(A, 1), maxrank)
+        rowpivs = zeros(Int, maxrank)
+        colpivs = zeros(Int, maxrank)
+        rowfrontier = frontier(treeonrows)
+
+        npivot, rows, cols = iaca(
+            A, colbuffer, rowbuffer, rowpivs, colpivs, rowfrontier, colidcs, maxrank
+        )
+
+        @test 0 < npivot <= maxrank
+        @test length(unique(rows)) == npivot
+        @test length(unique(cols)) == npivot
+        @test curerror(A, rows, cols) < 20tol
+    end
+end

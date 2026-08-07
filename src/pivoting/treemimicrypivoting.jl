@@ -1,43 +1,67 @@
 """
-    TreeMimicryPivoting{D,T,TreeType} <: GeoPivStrat
+    TreeMimicryPivoting{D,T,TreeType,Filter} <: GeoPivStrat
 
 Tree-aware mimicry pivoting strategy.
 
-This strategy adapts the `MimicryPivoting` idea to a hierarchical tree of
-clusters. Instead of selecting individual points directly, it navigates the
-tree to pick clusters and then nodes within those clusters so that the selected
-pivots mimic a reference distribution at multiple scales.
+This strategy adapts the `MimicryPivoting` idea to a hierarchical tree of clusters.
+Instead of selecting individual points directly, it navigates the tree to pick
+clusters and then nodes within those clusters so that the selected pivots mimic a
+reference distribution at multiple scales.
+
+A pluggable [`PivotingFilter`](@ref) restricts the tree descent and the pivot
+selection. The default [`NoFilter`](@ref) accepts every node and index, recovering
+the plain geometric strategy. [`EFIEDirectionalFilter`](@ref) groups basis functions
+by orientation and rotates through them in phases.
 
 # Fields
 
   - `refpos::Vector{SVector{D,T}}`: Reference positions to mimic (e.g., parent pivots)
   - `pos::Vector{SVector{D,T}}`: Candidate point positions
-  - `tree::TreeType`: Tree structure providing cluster centers, children and values
+  - `tree::TreeType`: Tree providing cluster centers, children and values
+  - `filter::Filter`: Restriction on descent and pivot selection
 
 # Type parameters
 
   - `D`: spatial dimension
   - `T`: numeric type for coordinates
-  - `TreeType`: type of the tree adapter (must implement `center`, `values`, `children`, `firstchild`)
+  - `TreeType`: tree adapter (must implement `center`, `values`, `children`, `firstchild`)
+  - `Filter`: filter type, statically dispatched in the per-pivot hot loops
 """
-struct TreeMimicryPivoting{D,T,TreeType} <: GeoPivStrat
+struct TreeMimicryPivoting{D,T,TreeType,Filter} <: GeoPivStrat
     refpos::Vector{SVector{D,T}}
     pos::Vector{SVector{D,T}}
     tree::TreeType
-
-    function TreeMimicryPivoting{D,T}(refpos, pos, tree) where {D,T}
-        return new{D,T,typeof(tree)}(refpos, pos, tree)
-    end
+    filter::Filter
 end
 
+"""
+    TreeMimicryPivoting(refpos, pos, tree)
+    TreeMimicryPivoting(refpos, pos, tree, filter)
+
+Build a [`TreeMimicryPivoting`](@ref) strategy. `refpos`/`pos` are the reference
+positions to mimic (e.g. parent pivots) and the candidate point positions; `tree`
+is a tree adapter providing `center`, `values`, `children` and `firstchild` (the
+ACAH2Trees extension supplies a ready-made adapter for `H2Trees.TwoNTree`).
+
+The three-argument form uses the default [`NoFilter`](@ref) (no directional
+restriction). Pass an explicit `filter` (a [`PivotingFilter`](@ref), e.g.
+[`EFIEDirectionalFilter`](@ref)) to restrict tree descent and pivot selection.
+"""
 function TreeMimicryPivoting(
     refpos::Vector{SVector{D,T}}, pos::Vector{SVector{D,T}}, tree
 ) where {D,T<:Real}
-    return TreeMimicryPivoting{D,T}(refpos, pos, tree)
+    return TreeMimicryPivoting{D,T,typeof(tree),NoFilter}(refpos, pos, tree, NoFilter())
 end
 
-mutable struct TreeMimicryPivotingFunctor{D,T,TreeType} <: GeoPivStratFunctor
-    pivoting::TreeMimicryPivoting{D,T,TreeType}
+function TreeMimicryPivoting(
+    refpos::Vector{SVector{D,T}}, pos::Vector{SVector{D,T}}, tree, filter::PivotingFilter
+) where {D,T<:Real}
+    return TreeMimicryPivoting{D,T,typeof(tree),typeof(filter)}(refpos, pos, tree, filter)
+end
+
+mutable struct TreeMimicryPivotingFunctor{D,T,TreeType,Filter,FState} <: GeoPivStratFunctor
+    pivoting::TreeMimicryPivoting{D,T,TreeType,Filter}
+    filterstate::FState
     nactive::Int
     refcentroid::SVector{D,T}
     farfield::Vector{Int}
@@ -46,37 +70,41 @@ mutable struct TreeMimicryPivotingFunctor{D,T,TreeType} <: GeoPivStratFunctor
     w::Vector{T}
     emptyclusters::Vector{Int}
     nempty::Int
+    usednodes::Vector{Int}
     usedidcs::Vector{Int}
+    candidatebuffers::Vector{Vector{Int}}
 end
 
-function (pivstrat::TreeMimicryPivoting{D,T})(
-    refidcs::AbstractVector{Int}, idcs::AbstractVector{Int}, maxrank::Int
+function _functor(
+    pivstrat::TreeMimicryPivoting{D,T}, filterstate, refidcs, idcs, maxrank::Int
 ) where {D,T}
-    refcentroid = _centroid(pivstrat.refpos, refidcs)
-    farfieldbuf = collect(Int, idcs)
-    farfieldlen = length(farfieldbuf)
-    h = zeros(T, farfieldlen)
-    leja = ones(T, farfieldlen)
-    w = zeros(T, farfieldlen)
-    usedidcs = zeros(Int, maxrank)
-    emptyclusters = zeros(Int, maxrank)
+    nactive = length(idcs)
     return TreeMimicryPivotingFunctor(
         pivstrat,
-        farfieldlen,
-        refcentroid,
-        farfieldbuf,
-        h,
-        leja,
-        w,
-        emptyclusters,
+        filterstate,
+        nactive,
+        _centroid(pivstrat.refpos, refidcs),
+        collect(Int, idcs),
+        zeros(T, nactive),
+        ones(T, nactive),
+        zeros(T, nactive),
+        zeros(Int, maxrank),
         0,
-        usedidcs,
+        zeros(Int, maxrank),
+        zeros(Int, maxrank),
+        Vector{Int}[],
     )
 end
 
-_buildpivstrat(strat::TreeMimicryPivoting, refidcs, idcs, maxrank) = strat(
-    refidcs, idcs, maxrank
-)
+function (pivstrat::TreeMimicryPivoting{D,T,TreeType,NoFilter})(
+    refidcs::AbstractVector{Int}, idcs::AbstractVector{Int}, maxrank::Int
+) where {D,T,TreeType}
+    return _functor(pivstrat, NoFilterState(), refidcs, idcs, maxrank)
+end
+
+_buildpivstrat(
+    strat::TreeMimicryPivoting{D,T,TreeType,NoFilter}, refidcs, idcs, maxrank
+) where {D,T,TreeType} = strat(refidcs, idcs, maxrank)
 
 function Base.resize!(pivstrat::TreeMimicryPivotingFunctor, nactive::Int)
     length(pivstrat.farfield) < nactive && resize!(pivstrat.farfield, nactive)
@@ -93,7 +121,7 @@ function reset!(
     pivstrat::TreeMimicryPivotingFunctor{D,T},
     refidcs::AbstractVector{Int},
     idcs::AbstractVector{Int},
-) where {D,T<:Real}
+) where {D,T}
     resize!(pivstrat, length(idcs))
     @inbounds for i in 1:(pivstrat.nactive)
         pivstrat.farfield[i] = Int(idcs[i])
@@ -103,41 +131,37 @@ function reset!(
     fill!(view(pivstrat.leja, 1:(pivstrat.nactive)), one(T))
     fill!(view(pivstrat.w, 1:(pivstrat.nactive)), zero(T))
     fill!(pivstrat.emptyclusters, 0)
+    fill!(pivstrat.usednodes, 0)
     fill!(pivstrat.usedidcs, 0)
     pivstrat.nempty = 0
+    _reset_filterstate!(pivstrat.filterstate)
     return nothing
 end
 
-@inline function local_resize!(pivstrat::TreeMimicryPivotingFunctor, localnactive::Int)
-    if length(pivstrat.h) < localnactive
-        resize!(pivstrat.h, localnactive)
-        resize!(pivstrat.leja, localnactive)
-        resize!(pivstrat.w, localnactive)
+@inline function local_reset!(pivstrat::TreeMimicryPivotingFunctor{D,T}, n::Int) where {D,T}
+    if length(pivstrat.h) < n
+        resize!(pivstrat.h, n)
+        resize!(pivstrat.leja, n)
+        resize!(pivstrat.w, n)
     end
-    return localnactive
+    fill!(view(pivstrat.h, 1:n), zero(T))
+    fill!(view(pivstrat.leja, 1:n), one(T))
+    fill!(view(pivstrat.w, 1:n), zero(T))
+    return n
 end
 
-@inline function local_reset!(
-    pivstrat::TreeMimicryPivotingFunctor{D,T}, localidcs::AbstractVector{<:Integer}
-) where {D,T<:Real}
-    nlocal = local_resize!(pivstrat, length(localidcs))
-    fill!(view(pivstrat.h, 1:nlocal), zero(T))
-    fill!(view(pivstrat.leja, 1:nlocal), one(T))
-    fill!(view(pivstrat.w, 1:nlocal), zero(T))
-    return nlocal
-end
-
-#The package expects the `tree` object to implement these functions. Adaptors
-#for concrete tree types should provide implementations in user code.
+# The package expects the `tree` object to implement these functions. Adaptors
+# for concrete tree types should provide implementations in user code (the
+# ACAH2Trees extension implements them for H2Trees.TwoNTree).
 center(tree::T, node::Int) where {T} = error("Not implemented for type $T")
-values(tree::T, node::Union{Int,Vector{Int}}) where {T} = error(
-    "Not implemented for type $T"
-)
+values(tree::T, node::Union{Int,Vector{Int}}) where {T} =
+    error("Not implemented for type $T")
 children(tree::T, node::Int) where {T} = error("Not implemented for type $T")
 parent(tree::T, node::Int) where {T} = error("Not implemented for type $T")
 firstchild(tree::T, node::Int) where {T} = error("Not implemented for type $T")
 
-@inline function _is_emptycluster(pivstrat::TreeMimicryPivotingFunctor, node::Int)
+# --- empty-cluster bookkeeping ---------------------------------------------
+@inline function _emptycluster(pivstrat::TreeMimicryPivotingFunctor, node::Int)
     @inbounds for i in 1:(pivstrat.nempty)
         pivstrat.emptyclusters[i] == node && return true
     end
@@ -145,141 +169,227 @@ firstchild(tree::T, node::Int) where {T} = error("Not implemented for type $T")
 end
 
 @inline function _mark_emptycluster!(pivstrat::TreeMimicryPivotingFunctor, node::Int)
-    _is_emptycluster(pivstrat, node) && return pivstrat
-    if pivstrat.nempty >= length(pivstrat.emptyclusters)
-        throw(
-            ArgumentError(
-                "Too many empty clusters tracked ($(pivstrat.nempty + 1)) for allocated capacity $(length(pivstrat.emptyclusters)). Increase maxrank.",
-            ),
-        )
+    _emptycluster(pivstrat, node) && return nothing
+    if pivstrat.nempty == length(pivstrat.emptyclusters)
+        resize!(pivstrat.emptyclusters, max(1, 2 * length(pivstrat.emptyclusters)))
     end
     pivstrat.nempty += 1
     pivstrat.emptyclusters[pivstrat.nempty] = node
-    return pivstrat
+    return nothing
 end
 
-@inline function _filter_emptyclusters(
-    pivstrat::TreeMimicryPivotingFunctor, nodes::AbstractVector{Int}
+@inline function _used_index(pivstrat::TreeMimicryPivotingFunctor, idx::Int, nused::Int)
+    @inbounds for k in 1:nused
+        pivstrat.usedidcs[k] == idx && return true
+    end
+    return false
+end
+
+@inline _nodirection() = Int32(-1)
+
+# The pivot-selection engine below routes through the PivotingFilter interface
+# hooks defined in filters/abstractfilter.jl. For NoFilter the identity defaults
+# apply (accept everything, one directionless phase); EFIEDirectionalFilter overrides them.
+
+# --- cluster scoring / descent ---------------------------------------------
+@inline function _first_index(w, n)
+    best = 1
+    bestscore = w[1]^4
+    @inbounds for i in 2:n
+        score = w[i]^4
+        if score > bestscore
+            best = i
+            bestscore = score
+        end
+    end
+    return best
+end
+
+function _node_score!(
+    pivstrat::TreeMimicryPivotingFunctor{D,T}, nodes, npivot::Int
+) where {D,T}
+    n = local_reset!(pivstrat, length(nodes))
+    pos = pivstrat.pivoting.pos
+    tree = pivstrat.pivoting.tree
+    @inbounds for i in 1:n
+        c = center(tree, nodes[i])
+        pivstrat.w[i] = inv(norm(c - pivstrat.refcentroid))
+        if npivot > 1
+            pivstrat.h[i] = norm(pos[pivstrat.usedidcs[1]] - c)
+            pivstrat.leja[i] = pivstrat.h[i]
+            for j in 2:(npivot - 1)
+                dist = norm(pos[pivstrat.usedidcs[j]] - c)
+                pivstrat.h[i] = min(pivstrat.h[i], dist)
+                pivstrat.leja[i] *= dist
+            end
+        end
+    end
+    return n
+end
+
+function _best_node(pivstrat::TreeMimicryPivotingFunctor, nodes, npivot::Int)
+    n = _node_score!(pivstrat, nodes, npivot)
+    return nodes[if npivot == 1
+        _first_index(pivstrat.w, n)
+    else
+        bestindex(pivstrat.leja, pivstrat.h, pivstrat.w, n, npivot)
+    end]
+end
+
+# Reusable per-recursion-depth candidate buffer, pooled on the functor so tree
+# descent doesn't allocate a fresh `Vector{Int}` at every level, for every pivot,
+# on every backtrack.
+function _depth_buffer!(pivstrat::TreeMimicryPivotingFunctor, depth::Int)
+    buffers = pivstrat.candidatebuffers
+    while length(buffers) < depth
+        push!(buffers, Int[])
+    end
+    buf = buffers[depth]
+    empty!(buf)
+    return buf
+end
+
+function _candidate_nodes(
+    pivstrat::TreeMimicryPivotingFunctor, nodes, dir::Int32, depth::Int
 )
-    pivstrat.nempty == 0 && return nodes
-    filtered = Int[]
-    sizehint!(filtered, length(nodes))
-    @inbounds for node in nodes
-        !_is_emptycluster(pivstrat, node) && push!(filtered, node)
-    end
-    return filtered
-end
-
-@inline function _filter_emptyclusters(pivstrat::TreeMimicryPivotingFunctor, nodes)
-    if pivstrat.nempty == 0
-        return collect(Int, nodes)
-    end
-
-    filtered = Int[]
-    Base.haslength(nodes) && sizehint!(filtered, length(nodes))
+    fs = pivstrat.filterstate
+    out = _depth_buffer!(pivstrat, depth)
+    Base.haslength(nodes) && sizehint!(out, length(nodes))
     @inbounds for node in nodes
         inode = Int(node)
-        !_is_emptycluster(pivstrat, inode) && push!(filtered, inode)
-    end
-    return filtered
-end
-
-function findcluster(
-    pivstrat::TreeMimicryPivotingFunctor{D,T}, nodes::AbstractVector{Int}
-) where {D,T<:Real}
-    nlocal = local_reset!(pivstrat, nodes)
-    tree = pivstrat.pivoting.tree
-    @inbounds for idx in 1:nlocal
-        pivstrat.w[idx] = 1 / norm(center(tree, nodes[idx]) - pivstrat.refcentroid)
-    end
-    w = view(pivstrat.w, 1:nlocal)
-    imax = argmax(w)
-    node = nodes[imax]
-    iszero(firstchild(tree, node)) && return node
-    return findcluster(pivstrat, collect(Int, children(tree, node)))
-end
-
-function findcluster(
-    pivstrat::TreeMimicryPivotingFunctor{D,T}, idcs::AbstractVector{Int}, npivot::Int
-) where {D,T<:Real}
-    nlocal = local_reset!(pivstrat, idcs)
-    pos = pivstrat.pivoting.pos
-    tree = pivstrat.pivoting.tree
-
-    @inbounds for i in 1:nlocal
-        pivstrat.w[i] = 1 / norm(center(tree, idcs[i]) - pivstrat.refcentroid)
-        pivstrat.h[i] = norm(pos[pivstrat.usedidcs[1]] - center(tree, idcs[i]))
-        pivstrat.leja[i] = pivstrat.h[i]
-        @inbounds for j in 2:(npivot - 1)
-            dist = norm(pos[pivstrat.usedidcs[j]] - center(tree, idcs[i]))
-            if dist < pivstrat.h[i]
-                pivstrat.h[i] = dist
-            end
-            pivstrat.leja[i] *= dist
+        if !_emptycluster(pivstrat, inode) && _accepts_node(fs, pivstrat, inode, dir)
+            push!(out, inode)
         end
     end
-    node = idcs[bestindex(pivstrat.leja, pivstrat.h, pivstrat.w, nlocal, npivot)]
+    return out
+end
 
-    # Might need rescue measure here!!!
-    iszero(firstchild(tree, node)) && return node
+function _findcluster(
+    pivstrat::TreeMimicryPivotingFunctor, nodes, npivot::Int, dir::Int32, depth::Int=1
+)
+    fs = pivstrat.filterstate
+    tree = pivstrat.pivoting.tree
+    candidates = _candidate_nodes(pivstrat, nodes, dir, depth)
+    while !isempty(candidates)
+        node = _best_node(pivstrat, candidates, npivot)
+        if iszero(firstchild(tree, node))
+            nodeidcs = values(tree, node)
+            allused = true
+            @inbounds for idx in nodeidcs
+                _used_index(pivstrat, idx, npivot - 1) && continue
+                allused = false
+                _accepts_index(fs, pivstrat, idx, dir) && return node
+            end
+            allused && _mark_emptycluster!(pivstrat, node)
+            filter!(!=(node), candidates)
+            continue
+        end
 
-    chds = _filter_emptyclusters(pivstrat, children(tree, node))
-    if isempty(chds)
-        _mark_emptycluster!(pivstrat, node)
-        activefarfield = _filter_emptyclusters(
-            pivstrat, view(pivstrat.farfield, 1:(pivstrat.nactive))
+        target = _findcluster(pivstrat, children(tree, node), npivot, dir, depth + 1)
+        !iszero(target) && return target
+        filter!(!=(node), candidates)
+    end
+    return 0
+end
+
+# --- leaf selection --------------------------------------------------------
+function _leaf_score(
+    pivstrat::TreeMimicryPivotingFunctor{D,T}, localidx::Int, basisidx::Int, npivot::Int
+) where {D,T}
+    npivot == 1 && return pivstrat.w[localidx]^4
+    edgecount = _edge_count(pivstrat.filterstate, pivstrat, basisidx, npivot - 1)
+    edgeweight = iszero(edgecount) ? T(1) : inv(one(T) + T(edgecount))
+    exponent = T(2) / T(npivot - 1)
+    return (pivstrat.leja[localidx]^exponent) *
+           pivstrat.h[localidx] *
+           (pivstrat.w[localidx]^4) *
+           edgeweight
+end
+
+function _best_leaf_index(
+    pivstrat::TreeMimicryPivotingFunctor, nodeidcs, npivot::Int, dir::Int32
+)
+    fs = pivstrat.filterstate
+    n = local_reset!(pivstrat, length(nodeidcs))
+    pos = pivstrat.pivoting.pos
+    @inbounds for i in 1:n
+        idx = nodeidcs[i]
+        pivstrat.w[i] = inv(norm(pos[idx] - pivstrat.refcentroid))
+        if npivot > 1
+            pivstrat.h[i] = norm(pos[pivstrat.usedidcs[1]] - pos[idx])
+            pivstrat.leja[i] = pivstrat.h[i]
+            for j in 2:(npivot - 1)
+                dist = norm(pos[pivstrat.usedidcs[j]] - pos[idx])
+                pivstrat.h[i] = min(pivstrat.h[i], dist)
+                pivstrat.leja[i] *= dist
+            end
+        end
+    end
+
+    # prefer indices carrying an as-yet-unused edge direction (no-op for NoFilter)
+    hasnewedge = false
+    @inbounds for i in 1:n
+        idx = nodeidcs[i]
+        _used_index(pivstrat, idx, npivot - 1) && continue
+        _accepts_index(fs, pivstrat, idx, dir) || continue
+        if iszero(_edge_count(fs, pivstrat, idx, npivot - 1))
+            hasnewedge = true
+            break
+        end
+    end
+
+    best = 0
+    bestscore = zero(eltype(pivstrat.w))
+    @inbounds for i in 1:n
+        idx = nodeidcs[i]
+        _used_index(pivstrat, idx, npivot - 1) && continue
+        _accepts_index(fs, pivstrat, idx, dir) || continue
+        hasnewedge && !iszero(_edge_count(fs, pivstrat, idx, npivot - 1)) && continue
+        score = _leaf_score(pivstrat, i, idx, npivot)
+        if iszero(best) || score > bestscore
+            best = i
+            bestscore = score
+        end
+    end
+    return best
+end
+
+# --- pivot selection -------------------------------------------------------
+function (pivstrat::TreeMimicryPivotingFunctor)(npivot::Int)
+    fs = pivstrat.filterstate
+    tree = pivstrat.pivoting.tree
+    direction = _initial_direction(fs, pivstrat, npivot - 1)
+    _reset_phase!(fs, direction)
+    while true
+        target = _findcluster(
+            pivstrat, view(pivstrat.farfield, 1:(pivstrat.nactive)), npivot, direction
         )
-        return findcluster(pivstrat, activefarfield, npivot)
-    end
-    return findcluster(pivstrat, chds, npivot)
-end
-
-function (pivstrat::TreeMimicryPivotingFunctor{D,F})() where {D,F<:Real}
-    targetcluster = findcluster(pivstrat, view(pivstrat.farfield, 1:(pivstrat.nactive)))
-    pos = pivstrat.pivoting.pos
-    tree = pivstrat.pivoting.tree
-    nodeidcs = values(tree, targetcluster)
-    nlocal = local_reset!(pivstrat, nodeidcs)
-    w = view(pivstrat.w, 1:nlocal)
-    for (idx, node) in enumerate(nodeidcs)
-        w[idx] = 1 / norm(pos[node] - pivstrat.refcentroid)
-    end
-    pivstrat.usedidcs[1] = nodeidcs[argmax(w)]
-    issubset(nodeidcs, view(pivstrat.usedidcs, 1:1)) &&
-        _mark_emptycluster!(pivstrat, targetcluster)
-
-    return pivstrat.usedidcs[1]
-end
-
-function (pivstrat::TreeMimicryPivotingFunctor{D,F})(npivot::Int) where {D,F<:Real}
-    activefarfield = _filter_emptyclusters(
-        pivstrat, view(pivstrat.farfield, 1:(pivstrat.nactive))
-    )
-    pos = pivstrat.pivoting.pos
-    tree = pivstrat.pivoting.tree
-    targetcluster = findcluster(pivstrat, activefarfield, npivot)
-    nodeidcs = values(tree, targetcluster)
-    # might be a performance killer
-    @assert !issubset(nodeidcs, view(pivstrat.usedidcs, 1:(npivot - 1)))
-
-    nlocal = local_reset!(pivstrat, nodeidcs)
-    @inbounds for idx in 1:nlocal
-        pivstrat.w[idx] = 1 / norm(pos[nodeidcs[idx]] - pivstrat.refcentroid)
-        pivstrat.h[idx] = norm(pos[pivstrat.usedidcs[1]] - pos[nodeidcs[idx]])
-        pivstrat.leja[idx] = pivstrat.h[idx]
-        @inbounds for j in 2:(npivot - 1)
-            dist = norm(pos[pivstrat.usedidcs[j]] - pos[nodeidcs[idx]])
-            if dist < pivstrat.h[idx]
-                pivstrat.h[idx] = dist
-            end
-            pivstrat.leja[idx] *= dist
+        if iszero(target)
+            newdir, ok = _advance_direction(fs, pivstrat, npivot - 1, direction)
+            ok || throw(ArgumentError("No unused tree mimicry pivot candidate found."))
+            direction = newdir
+            _reset_phase!(fs, direction)
+            continue
         end
+        nodeidcs = values(tree, target)
+        leafidx = _best_leaf_index(pivstrat, nodeidcs, npivot, direction)
+        if !iszero(leafidx)
+            pivstrat.usednodes[npivot] = target
+            pivstrat.usedidcs[npivot] = nodeidcs[leafidx]
+            issubset(nodeidcs, view(pivstrat.usedidcs, 1:npivot)) &&
+                _mark_emptycluster!(pivstrat, target)
+            return pivstrat.usedidcs[npivot]
+        end
+        issubset(nodeidcs, view(pivstrat.usedidcs, 1:(npivot - 1))) &&
+            _mark_emptycluster!(pivstrat, target)
     end
+end
 
-    pivstrat.usedidcs[npivot] = nodeidcs[bestindex(
-        pivstrat.leja, pivstrat.h, pivstrat.w, nlocal, npivot
-    )]
-    issubset(nodeidcs, view(pivstrat.usedidcs, 1:npivot)) &&
-        _mark_emptycluster!(pivstrat, targetcluster)
-    return pivstrat.usedidcs[npivot]
+(pivstrat::TreeMimicryPivotingFunctor)() = pivstrat(1)
+
+function update_refcentroid!(
+    functor::TreeMimicryPivotingFunctor, refidcs::AbstractVector{<:Integer}
+)
+    functor.refcentroid = _centroid(functor.pivoting.refpos, refidcs)
+    return functor
 end

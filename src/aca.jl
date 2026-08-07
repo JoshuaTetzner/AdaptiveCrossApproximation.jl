@@ -25,6 +25,24 @@ struct ACA{RowPivType,ColPivType,ConvCritType}
     end
 end
 
+"""
+    ACA(; tol=1e-4, rowpivoting=MaximumValue(), columnpivoting=MaximumValue(),
+        convergence=FNormEstimator(tol))
+
+Build an [`ACA`](@ref) compressor from keyword arguments.
+
+This is the constructor most users call directly (e.g. `ACA(tol=1e-4)` or
+`ACA(rowpivoting=Leja2(pos))`); `convergence` defaults to `FNormEstimator(tol)` so
+passing `tol` alone is usually enough.
+
+# Keyword Arguments
+
+  - `tol::Real = 1e-4`: Tolerance used to build the default `convergence` criterion.
+    Ignored if `convergence` is passed explicitly.
+  - `rowpivoting = MaximumValue()`: Row pivot selection strategy.
+  - `columnpivoting = MaximumValue()`: Column pivot selection strategy.
+  - `convergence = FNormEstimator(tol)`: Convergence criterion to stop iterations.
+"""
 function ACA(;
     tol=1e-4,
     rowpivoting=MaximumValue(),
@@ -49,6 +67,7 @@ function (aca::ACA{RP,CP,C})(
 
     return ACA(rowpiv, colpiv, convcrit)
 end
+
 function (aca::ACA{RP,CP,C})(
     A, nrowidcs::Int, ncolidcs::Int, maxrank::Int
 ) where {RP<:PivStrat,CP<:PivStrat,C<:ConvCrit}
@@ -160,7 +179,14 @@ function (aca::ACA)(
     # conv is true until convergence is reached
     npivot, conv = aca.convergence(rowbuffer, colbuffer, npivot, maxrows, maxcols)
 
+    # A convergence criterion may reject a pivot (return npivot - 1) while still
+    # signaling conv=true, e.g. when pivoting has switched to a random probe that
+    # can land on a spot with no residual left without that implying the whole
+    # block is resolved. `stall` bounds how many consecutive rejections we tolerate
+    # so this can't spin forever once a block's real rank is exhausted.
+    stall = 0
     while conv && npivot < maxrank
+        prevpivot = npivot
         npivot += 1
         @views nextrow = aca.rowpivoting(colbuffer[1:maxrows, max(1, npivot - 1)])
         rows[npivot] = rowidcs[nextrow]
@@ -195,6 +221,8 @@ function (aca::ACA)(
             end
         end
         npivot, conv = aca.convergence(rowbuffer, colbuffer, npivot, maxrows, maxcols)
+        stall = npivot > prevpivot ? 0 : stall + 1
+        stall >= maxrank && break
     end
     return npivot
 end

@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "AdaptiveCrossApproximation.jl"
+type: software
+authors:
+  - given-names: "Joshua M."
+    family-names: "Tetzner"
+    email: "joshua.tetzner@uni-rostock.de"
+repository-code: "https://github.com/JoshuaTetzner/AdaptiveCrossApproximation.jl"
+license: MIT
+version: 0.2.1
+# doi: 10.5281/zenodo.XXXXXXX  # filled in automatically by the GitHub-Zenodo
+# integration once the repository is registered there and a release is cut.

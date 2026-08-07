@@ -106,14 +106,14 @@ Abstract type for stateful value-based pivoting functors.
 """
 abstract type ValuePivStratFunctor <: PivStratFunctor end
 
-_buildpivstrat(strat::PivStrat, convcrit, idcs) = strat(idcs)
+_buildpivstrat(strat::PivStrat, _, idcs) = strat(idcs)
 
 function Base.resize!(functor::PivStratFunctor, args...)
-    throw(ArgumentError("resize! is not implemented for $(typeof(functor))."))
+    return throw(ArgumentError("resize! is not implemented for $(typeof(functor))."))
 end
 
 function reset!(functor::PivStratFunctor, args...)
-    throw(ArgumentError("reset! is not implemented for $(typeof(functor))."))
+    return throw(ArgumentError("reset! is not implemented for $(typeof(functor))."))
 end
 
 @inline function _centroid(
@@ -129,16 +129,9 @@ end
 """
     update_refcentroid!(functor::PivStratFunctor, refidcs)
 
-Update the stored reference-domain centroid in pivoting functors that expose
-`refcentroid`. For those functors, the reference positions are taken from
-`functor.pivoting.refpos`. For functors without `refcentroid`, this is a no-op.
+Update the stored reference-domain centroid in pivoting functors that track it.
+The default implementation is a no-op; concrete subtypes override as needed.
 """
-function update_refcentroid!(functor::PivStratFunctor, refidcs::AbstractVector{<:Integer})
-    if !hasproperty(functor, :refcentroid)
-        return functor
-    end
-
-    pivoting = getproperty(functor, :pivoting)
-    functor.refcentroid = _centroid(getproperty(pivoting, :refpos), refidcs)
+function update_refcentroid!(functor::PivStratFunctor, _::AbstractVector{<:Integer})
     return functor
 end

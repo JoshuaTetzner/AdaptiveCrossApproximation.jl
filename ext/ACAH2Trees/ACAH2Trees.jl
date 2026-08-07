@@ -1,16 +1,32 @@
 module ACAH2Trees
 using H2Trees
 import H2Trees:
-    isleaf, testtree, trialtree, root, children, parent, firstchild, data, numberofvalues
+    isleaf, testtree, trialtree, root, children, firstchild, data, numberofvalues
 using LinearAlgebra
 using AdaptiveCrossApproximation
-import AdaptiveCrossApproximation: GeoPivStrat, GeoPivStratFunctor
 
 include("treemimicrypivoting.jl")
 function AdaptiveCrossApproximation._tree(
-    ::AdaptiveCrossApproximation.H2Tree, args...; kwargs...
+    ::AdaptiveCrossApproximation.H2Tree,
+    testspace,
+    trialspace;
+    minhalfsize=1 / 2^10,
+    testminvalues::Int=200,
+    trialminvalues::Int=200,
+    kwargs...,
 )
-    return H2Trees.TwoNTree(args...; kwargs...)
+    return H2Trees.buildtree(
+        testspace,
+        trialspace;
+        builder=H2Trees.BlockTreeBuilder(;
+            test=H2Trees.TwoNTreeBuilder(;
+                minhalfsize=minhalfsize, minvalues=testminvalues, kwargs...
+            ),
+            trial=H2Trees.TwoNTreeBuilder(;
+                minhalfsize=minhalfsize, minvalues=trialminvalues, kwargs...
+            ),
+        ),
+    )
 end
 
 function AdaptiveCrossApproximation.permutation(tree::H2Trees.H2ClusterTree)
@@ -37,13 +53,11 @@ end
 
 AdaptiveCrossApproximation.testtree(tree::H2Trees.BlockTree) = testtree(tree)
 AdaptiveCrossApproximation.trialtree(tree::H2Trees.BlockTree) = trialtree(tree)
-AdaptiveCrossApproximation.values(tree::H2Trees.H2ClusterTree, node::Int) = H2Trees.values(
-    tree, node
-)
+AdaptiveCrossApproximation.values(tree::H2Trees.H2ClusterTree, node::Int) =
+    H2Trees.values(tree, node)
 AdaptiveCrossApproximation.levels(tree::H2Trees.H2ClusterTree) = H2Trees.levels(tree)
-AdaptiveCrossApproximation.LevelIterator(tree::H2Trees.H2ClusterTree, level::Int) = H2Trees.LevelIterator(
-    tree, level
-)
+AdaptiveCrossApproximation.LevelIterator(tree::H2Trees.H2ClusterTree, level::Int) =
+    H2Trees.LevelIterator(tree, level)
 
 include("nearinteractions.jl")
 include("farinteractions.jl")
