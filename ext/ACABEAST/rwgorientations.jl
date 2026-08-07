@@ -61,3 +61,27 @@ function AdaptiveCrossApproximation.rwgorientations(rwg::BEAST.Space)
 
     return ℓ, n
 end
+
+"""
+    EFIEDirectionalFilter(candidatespace, candidatetree)
+
+Build an [`EFIEDirectionalFilter`](@ref) from a Raviart–Thomas candidate space and
+its tree. Computes the candidate edge/normal groups and the per-node dominant
+normal-direction sets used by the filter.
+"""
+function AdaptiveCrossApproximation.EFIEDirectionalFilter(
+    candidatespace::BEAST.Space, candidatetree
+)
+    candidateedges, candidatenormals = AdaptiveCrossApproximation.rwgorientations(
+        candidatespace
+    )
+    edgeids, _, _, _ = AdaptiveCrossApproximation.basisfunction_orientation_ids(
+        candidateedges, candidatenormals
+    )
+    nodedirectionids, basisdirections, _ = AdaptiveCrossApproximation.node_normal_orientation_sets(
+        candidatenormals, candidatetree
+    )
+    return AdaptiveCrossApproximation.EFIEDirectionalFilter(
+        edgeids, basisdirections, nodedirectionids
+    )
+end

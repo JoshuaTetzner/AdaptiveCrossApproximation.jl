@@ -162,7 +162,7 @@ function (convcrit::PhaseExtrapolatorFunctor{F})(
     rcbuffer::AbstractVector{K}, npivot::Int
 ) where {F<:Real,K}
     rcnorm = norm(rcbuffer)
-    isapprox(rcnorm, 0.0) && return npivot - 1, false
+    rcnorm <= _zeroresidualtol(convcrit.estimator) && return npivot - 1, false
     length(convcrit.lastnorms) < npivot && resize!(convcrit.lastnorms, npivot)
     length(convcrit.normdirections) < npivot && resize!(convcrit.normdirections, npivot)
     convcrit.lastnorms[npivot] = rcnorm

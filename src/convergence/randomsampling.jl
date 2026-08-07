@@ -168,11 +168,12 @@ function (convcrit::RandomSamplingFunctor{F,K,M})(
     end
     meanrest = sumrest2 / nactive
 
-    (meanrest == 0.0 && rnorm == 0.0 && cnorm == 0.0) && (return npivot - 1, false)
+    zerotol = _zeroresidualtol(convcrit)
+    (meanrest == 0.0 && rnorm <= zerotol && cnorm <= zerotol) && (return npivot - 1, false)
 
     lhs = sqrt(meanrest * maxrows * maxcolumns)
     rhs = tolerance(convcrit) * convcrit.normUV
-    (rnorm == 0.0 || cnorm == 0.0) && (return npivot - 1, lhs > rhs)
+    (rnorm <= zerotol || cnorm <= zerotol) && (return npivot - 1, lhs > rhs)
 
     normF!(convcrit, rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
     rhs = tolerance(convcrit) * convcrit.normUV

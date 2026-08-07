@@ -2,7 +2,7 @@
 #
 # These helpers turn per-basis-function geometric data (edge directions, face
 # normals) into the integer group IDs and per-node direction sets consumed by
-# `TreeMimicryPivoting2`. They depend only on the ACA tree stubs
+# the `EFIEDirectionalFilter`. They depend only on the ACA tree stubs
 # (`values`, `children`, `parent`) and Julia Base, so backend-specific data
 # extraction (e.g. `rwgorientations` for BEAST spaces) is provided by extensions.
 
@@ -254,8 +254,8 @@ group occurs among its basis functions and selects up to `max_orientations` mutu
 at least `active_probability` of the node's basis functions, requiring the dominant
 direction to cover at least `primary_probability` and secondary ones at least
 `secondary_probability`. If no direction set is dominant enough, the node inherits its
-parent's set. Used to drive [`TreeMimicryPivoting2`](@ref)'s `DirectionFilter`, which
-restricts descent/pivoting to one orientation group at a time.
+parent's set. Used to drive the [`EFIEDirectionalFilter`](@ref), which restricts
+descent/pivoting to one orientation group at a time.
 
 # Returns
 
@@ -265,7 +265,7 @@ restricts descent/pivoting to one orientation group at a time.
 
 # See also
 
-[`basisfunction_orientation_ids`](@ref), [`TreeMimicryPivoting2`](@ref)
+[`basisfunction_orientation_ids`](@ref), [`EFIEDirectionalFilter`](@ref)
 """
 function node_normal_orientation_sets(
     normals,

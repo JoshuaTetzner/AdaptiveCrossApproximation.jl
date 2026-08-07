@@ -8,10 +8,10 @@ Instead of selecting individual points directly, it navigates the tree to pick
 clusters and then nodes within those clusters so that the selected pivots mimic a
 reference distribution at multiple scales.
 
-A pluggable `Filter` restricts the tree descent and the pivot selection. The default
-[`NoFilter`](@ref) accepts every node and index, recovering the plain geometric
-strategy. [`TreeMimicryPivoting2`](@ref) plugs in a direction filter that groups
-basis functions by orientation and rotates through them in phases.
+A pluggable [`PivotingFilter`](@ref) restricts the tree descent and the pivot
+selection. The default [`NoFilter`](@ref) accepts every node and index, recovering
+the plain geometric strategy. [`EFIEDirectionalFilter`](@ref) groups basis functions
+by orientation and rotates through them in phases.
 
 # Fields
 
@@ -35,21 +35,6 @@ struct TreeMimicryPivoting{D,T,TreeType,Filter} <: GeoPivStrat
 end
 
 """
-    NoFilter
-
-Identity pivot filter: accepts every node and index, assigns unit weight and runs a
-single (directionless) phase. Recovers the plain tree-mimicry pivoting behaviour.
-"""
-struct NoFilter end
-
-"""
-    NoFilterState
-
-Per-factorization state of [`NoFilter`](@ref); stateless.
-"""
-struct NoFilterState end
-
-"""
     TreeMimicryPivoting(refpos, pos, tree)
 
 Build a [`TreeMimicryPivoting`](@ref) strategy with the default [`NoFilter`](@ref),
@@ -66,6 +51,26 @@ function TreeMimicryPivoting(
     refpos::Vector{SVector{D,T}}, pos::Vector{SVector{D,T}}, tree
 ) where {D,T<:Real}
     return TreeMimicryPivoting{D,T,typeof(tree),NoFilter}(refpos, pos, tree, NoFilter())
+end
+
+"""
+    TreeMimicryPivoting(refpos, pos, tree, filter)
+
+Build a [`TreeMimicryPivoting`](@ref) strategy with an explicit pivot `filter`
+(a [`PivotingFilter`](@ref), e.g. [`EFIEDirectionalFilter`](@ref)). Passing
+[`NoFilter`](@ref) is equivalent to the three-argument constructor.
+
+# Arguments
+
+  - `refpos::Vector{SVector{D,T}}`: Reference positions to mimic (e.g., parent pivots).
+  - `pos::Vector{SVector{D,T}}`: Candidate point positions.
+  - `tree`: Tree adapter (see the three-argument constructor).
+  - `filter::PivotingFilter`: Restriction on descent and pivot selection.
+"""
+function TreeMimicryPivoting(
+    refpos::Vector{SVector{D,T}}, pos::Vector{SVector{D,T}}, tree, filter::PivotingFilter
+) where {D,T<:Real}
+    return TreeMimicryPivoting{D,T,typeof(tree),typeof(filter)}(refpos, pos, tree, filter)
 end
 
 mutable struct TreeMimicryPivotingFunctor{D,T,TreeType,Filter,FState} <: GeoPivStratFunctor
@@ -241,20 +246,9 @@ end
 
 @inline _nodirection() = Int32(-1)
 
-# --- filter interface (NoFilter defaults; DirectionFilter overrides) --------
-# The engine is TreeMimicryPivoting2's machinery routed through these hooks.
-# For NoFilter every hook collapses to the plain geometric behaviour: all nodes
-# and indices are accepted, no edge weighting is applied, and a single
-# directionless phase runs until the candidates are exhausted.
-@inline _reset_filterstate!(::NoFilterState) = nothing
-@inline _accepts_node(::NoFilterState, ::TreeMimicryPivotingFunctor, ::Int, ::Int32) = true
-@inline _accepts_index(::NoFilterState, ::TreeMimicryPivotingFunctor, ::Int, ::Int32) = true
-@inline _edge_count(::NoFilterState, ::TreeMimicryPivotingFunctor, ::Int, ::Int) = 0
-@inline _reset_phase!(::NoFilterState, ::Int32) = nothing
-@inline _initial_direction(::NoFilterState, ::TreeMimicryPivotingFunctor, ::Int) =
-    _nodirection()
-@inline _advance_direction(::NoFilterState, ::TreeMimicryPivotingFunctor, ::Int, ::Int32) =
-    (_nodirection(), false)
+# The pivot-selection engine below routes through the PivotingFilter interface
+# hooks defined in filters/abstractfilter.jl. For NoFilter the identity defaults
+# apply (accept everything, one directionless phase); EFIEDirectionalFilter overrides them.
 
 # --- cluster scoring / descent ---------------------------------------------
 @inline function _first_index(w, n)

@@ -49,8 +49,9 @@ function (convcrit::FNormEstimatorFunctor{F})(
 ) where {F<:Real,K}
     @views rnorm = norm(rowbuffer[npivot, 1:maxcolumns])
     @views cnorm = norm(colbuffer[1:maxrows, npivot])
-    (isapprox(rnorm, 0.0) && isapprox(cnorm, 0.0)) && (return npivot - 1, false)
-    if (isapprox(rnorm, 0.0) || isapprox(cnorm, 0.0))
+    zerotol = _zeroresidualtol(convcrit)
+    (rnorm <= zerotol && cnorm <= zerotol) && (return npivot - 1, false)
+    if (rnorm <= zerotol || cnorm <= zerotol)
         (npivot == 1) ? (return npivot - 1, true) : (return npivot - 1, false)
     end
     normF!(convcrit, rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
@@ -61,6 +62,6 @@ function (convcrit::FNormEstimatorFunctor{F})(
     rcbuffer::AbstractVector{K}, npivot::Int
 ) where {F<:Real,K}
     rcnorm = norm(rcbuffer)
-    isapprox(rcnorm, 0.0) && (return npivot - 1, false)
+    (rcnorm <= _zeroresidualtol(convcrit)) && (return npivot - 1, false)
     return npivot, rcnorm > convcrit.tol * convcrit.normUV
 end

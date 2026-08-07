@@ -101,8 +101,8 @@ end
     colidcs = collect(1:size(A, 2))
     tol = 1e-3
 
-    treeoncols = TwoNTree(spos, 0.0; minvalues=8)
-    treeonrows = TwoNTree(tpos, 0.0; minvalues=8)
+    treeoncols = TwoNTree(spos; builder=TwoNTreeBuilder(; minhalfsize=0.0, minvalues=8))
+    treeonrows = TwoNTree(tpos; builder=TwoNTreeBuilder(; minhalfsize=0.0, minvalues=8))
 
     frontier(tree) = collect(H2Trees.LevelIterator(tree, 2))
 

@@ -386,7 +386,7 @@ end
     )
 end
 
-@testset "TreeMimicryPivoting2 (DirectionFilter)" begin
+@testset "TreeMimicryPivoting (EFIEDirectionalFilter)" begin
     struct DirTree
         nodes::Vector{Int}
         centers::Vector{SVector{3,Float64}}
@@ -437,9 +437,8 @@ end
     refpos = [@SVector [Float64(i), 0.0, 0.0] for i in 1:8]
     pos = [@SVector [Float64(i), 1.0, 0.0] for i in 1:8]
 
-    piv = AdaptiveCrossApproximation.TreeMimicryPivoting2(
-        refpos, pos, edgeids, normalids, nodesets, tree
-    )
+    filter = AdaptiveCrossApproximation.EFIEDirectionalFilter(edgeids, normalids, nodesets)
+    piv = AdaptiveCrossApproximation.TreeMimicryPivoting(refpos, pos, tree, filter)
     maxrank = 5
     convcrit = AdaptiveCrossApproximation.PhaseExtrapolator(1e-6)(maxrank)
     functor = piv(convcrit, [1, 8], [2, 3], maxrank)

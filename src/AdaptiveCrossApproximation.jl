@@ -91,8 +91,9 @@ include("pivoting/maxvalue.jl")
 include("pivoting/lejapoints.jl")
 include("pivoting/filldistance.jl")
 include("pivoting/mimicrypivoting.jl")
+include("pivoting/filters/abstractfilter.jl")
 include("pivoting/treemimicrypivoting.jl")
-include("pivoting/orientations.jl")
+include("pivoting/filters/orientations.jl")
 
 include("convergence/estimation.jl")
 include("convergence/extrapolation.jl")
@@ -100,7 +101,7 @@ include("convergence/phaseextrapolation.jl")
 include("convergence/randomsampling.jl")
 include("convergence/combinedconvcrit.jl")
 
-include("pivoting/treemimicrypivoting2.jl")
+include("pivoting/filters/efiedirectional.jl")
 
 include("pivoting/combinedpivstrat.jl")
 include("pivoting/randomsampling.jl")
@@ -228,6 +229,7 @@ export IACA
 export FNormEstimator, FNormExtrapolator, PhaseExtrapolator
 export MaximumValue, Leja2, FillDistance
 export MimicryPivoting, TreeMimicryPivoting
+export PivotingFilter, NoFilter, EFIEDirectionalFilter
 export reset!
 export AbstractKernelMatrix, GPUMatrixData
 export assemble_blocks, assemble_blocks_sparse

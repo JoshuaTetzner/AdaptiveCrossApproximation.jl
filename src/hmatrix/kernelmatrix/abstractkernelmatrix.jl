@@ -111,8 +111,7 @@ end
     assemble_blocks_sparse(matrix::AbstractKernelMatrix, blocks, rowidcs, colidcs; kwargs...) -> blocks
 
 Batched counterpart of [`assemble_blocks`](@ref): fills every preallocated
-`blocks[i]` in one combined pass instead of one `matrix(block, rowidcs[i],
-colidcs[i])` call per `i`. Same `rowidcs`/`colidcs`/`blocks` contract as
+`blocks[i]` in one combined pass instead of one `matrix(block, rowidcs[i], colidcs[i])` call per `i`. Same `rowidcs`/`colidcs`/`blocks` contract as
 `assemble_blocks`.
 
 Default (any `AbstractKernelMatrix`) implementation: just forwards to
@@ -126,7 +125,9 @@ with; a plain `BEAST.DoubleNumQStrat` matrix is only valid here for blocks
 guaranteed geometrically far (no singularity check at all in that case), same
 contract as evaluating such a matrix via the plain call operator.
 """
-function assemble_blocks_sparse(matrix::AbstractKernelMatrix, blocks, rowidcs, colidcs; kwargs...)
+function assemble_blocks_sparse(
+    matrix::AbstractKernelMatrix, blocks, rowidcs, colidcs; kwargs...
+)
     return assemble_blocks(matrix, blocks, rowidcs, colidcs; kwargs...)
 end
 

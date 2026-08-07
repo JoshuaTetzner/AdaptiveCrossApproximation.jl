@@ -15,13 +15,17 @@ function AdaptiveCrossApproximation._tree(
     trialminvalues::Int=200,
     kwargs...,
 )
-    return H2Trees.TwoNTree(
+    return H2Trees.buildtree(
         testspace,
-        trialspace,
-        minhalfsize;
-        testminvalues=testminvalues,
-        trialminvalues=trialminvalues,
-        kwargs...,
+        trialspace;
+        builder=H2Trees.BlockTreeBuilder(;
+            test=H2Trees.TwoNTreeBuilder(;
+                minhalfsize=minhalfsize, minvalues=testminvalues, kwargs...
+            ),
+            trial=H2Trees.TwoNTreeBuilder(;
+                minhalfsize=minhalfsize, minvalues=trialminvalues, kwargs...
+            ),
+        ),
     )
 end
 

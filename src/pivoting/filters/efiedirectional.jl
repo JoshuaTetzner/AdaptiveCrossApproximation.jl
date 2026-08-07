@@ -1,4 +1,4 @@
-# Direction-aware filter for TreeMimicryPivoting. Groups basis functions by
+# EFIE direction-aware filter for TreeMimicryPivoting. Groups basis functions by
 # orientation (edge / normal direction) and rotates through the groups in phases:
 # a phase stays active until its convergence criterion (a PhaseExtrapolator) fires,
 # then the next unfinished direction is selected in round-robin order. Basis
@@ -6,11 +6,12 @@
 # of an index is down-weighted by how many pivots already share its edge direction.
 
 """
-    DirectionFilter
+    EFIEDirectionalFilter
 
-Direction/orientation filter for [`TreeMimicryPivoting`](@ref). Restricts descent and
-pivot selection to basis functions of the currently active direction, cycling through
-directions in phases. Built through [`TreeMimicryPivoting2`](@ref).
+EFIE direction/orientation [`PivotingFilter`](@ref) for [`TreeMimicryPivoting`](@ref).
+Restricts descent and pivot selection to basis functions of the currently active
+direction, cycling through directions in phases. Pass it to the four-argument
+`TreeMimicryPivoting(refpos, pos, tree, filter)` constructor.
 
 # Fields
 
@@ -18,19 +19,19 @@ directions in phases. Built through [`TreeMimicryPivoting2`](@ref).
   - `basisdirections::Vector{Int32}`: per-index normal-direction group id
   - `nodedirectionids::Vector{Vector{Int32}}`: dominant direction ids per tree node
 """
-struct DirectionFilter
+struct EFIEDirectionalFilter <: PivotingFilter
     edgedirections::Vector{Int32}
     basisdirections::Vector{Int32}
     nodedirectionids::Vector{Vector{Int32}}
 end
 
 """
-    DirectionFilterState{CC}
+    EFIEDirectionalFilterState{CC}
 
-Per-factorization state of a [`DirectionFilter`](@ref): the shared convergence
+Per-factorization state of an [`EFIEDirectionalFilter`](@ref): the shared convergence
 criterion plus the set of directions whose phase has finished.
 """
-mutable struct DirectionFilterState{CC}
+mutable struct EFIEDirectionalFilterState{CC} <: PivotingFilterState
     convcrit::CC
     edgedirections::Vector{Int32}
     basisdirections::Vector{Int32}
@@ -39,47 +40,33 @@ mutable struct DirectionFilterState{CC}
     nfinished::Int
 end
 
-"""
-    TreeMimicryPivoting2(refpos, pos, edgedirections, basisdirections, nodedirectionids, tree)
-
-Tree-mimicry pivoting with a [`DirectionFilter`](@ref): pivots mimic the reference
-distribution while cycling through orientation groups in phases.
-"""
-function TreeMimicryPivoting2(
-    refpos::Vector{SVector{D,T}},
-    pos::Vector{SVector{D,T}},
-    edgedirections::Vector{Int32},
-    basisdirections::Vector{Int32},
-    nodedirectionids::Vector{Vector{Int32}},
-    tree,
-) where {D,T<:Real}
-    filter = DirectionFilter(edgedirections, basisdirections, nodedirectionids)
-    return TreeMimicryPivoting{D,T,typeof(tree),typeof(filter)}(refpos, pos, tree, filter)
+function _filterstate(f::EFIEDirectionalFilter, convcrit::PhaseExtrapolatorFunctor)
+    return EFIEDirectionalFilterState(
+        convcrit, f.edgedirections, f.basisdirections, f.nodedirectionids, Int32[], 0
+    )
 end
 
-function (pivstrat::TreeMimicryPivoting{D,T,TreeType,<:DirectionFilter})(
+function (pivstrat::TreeMimicryPivoting{D,T,TreeType,<:EFIEDirectionalFilter})(
     convcrit::PhaseExtrapolatorFunctor,
     refidcs::AbstractVector{Int},
     idcs::AbstractVector{Int},
     maxrank::Int,
 ) where {D,T,TreeType}
-    f = pivstrat.filter
-    filterstate = DirectionFilterState(
-        convcrit, f.edgedirections, f.basisdirections, f.nodedirectionids, Int32[], 0
+    return _functor(
+        pivstrat, _filterstate(pivstrat.filter, convcrit), refidcs, idcs, maxrank
     )
-    return _functor(pivstrat, filterstate, refidcs, idcs, maxrank)
 end
 
 _buildpivstrat(
     convcrit,
-    strat::TreeMimicryPivoting{D,T,TreeType,<:DirectionFilter},
+    strat::TreeMimicryPivoting{D,T,TreeType,<:EFIEDirectionalFilter},
     refidcs,
     idcs,
     maxrank,
 ) where {D,T,TreeType} = strat(convcrit, refidcs, idcs, maxrank)
 
 # --- filter interface implementation ---------------------------------------
-function _reset_filterstate!(fs::DirectionFilterState)
+function _reset_filterstate!(fs::EFIEDirectionalFilterState)
     empty!(fs.finisheddirections)
     fs.nfinished = 0
     return nothing
@@ -95,7 +82,7 @@ end
 @inline _matches_direction(dir::Int32, basisdir::Int32) = dir < 0 || basisdir == dir
 
 @inline function _accepts_index(
-    fs::DirectionFilterState, ::TreeMimicryPivotingFunctor, idx::Int, dir::Int32
+    fs::EFIEDirectionalFilterState, ::TreeMimicryPivotingFunctor, idx::Int, dir::Int32
 )
     return _matches_direction(dir, fs.basisdirections[idx])
 end
@@ -106,7 +93,7 @@ end
 # tree interface (firstchild/children) and only call `values` on leaves. This
 # keeps the same work but removes the per-check subtree materialization that
 # dominated far-assembly allocations.
-function _subtree_has_zerodir(tree, node::Int, fs::DirectionFilterState)
+function _subtree_has_zerodir(tree, node::Int, fs::EFIEDirectionalFilterState)
     if iszero(firstchild(tree, node))
         @inbounds for idx in values(tree, node)
             iszero(fs.basisdirections[idx]) && return true
@@ -123,7 +110,7 @@ function _subtree_has_unused_match(
     functor::TreeMimicryPivotingFunctor,
     tree,
     node::Int,
-    fs::DirectionFilterState,
+    fs::EFIEDirectionalFilterState,
     dir::Int32,
     nused::Int,
 )
@@ -144,7 +131,7 @@ function _subtree_has_unused_dir(
     functor::TreeMimicryPivotingFunctor,
     tree,
     node::Int,
-    fs::DirectionFilterState,
+    fs::EFIEDirectionalFilterState,
     dir::Int32,
     nused::Int,
 )
@@ -162,7 +149,10 @@ function _subtree_has_unused_dir(
 end
 
 function _accepts_node(
-    fs::DirectionFilterState, functor::TreeMimicryPivotingFunctor, node::Int, dir::Int32
+    fs::EFIEDirectionalFilterState,
+    functor::TreeMimicryPivotingFunctor,
+    node::Int,
+    dir::Int32,
 )
     dir < 0 && return true
     if iszero(dir)
@@ -172,7 +162,10 @@ function _accepts_node(
 end
 
 @inline function _edge_count(
-    fs::DirectionFilterState, functor::TreeMimicryPivotingFunctor, idx::Int, nused::Int
+    fs::EFIEDirectionalFilterState,
+    functor::TreeMimicryPivotingFunctor,
+    idx::Int,
+    nused::Int,
 )
     dir = fs.edgedirections[idx]
     count = 0
@@ -182,17 +175,39 @@ end
     return count
 end
 
-@inline _reset_phase!(fs::DirectionFilterState, dir::Int32) = reset_phase!(fs.convcrit, dir)
+@inline _reset_phase!(fs::EFIEDirectionalFilterState, dir::Int32) =
+    reset_phase!(fs.convcrit, dir)
 
 # --- direction phasing -----------------------------------------------------
-@inline function _finished_direction(fs::DirectionFilterState, dir::Int32)
+# True only when every active, non-empty far cluster carries a dominant-direction
+# set. When it is false (a block that is not uniformly directional — e.g. clusters
+# of sharp-edged / open geometry whose basis functions have no dominant
+# orientation), orientation phasing is disabled for the whole block and pivoting
+# falls back to the plain (directionless) tree-mimicry strategy. This all-or-
+# nothing gate matches the paper/workingstate behaviour; without it the filter
+# over-applies orientation-restricted pivoting to poorly-oriented blocks and
+# degrades their low-rank far compression.
+function _farfield_has_node_directions(
+    fs::EFIEDirectionalFilterState, functor::TreeMimicryPivotingFunctor
+)
+    hasactive = false
+    @inbounds for i in 1:(functor.nactive)
+        node = functor.farfield[i]
+        _emptycluster(functor, node) && continue
+        hasactive = true
+        isempty(fs.nodedirectionids[node]) && return false
+    end
+    return hasactive
+end
+
+@inline function _finished_direction(fs::EFIEDirectionalFilterState, dir::Int32)
     @inbounds for i in 1:(fs.nfinished)
         fs.finisheddirections[i] == dir && return true
     end
     return false
 end
 
-function _mark_finished_direction!(fs::DirectionFilterState, dir::Int32)
+function _mark_finished_direction!(fs::EFIEDirectionalFilterState, dir::Int32)
     dir <= 0 && return nothing
     _finished_direction(fs, dir) && return nothing
     push!(fs.finisheddirections, dir)
@@ -201,7 +216,10 @@ function _mark_finished_direction!(fs::DirectionFilterState, dir::Int32)
 end
 
 function _has_unused_basis_direction(
-    fs::DirectionFilterState, functor::TreeMimicryPivotingFunctor, dir::Int32, nused::Int
+    fs::EFIEDirectionalFilterState,
+    functor::TreeMimicryPivotingFunctor,
+    dir::Int32,
+    nused::Int,
 )
     tree = functor.pivoting.tree
     @inbounds for i in 1:(functor.nactive)
@@ -213,7 +231,10 @@ function _has_unused_basis_direction(
 end
 
 function _available_direction(
-    fs::DirectionFilterState, functor::TreeMimicryPivotingFunctor, dir::Int32, nused::Int
+    fs::EFIEDirectionalFilterState,
+    functor::TreeMimicryPivotingFunctor,
+    dir::Int32,
+    nused::Int,
 )
     tree = functor.pivoting.tree
     @inbounds for i in 1:(functor.nactive)
@@ -226,11 +247,12 @@ function _available_direction(
 end
 
 function _next_unfinished_direction(
-    fs::DirectionFilterState,
+    fs::EFIEDirectionalFilterState,
     functor::TreeMimicryPivotingFunctor,
     nused::Int,
     lastdir::Int32,
 )
+    _farfield_has_node_directions(fs, functor) || return _nodirection()
     bestafter = Int32(0)
     bestwrap = Int32(0)
     @inbounds for i in 1:(functor.nactive)
@@ -250,8 +272,9 @@ function _next_unfinished_direction(
 end
 
 function _all_dominant_directions_finished(
-    fs::DirectionFilterState, functor::TreeMimicryPivotingFunctor, nused::Int
+    fs::EFIEDirectionalFilterState, functor::TreeMimicryPivotingFunctor, nused::Int
 )
+    _farfield_has_node_directions(fs, functor) || return true
     @inbounds for i in 1:(functor.nactive)
         node = functor.farfield[i]
         _emptycluster(functor, node) && continue
@@ -264,7 +287,7 @@ function _all_dominant_directions_finished(
 end
 
 function _initial_direction(
-    fs::DirectionFilterState, functor::TreeMimicryPivotingFunctor, nused::Int
+    fs::EFIEDirectionalFilterState, functor::TreeMimicryPivotingFunctor, nused::Int
 )
     lastdir = fs.convcrit.currentdirection
     if iszero(nused)
@@ -287,7 +310,10 @@ function _initial_direction(
 end
 
 function _advance_direction(
-    fs::DirectionFilterState, functor::TreeMimicryPivotingFunctor, nused::Int, dir::Int32
+    fs::EFIEDirectionalFilterState,
+    functor::TreeMimicryPivotingFunctor,
+    nused::Int,
+    dir::Int32,
 )
     nextdir = _next_unfinished_direction(fs, functor, nused, dir)
     if !iszero(nextdir) && nextdir != dir

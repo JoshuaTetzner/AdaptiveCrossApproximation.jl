@@ -29,10 +29,16 @@ function AdaptiveCrossApproximation._tree(
     kwargs...,
 )
     testtree = H2Trees.KMeansTree(
-        BEAST.positions(testspace), numberofclusters; minvalues=minvalues, kwargs...
+        BEAST.positions(testspace);
+        builder=H2Trees.KMeansTreeBuilder(;
+            numberofclusters=numberofclusters, minvalues=minvalues, kwargs...
+        ),
     )
     trialtree = H2Trees.KMeansTree(
-        BEAST.positions(trialspace), numberofclusters; minvalues=minvalues, kwargs...
+        BEAST.positions(trialspace);
+        builder=H2Trees.KMeansTreeBuilder(;
+            numberofclusters=numberofclusters, minvalues=minvalues, kwargs...
+        ),
     )
     return H2Trees.BlockTree(testtree, trialtree)
 end

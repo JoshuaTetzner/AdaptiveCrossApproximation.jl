@@ -65,7 +65,7 @@ end
 function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
     rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}, maxrank::Int
 ) where {
-    RowPivType<:TreeMimicryPivoting{<:Any,<:Any,<:Any,<:DirectionFilter},
+    RowPivType<:TreeMimicryPivoting{<:Any,<:Any,<:Any,<:EFIEDirectionalFilter},
     ColPivType<:MaximumValue,
     ConvCritType<:ConvCrit,
 }
@@ -192,7 +192,7 @@ function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
     rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}, maxrank::Int
 ) where {
     RowPivType<:MaximumValue,
-    ColPivType<:TreeMimicryPivoting{<:Any,<:Any,<:Any,<:DirectionFilter},
+    ColPivType<:TreeMimicryPivoting{<:Any,<:Any,<:Any,<:EFIEDirectionalFilter},
     ConvCritType<:ConvCrit,
 }
     convcrit = iaca.convergence(maxrank)

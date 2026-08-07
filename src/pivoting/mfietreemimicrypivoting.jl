@@ -48,10 +48,7 @@ mutable struct MFIETreeMimicryPivotingFunctor{T,TreeType} <: GeoPivStratFunctor
 end
 
 function _reference_plane(
-    pos::Vector{SVector{3,T}},
-    idcs::AbstractVector{Int},
-    atol::T,
-    rtol::T,
+    pos::Vector{SVector{3,T}}, idcs::AbstractVector{Int}, atol::T, rtol::T
 ) where {T<:Real}
     origin = _centroid(pos, idcs)
     zerovec = zero(SVector{3,T})
@@ -97,10 +94,7 @@ function (strategy::MFIETreeMimicryPivoting{T})(
     refidcs::AbstractVector{Int}, idcs::AbstractVector{Int}, maxrank::Int
 ) where {T}
     planar, origin, normal, threshold = _reference_plane(
-        strategy.refpos,
-        refidcs,
-        strategy.planarity_atol,
-        strategy.planarity_rtol,
+        strategy.refpos, refidcs, strategy.planarity_atol, strategy.planarity_rtol
     )
     nactive = length(idcs)
     return MFIETreeMimicryPivotingFunctor(
@@ -156,23 +150,17 @@ end
     return false
 end
 
-@inline function _same_reference_plane(
-    strategy::MFIETreeMimicryPivotingFunctor, idx::Int
-)
+@inline function _same_reference_plane(strategy::MFIETreeMimicryPivotingFunctor, idx::Int)
     strategy.referenceisplanar || return false
     return abs(
-        dot(
-            strategy.pivoting.pos[idx] - strategy.refcentroid,
-            strategy.refnormal,
-        ),
+        dot(strategy.pivoting.pos[idx] - strategy.refcentroid, strategy.refnormal)
     ) <= strategy.planethreshold
 end
 
 @inline function _mfie_eligible(
     strategy::MFIETreeMimicryPivotingFunctor, idx::Int, nused::Int
 )
-    return !_mfie_used_index(strategy, idx, nused) &&
-           !_same_reference_plane(strategy, idx)
+    return !_mfie_used_index(strategy, idx, nused) && !_same_reference_plane(strategy, idx)
 end
 
 function _mfie_node_has_candidate(
@@ -184,9 +172,7 @@ function _mfie_node_has_candidate(
     return false
 end
 
-function _mfie_candidate_nodes(
-    strategy::MFIETreeMimicryPivotingFunctor, nodes, nused::Int
-)
+function _mfie_candidate_nodes(strategy::MFIETreeMimicryPivotingFunctor, nodes, nused::Int)
     candidates = Int[]
     Base.haslength(nodes) && sizehint!(candidates, length(nodes))
     @inbounds for node in nodes
@@ -236,16 +222,12 @@ function _mfie_best_node(
     return best
 end
 
-function _mfie_find_leaf(
-    strategy::MFIETreeMimicryPivotingFunctor, nodes, npivot::Int
-)
+function _mfie_find_leaf(strategy::MFIETreeMimicryPivotingFunctor, nodes, npivot::Int)
     candidates = _mfie_candidate_nodes(strategy, nodes, npivot - 1)
     while !isempty(candidates)
         node = _mfie_best_node(strategy, candidates, npivot)
         iszero(firstchild(strategy.pivoting.tree, node)) && return node
-        leaf = _mfie_find_leaf(
-            strategy, children(strategy.pivoting.tree, node), npivot
-        )
+        leaf = _mfie_find_leaf(strategy, children(strategy.pivoting.tree, node), npivot)
         !iszero(leaf) && return leaf
         filter!(!=(node), candidates)
     end

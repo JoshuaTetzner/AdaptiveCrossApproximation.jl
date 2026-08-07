@@ -21,16 +21,17 @@ struct CombinedPivStratFunctor <: PivStratFunctor
     strats::Vector{PivStratFunctor}
 end
 
-function (pivstrat::CombinedPivStrat)(
-    convergence::CombinedConvCritFunctor, idcs::AbstractArray{Int}
-)
+# Build each sub-strategy through its own `_buildpivstrat`, exactly as a standalone
+# pivoting would be built: value strategies consume `idcs` (a candidate-index vector in
+# the NCA path, or a candidate count in the standalone ACA/HMatrix path — `MaximumValue`
+# handles both), while convergence-driven ones such as `RandomSamplingPivoting` consume
+# the shared `convergence`. This keeps `CombinedPivStrat` a generic strategy combiner,
+# like `CombinedConvCrit`, rather than assuming a fixed set of strategies or an index
+# vector.
+function (pivstrat::CombinedPivStrat)(convergence::CombinedConvCritFunctor, idcs)
     curr_strats = Vector{PivStratFunctor}(undef, length(pivstrat.strats))
     for (i, strat) in enumerate(pivstrat.strats)
-        if isa(strat, RandomSamplingPivoting)
-            curr_strats[i] = strat(convergence)
-        else
-            curr_strats[i] = strat(idcs)
-        end
+        curr_strats[i] = _buildpivstrat(strat, convergence, idcs)
     end
 
     return CombinedPivStratFunctor(convergence, curr_strats)

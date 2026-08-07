@@ -73,3 +73,13 @@ function normF!(
     convcrit.normUV = sqrt(convcrit.normUV^2 + delta_sq)
     return nothing
 end
+
+# Scale below which a residual row/column is considered numerically zero, and the
+# pivot that produced it redundant. A rank-deficient block drives the residual to
+# ~eps relative to the block (not exactly zero), so an exact `x == 0` / `isapprox(x,
+# 0)` guard misses it and lets the convergence keep a redundant pivot, yielding a
+# singular interpolation skeleton. Judging "collapsed" relative to the running block
+# scale `normUV` catches it; `sqrt(eps)` sits far below any tolerance-level residual
+# (~tol·normUV) yet far above the machine-zero residual of a redundant pivot.
+@inline _zeroresidualtol(convcrit::ConvCritFunctor) =
+    sqrt(eps(typeof(convcrit.normUV))) * convcrit.normUV

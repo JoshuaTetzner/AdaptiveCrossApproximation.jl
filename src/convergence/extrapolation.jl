@@ -45,6 +45,24 @@ end
 tolerance(cc::FNormExtrapolatorFunctor) = cc.estimator.tol
 tolerance(cc::FNormExtrapolator) = cc.estimator.tol
 
+# Upper decreasing envelope of the norm history, used to clean the extrapolation input.
+# Scan newest→oldest and keep a pivot only if its norm exceeds the last kept one; every
+# downward dip (a redundant-pick collapse) — single- or multi-point — is dropped, so the
+# fit tracks the monotone trend the residual should follow instead of being dragged down
+# by transient drops. Returns the kept indices in ascending order.
+function _monotone_backward_indices(v::AbstractVector, n::Int)
+    idx = Int[n]
+    ref = v[n]
+    @inbounds for j in (n - 1):-1:1
+        if v[j] > ref
+            push!(idx, j)
+            ref = v[j]
+        end
+    end
+    reverse!(idx)
+    return idx
+end
+
 function (convcrit::FNormExtrapolatorFunctor{F})(
     rowbuffer::AbstractMatrix{K},
     colbuffer::AbstractMatrix{K},
@@ -54,16 +72,17 @@ function (convcrit::FNormExtrapolatorFunctor{F})(
 ) where {F<:Real,K}
     npivot_, conv = convcrit.estimator(rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
     (npivot_ != npivot) && (return npivot_, conv)
-    if conv
-        @views convcrit.lastnorms[npivot] =
-            norm(rowbuffer[npivot, 1:maxcolumns]) * norm(colbuffer[1:maxrows, npivot])
-        return npivot, true
-    else
-        npivot - 1 < 3 && return npivot, false
-        f2 = fit(Vector(1:(npivot - 1)), log10.(convcrit.lastnorms[1:(npivot - 1)]), 2)
-        return npivot,
-        f2(npivot) > log10(convcrit.estimator.tol * convcrit.estimator.normUV)
-    end
+    # Record this pivot's update norm on EVERY pivot, before branching: on the
+    # non-converged branch a noisy dip must not leave a 0 in `lastnorms`, which later
+    # becomes log10(0) = -Inf and corrupts the quadratic extrapolation (spurious stop).
+    @views convcrit.lastnorms[npivot] =
+        norm(rowbuffer[npivot, 1:maxcolumns]) * norm(colbuffer[1:maxrows, npivot])
+    conv && return npivot, true
+    npivot - 1 < 4 && return npivot, false
+    idx = _monotone_backward_indices(convcrit.lastnorms, npivot - 1)
+    length(idx) < 4 && return npivot, true
+    f2 = fit(F.(idx), log10.(convcrit.lastnorms[idx]), 2)
+    return npivot, f2(F(npivot)) > log10(convcrit.estimator.tol * convcrit.estimator.normUV)
 end
 
 function (convcrit::FNormExtrapolatorFunctor{F})(
@@ -71,14 +90,15 @@ function (convcrit::FNormExtrapolatorFunctor{F})(
 ) where {F<:Real,K}
     npivot_, conv = convcrit.estimator(rcbuffer, npivot)
     (npivot_ != npivot) && (return npivot_, conv)
-    if conv
-        length(convcrit.lastnorms) < npivot && resize!(convcrit.lastnorms, npivot)
-        @inbounds convcrit.lastnorms[npivot] = norm(rcbuffer)
-        return npivot, true
-    else
-        npivot - 1 < 3 && return npivot, false
-        f2 = fit(Vector(1:(npivot - 1)), log10.(convcrit.lastnorms[1:(npivot - 1)]), 2)
-        return npivot,
-        f2(F(npivot)) > log10(tolerance(convcrit) * convcrit.estimator.normUV)
-    end
+    # Record this pivot's update norm on EVERY pivot, before branching: on the
+    # non-converged branch a noisy dip must not leave a 0 in `lastnorms`, which later
+    # becomes log10(0) = -Inf and corrupts the quadratic extrapolation (spurious stop).
+    length(convcrit.lastnorms) < npivot && resize!(convcrit.lastnorms, npivot)
+    @inbounds convcrit.lastnorms[npivot] = norm(rcbuffer)
+    conv && return npivot, true
+    npivot - 1 < 4 && return npivot, false
+    idx = _monotone_backward_indices(convcrit.lastnorms, npivot - 1)
+    length(idx) < 4 && return npivot, true
+    f2 = fit(F.(idx), log10.(convcrit.lastnorms[idx]), 2)
+    return npivot, f2(F(npivot)) > log10(tolerance(convcrit) * convcrit.estimator.normUV)
 end

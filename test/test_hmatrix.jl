@@ -39,8 +39,13 @@ fct32 = myfct32()
             AdaptiveCrossApproximation.PreserveSpaceOrder(),
         ]
             for tol in [1e-2, 1e-4, 1e-6]
-                tree = TwoNTree(
-                    mesh[1], mesh[2], 1 / 2^10; testminvalues=100, trialminvalues=100
+                tree = buildtree(
+                    mesh[1],
+                    mesh[2];
+                    builder=BlockTreeBuilder(;
+                        test=TwoNTreeBuilder(; minhalfsize=1 / 2^10, minvalues=100),
+                        trial=TwoNTreeBuilder(; minhalfsize=1 / 2^10, minvalues=100),
+                    ),
                 )
 
                 mat = AdaptiveCrossApproximation.HMatrix(
@@ -91,7 +96,10 @@ k = 2.4567799554075624 + 0.0im
 
 circ = CompScienceMeshes.meshcircle(1.0, 0.025)
 X = BEAST.lagrangecx(circ; order=2)
-tree = BlockTree(KMeansTree(X.pos, 2; minvalues=100), KMeansTree(X.pos, 2; minvalues=100))
+tree = BlockTree(
+    KMeansTree(X.pos; builder=KMeansTreeBuilder(; numberofclusters=2, minvalues=100)),
+    KMeansTree(X.pos; builder=KMeansTreeBuilder(; numberofclusters=2, minvalues=100)),
+)
 
 op = Helmholtz2D.doublelayer(; wavenumber=k)
 quadstrat = BEAST.DoubleNumSauterQstrat(2, 3, 0, 4, 3, 4)
