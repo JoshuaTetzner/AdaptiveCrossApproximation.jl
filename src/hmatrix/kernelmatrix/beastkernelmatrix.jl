@@ -23,15 +23,7 @@ struct BEASTKernelMatrix{T,NearBlockAssemblerType} <: AbstractKernelMatrix{T}
 end
 
 function Base.size(M::BEASTKernelMatrix, dim=nothing)
-    if dim === nothing
-        return (length(M.nearassembler.tfs), length(M.nearassembler.bfs))
-    elseif dim == 1
-        return length(M.nearassembler.tfs)
-    elseif dim == 2
-        return length(M.nearassembler.bfs)
-    else
-        error("dim must be either 1 or 2")
-    end
+    return _kernelmatrix_size(length(M.nearassembler.tfs), length(M.nearassembler.bfs), dim)
 end
 
 nextrc!(buf, A::BEASTKernelMatrix, i, j) = A(buf, i, j)

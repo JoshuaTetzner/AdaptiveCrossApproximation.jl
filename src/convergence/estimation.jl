@@ -1,9 +1,10 @@
-# Keep only main public-facing docstrings, remove internal implementation details
-
 """
     FNormEstimator{F} <: ConvCrit
 
-Frobenius norm-based convergence criterion for standard ACA.
+Frobenius norm-based convergence criterion for ACA and IACA.
+
+Dispatches on input type: matrix arguments follow the ACA path (accumulated Frobenius
+norm), vector arguments follow the IACA path (moving-average norm).
 
 # Fields
 
@@ -14,7 +15,7 @@ mutable struct FNormEstimator{F} <: ConvCrit
 end
 
 mutable struct FNormEstimatorFunctor{F} <: ConvCritFunctor
-    normUV²::F
+    normUV::F
     tol::F
 end
 
@@ -25,11 +26,19 @@ end
 _buildconvcrit(cc::FNormEstimator, A, rowidcs, colidcs, maxrank) = cc()
 
 function reset!(convcrit::FNormEstimatorFunctor)
-    convcrit.normUV² = zero(convcrit.normUV²)
+    convcrit.normUV = zero(convcrit.normUV)
     return nothing
 end
 
 tolerance(cc::FNormEstimator) = cc.tol
+tolerance(cc::FNormEstimatorFunctor) = cc.tol
+
+function normF!(
+    convcrit::FNormEstimatorFunctor, rcbuffer::AbstractVector{K}, npivot::Int
+) where {K}
+    convcrit.normUV = ((npivot - 1) * convcrit.normUV + norm(rcbuffer)) / npivot
+    return nothing
+end
 
 function (convcrit::FNormEstimatorFunctor{F})(
     rowbuffer::AbstractMatrix{K},
@@ -45,45 +54,13 @@ function (convcrit::FNormEstimatorFunctor{F})(
         (npivot == 1) ? (return npivot - 1, true) : (return npivot - 1, false)
     end
     normF!(convcrit, rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
-    return npivot, rnorm * cnorm > convcrit.tol * sqrt(convcrit.normUV²)
+    return npivot, rnorm * cnorm > convcrit.tol * convcrit.normUV
 end
 
-"""
-    iFNormEstimator{F} <: ConvCrit
-
-Frobenius norm-based convergence criterion for incomplete ACA (IACA).
-Uses moving average norm estimate for geometric pivoting scenarios.
-
-# Fields
-
-  - `tol::F`: Relative tolerance threshold
-"""
-mutable struct iFNormEstimator{F} <: ConvCrit
-    tol::F
-end
-
-mutable struct iFNormEstimatorFunctor{F} <: ConvCritFunctor
-    normUV::F
-    tol::F
-end
-
-function (cc::iFNormEstimator{F})() where {F}
-    return iFNormEstimatorFunctor(F(0.0), cc.tol)
-end
-
-function reset!(convcrit::iFNormEstimatorFunctor)
-    convcrit.normUV = zero(convcrit.normUV)
-    return nothing
-end
-
-tolerance(cc::iFNormEstimatorFunctor) = cc.tol
-tolerance(cc::iFNormEstimator) = cc.tol
-
-function (convcrit::iFNormEstimatorFunctor{F})(
+function (convcrit::FNormEstimatorFunctor{F})(
     rcbuffer::AbstractVector{K}, npivot::Int
 ) where {F<:Real,K}
-    @views rcnorm = norm(rcbuffer)
-
+    rcnorm = norm(rcbuffer)
     isapprox(rcnorm, 0.0) && (return npivot - 1, false)
-    return npivot, rcnorm > tolerance(convcrit) * convcrit.normUV
+    return npivot, rcnorm > convcrit.tol * convcrit.normUV
 end

@@ -19,11 +19,11 @@ via `Matrix`.
 # Notes
 
 `HMatrix` is typically created through the high-level constructor
-`HMatrix(operator, testspace, trialspace, tree; kwargs...)` or `H.assemble(...)`.
+`HMatrix(operator, testspace, trialspace, tree; kwargs...)` or `assemble(...)`.
 
 # See also
 
-`HMatrix`, `H.assemble`, `farmatrix`, `nearmatrix`
+`HMatrix`, `assemble`, `farmatrix`, `nearmatrix`
 """
 struct HMatrix{K,NearInteractionType,FarInteractionType} <: LinearMaps.LinearMap{K}
     nearinteractions::NearInteractionType
@@ -44,15 +44,21 @@ function Base.Matrix(A::HMatrix)
     return mat
 end
 
+"""
+    nnz(A::HMatrix)
+
+Count the number of stored scalars in a hierarchical matrix.
+
+Sums the near-field block-sparse storage with the far-field low-rank factor
+storage (`length(U) + length(V)` per block), i.e. the actual memory footprint
+in matrix entries rather than the dense `size(A,1) * size(A,2)`. See also
+[`storage`](@ref) for a GB-scale report including compression ratio.
+"""
 function nnz(A::HMatrix)
-    nnz = BlockSparseMatrices.nnz(A.nearinteractions)
-    println("Nearinteractions: $nnz")
-    fnnz = 0
-    for farinteraction in A.farinteractions
-        fnnz += BlockSparseMatrices.nnz(farinteraction)
-    end
-    println("Farinteractions: $fnnz")
-    return nnz + fnnz
+    farnnz = sum(
+        length(blk.U) + length(blk.V) for f in A.farinteractions for blk in f.blocks; init=0
+    )
+    return BlockSparseMatrices.nnz(A.nearinteractions) + farnnz
 end
 
 function Base.size(A::HMatrix, dim=nothing)
@@ -61,8 +67,8 @@ function Base.size(A::HMatrix, dim=nothing)
 end
 
 function LinearMaps._unsafe_mul!(
-    y::AbstractVector, A::M, x::AbstractVector
-) where {K,M<:HMatrix{K}}
+    y::AbstractVector, A::HMatrix{K}, x::AbstractVector
+) where {K}
     fill!(y, zero(K))
 
     y .+= A.nearinteractions * x
@@ -74,8 +80,8 @@ function LinearMaps._unsafe_mul!(
 end
 
 function LinearMaps._unsafe_mul!(
-    y::AbstractVector, A::M, x::AbstractVector
-) where {K,Z<:HMatrix{K},M<:LinearMaps.TransposeMap{<:Any,Z}}
+    y::AbstractVector, A::LinearMaps.TransposeMap{<:Any,<:HMatrix{K}}, x::AbstractVector
+) where {K}
     fill!(y, zero(K))
 
     y .+= transpose(A.lmap.nearinteractions) * x
@@ -87,8 +93,8 @@ function LinearMaps._unsafe_mul!(
 end
 
 function LinearMaps._unsafe_mul!(
-    y::AbstractVector, A::M, x::AbstractVector
-) where {K,Z<:HMatrix{K},M<:LinearMaps.AdjointMap{<:Any,Z}}
+    y::AbstractVector, A::LinearMaps.AdjointMap{<:Any,<:HMatrix{K}}, x::AbstractVector
+) where {K}
     fill!(y, zero(K))
 
     y .+= adjoint(A.lmap.nearinteractions) * x

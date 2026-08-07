@@ -30,8 +30,10 @@ and at iteration $r$ the algorithm checks if
 $$|a| < \varepsilon \frac{ \|A^{m\times r}\|_\text{F}}{\sqrt{r}} .$$
 
 This simpler criterion requires only current pivot norms, not historical inner products.
+It is the same [`FNormEstimator`](@ref) type as above; which formula is used is selected
+automatically based on whether it is called with matrix (ACA) or vector (IACA) arguments.
 
-API: [`iFNormEstimator`](@ref)
+API: [`FNormEstimator`](@ref)
 
 ## Random Sampling
 

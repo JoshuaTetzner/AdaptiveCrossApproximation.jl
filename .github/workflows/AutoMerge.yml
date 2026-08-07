@@ -1,0 +1,38 @@
+name: Auto-merge bot PRs
+
+# Enables auto-merge for dependency-update PRs from Dependabot and CompatHelper.
+# Auto-merge only completes once the branch ruleset's required checks pass, so a
+# bump that breaks CI simply waits for a human instead of merging.
+on: pull_request_target
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  dependabot:
+    name: Dependabot
+    runs-on: ubuntu-latest
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    steps:
+      - name: Fetch Dependabot metadata
+        uses: dependabot/fetch-metadata@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Enable auto-merge
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  compathelper:
+    name: CompatHelper
+    runs-on: ubuntu-latest
+    # CompatHelper opens its PRs from branches named compathelper/new_version/...
+    if: ${{ startsWith(github.head_ref, 'compathelper/') }}
+    steps:
+      - name: Enable auto-merge
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

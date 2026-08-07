@@ -4,28 +4,35 @@ using BEAST
 using ParallelKMeans
 using H2Trees
 using AdaptiveCrossApproximation
-using Krylov
 using PlotlyJS
 
 const ACA = AdaptiveCrossApproximation
-# Geometry and function space: PEC sphere
+# Geometry and function spaces: PEC sphere, primal (RWG) and dual (BC) meshes
 Γ = meshsphere(1.0, 0.1)
 X = raviartthomas(Γ)
+Y = buffachristiansen(Γ)
 
-# Problem setup: EFIE for a PEC sphere illuminated by a plane wave
-κ, η = 1.0, 1.0
-t = Maxwell3D.singlelayer(; wavenumber=κ)
+# Problem setup: MFIE for a PEC sphere illuminated by a plane wave
+ϵ, μ, ω = 1.0, 1.0, 1.0
+κ, η = ω * sqrt(ϵ * μ), sqrt(μ / ϵ)
+
+K = Maxwell3D.doublelayer(; wavenumber=κ)
+N = BEAST.NCross()
 E = Maxwell3D.planewave(; direction=ẑ, polarization=x̂, wavenumber=κ)
+H = -1 / (im * μ * ω) * curl(E)
+h = (n × H) × n
 
-# Assemble the compressed EFIE operator directly through ACA's high-level entry
-# point. `assemble` builds an H2Trees cluster tree from the RWG basis positions
-# and compresses admissible (far) blocks with ACA -- no manual tree needed.
-T = ACA.assemble(t, X, X; tol=1e-3, maxrank=60)
-e = assemble((n × E) × n, X)
+@hilbertspace j
+@hilbertspace m
 
-u, stats = Krylov.gmres(T, e; rtol=1e-4)
-@assert stats.solved "GMRES failed to converge"
-ACA.storage(T); #hide
+a = K[m, j] + 0.5 * N[m, j]
+l = h[m]
+
+A = assemble(a, ∏(Y), ∏(X); materialize=ACA.assemble)
+b = assemble(l, ∏(Y))
+
+A⁻¹ = BEAST.GMRESSolver(A; reltol=1e-4, maxiter=1000)
+u = A⁻¹ * b
 
 # Bistatic RCS in the plane φ=0: σ(θ) = 4π|E_far(θ)|² for unit-amplitude incidence
 Θ = range(0; stop=π, length=181)
@@ -48,7 +55,7 @@ plt = Plot(
         Subplots(;
             rows=2, cols=2, specs=[Spec() Spec(; rowspan=2); Spec(; kind="mesh3d") missing]
         );
-        title_text="EFIE: PEC sphere scattering (ACA.assemble)",
+        title_text="MFIE: PEC sphere scattering (ACA.assemble)",
     ),
 )
 add_trace!(plt, scatter(; x=rad2deg.(Θ), y=rcs_dB, name="bistatic RCS [dB]"); row=1, col=1)
@@ -60,5 +67,5 @@ add_trace!(
 )
 add_trace!(plt, patch(geo, norm.(fcr); caxis=(0, 2)); row=2, col=1)
 
-savefig(plt, "efie_results.html"); #hide
+savefig(plt, "mfie_results.html"); #hide
 nothing #hide

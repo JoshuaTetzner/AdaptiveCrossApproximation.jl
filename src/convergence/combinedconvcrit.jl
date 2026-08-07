@@ -2,7 +2,7 @@
     CombinedConvCrit
 
 Composite convergence criterion combining multiple criteria.
-Converges when any constituent criterion is satisfied.
+Stops only when ALL constituent criteria have signaled convergence (AND logic).
 
 # Fields
 
@@ -12,20 +12,15 @@ mutable struct CombinedConvCrit <: ConvCrit
     crits::Vector{ConvCrit}
 end
 
-mutable struct CombinedConvCritFunctor <: ConvCritFunctor
+struct CombinedConvCritFunctor <: ConvCritFunctor
     crits::Vector{ConvCritFunctor}
     isconverged::Vector{Bool}
 end
 
-function (convcrit::CombinedConvCrit)(
-    K::Union{AbstractMatrix,AbstractKernelMatrix},
-    nrowidcs::Int,
-    ncolidcs::Int;
-    maxrank::Int=40,
-)
-    curr_crits = Vector{ConvCritFunctor}(undef, length(convcrit.crits))
-    for (i, crit) in enumerate(convcrit.crits)
-        curr_crits[i] = _buildconvcrit(crit, K, nrowidcs, ncolidcs, maxrank)
+function _buildconvcrit(cc::CombinedConvCrit, K, rowidcs, colidcs, maxrank)
+    curr_crits = Vector{ConvCritFunctor}(undef, length(cc.crits))
+    for (i, crit) in enumerate(cc.crits)
+        curr_crits[i] = _buildconvcrit(crit, K, rowidcs, colidcs, maxrank)
     end
     return CombinedConvCritFunctor(curr_crits, ones(Bool, length(curr_crits)))
 end
@@ -36,23 +31,8 @@ function (convcrit::CombinedConvCrit)(
     colidcs::AbstractVector{Int};
     maxrank::Int=40,
 )
-    curr_crits = Vector{ConvCritFunctor}(undef, length(convcrit.crits))
-    for (i, crit) in enumerate(convcrit.crits)
-        curr_crits[i] = _buildconvcrit(crit, K, rowidcs, colidcs, maxrank)
-    end
-    return CombinedConvCritFunctor(curr_crits, ones(Bool, length(curr_crits)))
+    return _buildconvcrit(convcrit, K, rowidcs, colidcs, maxrank)
 end
-
-_buildconvcrit(cc::CombinedConvCrit, A, rowidcs, colidcs, maxrank) =
-    cc(A, rowidcs, colidcs; maxrank=maxrank)
-
-_buildconvcrit(
-    cc::CombinedConvCrit,
-    A,
-    rowidcs::AbstractVector{Int},
-    colidcs::AbstractVector{Int},
-    maxrank,
-) = cc(A, rowidcs, colidcs; maxrank=maxrank)
 
 function reset!(
     convcrit::CombinedConvCritFunctor,
@@ -77,13 +57,11 @@ function (convcrit::CombinedConvCritFunctor)(
         npivot_, convcrit.isconverged[i] = crit(
             rowbuffer, colbuffer, npivot, maxrows, maxcolumns
         )
-
-        if (npivot_ != npivot && i == length(convcrit.crits))
+        if npivot_ != npivot && i == length(convcrit.crits)
             rowbuffer[npivot, :] .= K(0)
             colbuffer[:, npivot] .= K(0)
             return npivot_, convcrit.isconverged[i]
         end
     end
-
     return npivot, any(convcrit.isconverged)
 end

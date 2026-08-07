@@ -6,13 +6,19 @@ The Incomplete Adaptive Cross Approximation (IACA) is a variant of the Adaptive 
 
 In contrast to the standard ACA, which computes full rows and columns for pivot selection, the IACA restricts computations to only those matrix elements required for the final nested representation. This reduces unnecessary evaluations and enables a more efficient construction of H2-matrices.
 
-The IACA constructs a factorization of the form
+The IACA underlies the same low-rank factorization as ACA,
 
 ```math
 \mathbf{A} \approx \mathbf{U}\mathbf{V}^T = \sum_{k=1}^r \mathbf{u}_k \mathbf{v}_k^T
 ```
 
-but only evaluates a subset of entries corresponding to selected pivot indices. This makes it particularly suitable for hierarchical methods such as the NCA.
+but only evaluates a subset of entries corresponding to selected pivot indices, and it
+returns *only those pivot indices* — not a materialized `U`/`V`. This makes it
+particularly suitable for hierarchical methods such as the NCA, where the pivots
+(not a dense factorization) are what gets reused across nested levels. If an explicit
+low-rank factorization is needed, it can be assembled from the returned row/column
+indices `rows`, `cols` as the CUR-style skeleton `U = A[:, cols] * inv(A[rows, cols])`,
+`V = A[rows, :]`.
 
 API: [`IACA`](@ref)
 
@@ -20,14 +26,17 @@ API: [`IACA`](@ref)
 
 ## Algorithm
 
-The IACA algorithm computes a low-rank approximation of a matrix `A^{m×n}` using only a subset of rows and columns that are required for the nested representation.
-The algorithm builds a factorization of the form
+The IACA algorithm selects a subset of rows and columns of a matrix `A^{m×n}` that are
+required for the nested representation, evaluating only the matrix entries needed to
+make that selection. Conceptually this pivot sequence corresponds to the same
+factorization as ACA,
 
 ```math
 \mathbf{A} \approx \mathbf{U}\mathbf{V}^T = \sum_{k=1}^r \mathbf{u}_k \mathbf{v}_k^T
 ```
 
-where `U ∈ ℝ^{m×r}` and `V ∈ ℝ^{n×r}` are computed iteratively.
+with `U ∈ ℝ^{m×r}` and `V ∈ ℝ^{n×r}`, but IACA itself only returns the selected pivot
+indices, computed iteratively.
 
 The IACA algorithm proceeds as follows:
 
@@ -56,7 +65,8 @@ This approach we call **mimicry pivoting**, for details see [`MimicryPivoting`](
 
 Since the full residual is not available, the classical ACA stopping criterion cannot be used.
 
-Instead, the IACA estimates the residual using the [`iFNormEstimator`](@ref) which provides an estimate of the Frobenius norm of the residual using only rows or columns.
+Instead, the IACA estimates the residual using [`FNormEstimator`](@ref) (its vector-argument
+dispatch), which provides an estimate of the Frobenius norm of the residual using only rows or columns.
 
 To avoid premature convergence due to inaccurate estimates:
 

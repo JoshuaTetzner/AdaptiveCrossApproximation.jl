@@ -1,16 +1,28 @@
 module ACAH2Trees
 using H2Trees
 import H2Trees:
-    isleaf, testtree, trialtree, root, children, parent, firstchild, data, numberofvalues
+    isleaf, testtree, trialtree, root, children, firstchild, data, numberofvalues
 using LinearAlgebra
 using AdaptiveCrossApproximation
-import AdaptiveCrossApproximation: GeoPivStrat, GeoPivStratFunctor
 
 include("treemimicrypivoting.jl")
 function AdaptiveCrossApproximation._tree(
-    ::AdaptiveCrossApproximation.H2Tree, args...; kwargs...
+    ::AdaptiveCrossApproximation.H2Tree,
+    testspace,
+    trialspace;
+    minhalfsize=1 / 2^10,
+    testminvalues::Int=200,
+    trialminvalues::Int=200,
+    kwargs...,
 )
-    return H2Trees.TwoNTree(args...; kwargs...)
+    return H2Trees.TwoNTree(
+        testspace,
+        trialspace,
+        minhalfsize;
+        testminvalues=testminvalues,
+        trialminvalues=trialminvalues,
+        kwargs...,
+    )
 end
 
 function AdaptiveCrossApproximation.permutation(tree::H2Trees.H2ClusterTree)

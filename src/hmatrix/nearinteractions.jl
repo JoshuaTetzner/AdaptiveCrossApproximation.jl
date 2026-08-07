@@ -25,7 +25,7 @@ For well-separated clusters (distance > η × cluster diameter), the interaction
 is computed via ACA compression; otherwise, via direct near-field assembly.
 Typical values: `η ≈ 1.0` to `3.0` depending on required accuracy.
 """
-function isnear(η::Real=Float64(1.0))
+function isnear(η::Real=1.0)
     return IsNearFunctor{typeof(η)}(η)
 end
 
@@ -102,6 +102,7 @@ block-sparse matrix stores these near-field interactions.
   - `isnear`: Admissibility predicate (default: `isnear()`)
   - `scheduler`: Thread scheduler (default: `SerialScheduler()`)
   - `matrixdata`: Assembly data passed to kernel matrix (optional)
+  - `verbose`: enable progress output (default `true`)
 
 # Returns
 
@@ -121,7 +122,7 @@ function assemblenears(
     isnear=isnear(),
     scheduler=SerialScheduler(),
     matrixdata=defaultmatrixdata(operator, testspace, trialspace),
-    verbose::Bool=false,
+    verbose::Bool=true,
 )
     nearmatrix = AbstractKernelMatrix(
         operator, testspace, trialspace; matrixdata=matrixdata
@@ -176,6 +177,7 @@ block storage format optimized for the reordered layout.
   - `isnear`: Admissibility predicate (default: `isnear()`)
   - `scheduler`: Thread scheduler (default: `SerialScheduler()`)
   - `matrixdata`: Assembly data passed to kernel matrix (optional)
+  - `verbose`: enable progress output (default `true`)
 
 # Returns
 
@@ -196,7 +198,7 @@ function assemblenears(
     isnear=isnear(),
     scheduler=SerialScheduler(),
     matrixdata=defaultmatrixdata(operator, testspace, trialspace),
-    verbose::Bool=false,
+    verbose::Bool=true,
 )
     nearmatrix = AbstractKernelMatrix(
         operator, testspace, trialspace; matrixdata=matrixdata

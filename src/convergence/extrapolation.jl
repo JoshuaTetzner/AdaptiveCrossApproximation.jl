@@ -1,5 +1,3 @@
-using Polynomials
-
 """
     FNormExtrapolator{F} <: ConvCrit
 
@@ -8,15 +6,15 @@ Combines norm estimation with quadratic extrapolation to predict convergence.
 
 # Fields
 
-  - `estimator::Union{FNormEstimator{F},iFNormEstimator{F}}`: Underlying norm estimator
+  - `estimator::FNormEstimator{F}`: Underlying norm estimator
 """
 struct FNormExtrapolator{F} <: ConvCrit
-    estimator::Union{FNormEstimator{F},iFNormEstimator{F}}
+    estimator::FNormEstimator{F}
 end
 
 struct FNormExtrapolatorFunctor{F} <: ConvCritFunctor
     lastnorms::Vector{F}
-    estimator::Union{FNormEstimatorFunctor{F},iFNormEstimatorFunctor{F}}
+    estimator::FNormEstimatorFunctor{F}
 end
 
 """
@@ -61,9 +59,10 @@ function (convcrit::FNormExtrapolatorFunctor{F})(
             norm(rowbuffer[npivot, 1:maxcolumns]) * norm(colbuffer[1:maxrows, npivot])
         return npivot, true
     else
+        npivot - 1 < 3 && return npivot, false
         f2 = fit(Vector(1:(npivot - 1)), log10.(convcrit.lastnorms[1:(npivot - 1)]), 2)
         return npivot,
-        f2(npivot) > log10(convcrit.estimator.tol * sqrt(convcrit.estimator.normUV²))
+        f2(npivot) > log10(convcrit.estimator.tol * convcrit.estimator.normUV)
     end
 end
 
@@ -72,12 +71,14 @@ function (convcrit::FNormExtrapolatorFunctor{F})(
 ) where {F<:Real,K}
     npivot_, conv = convcrit.estimator(rcbuffer, npivot)
     (npivot_ != npivot) && (return npivot_, conv)
-
-    @views convcrit.lastnorms[npivot] = norm(rcbuffer)
     if conv
+        length(convcrit.lastnorms) < npivot && resize!(convcrit.lastnorms, npivot)
+        @inbounds convcrit.lastnorms[npivot] = norm(rcbuffer)
         return npivot, true
     else
-        f2 = fit(Vector(1:(npivot)), log10.(convcrit.lastnorms[1:(npivot)]), 2)
-        return npivot, f2(npivot) > log10(tolerance(convcrit) * convcrit.estimator.normUV)
+        npivot - 1 < 3 && return npivot, false
+        f2 = fit(Vector(1:(npivot - 1)), log10.(convcrit.lastnorms[1:(npivot - 1)]), 2)
+        return npivot,
+        f2(F(npivot)) > log10(tolerance(convcrit) * convcrit.estimator.normUV)
     end
 end

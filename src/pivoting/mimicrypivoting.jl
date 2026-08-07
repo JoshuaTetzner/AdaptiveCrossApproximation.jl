@@ -31,7 +31,6 @@ end
     npivot::Int,
 ) where {F<:Real}
     nactive > 0 || throw(ArgumentError("nactive must be positive."))
-    npivot > 1 || throw(ArgumentError("npivot must be larger than 1."))
 
     exponent = F(2) / F(npivot - 1)
     @inbounds begin
@@ -73,7 +72,7 @@ function (strat::MimicryPivoting{D,F})(refidcs, idcs) where {D,F}
     return MimicryPivotingFunctor{D,F}(strat, nactive, refcentroid, idcs, h, leja, w)
 end
 
-_buildpivstrat(strat::MimicryPivoting, refidcs, idcs, maxrank) = strat(refidcs, idcs)
+_buildpivstrat(strat::MimicryPivoting, refidcs, idcs, _) = strat(refidcs, idcs)
 
 function Base.resize!(functor::MimicryPivotingFunctor{D,F}, nactive::Int) where {D,F<:Real}
     if length(functor.idcs) < nactive
@@ -104,14 +103,14 @@ function reset!(
 end
 
 function (pivstrat::MimicryPivotingFunctor{D,F})() where {D,F}
-    AdaptiveCrossApproximation.leja2_init!(pivstrat, pivstrat.idcs[1], pivstrat.nactive)
+    leja2_init!(pivstrat, pivstrat.idcs[1], pivstrat.nactive)
     return 1
 end
 
 function (pivstrat::MimicryPivotingFunctor{D,F})(rc::AbstractArray) where {D,F}
     nactive = pivstrat.nactive
     if all(iszero, view(pivstrat.h, 1:nactive))
-        AdaptiveCrossApproximation.leja2_init!(pivstrat, pivstrat.idcs[1], nactive)
+        leja2_init!(pivstrat, pivstrat.idcs[1], nactive)
     end
 
     nextidx = bestindex(
@@ -122,6 +121,41 @@ function (pivstrat::MimicryPivotingFunctor{D,F})(rc::AbstractArray) where {D,F}
         1,
     )
 
-    AdaptiveCrossApproximation.leja2!(pivstrat, pivstrat.idcs[nextidx], nactive)
+    leja2!(pivstrat, pivstrat.idcs[nextidx], nactive)
     return nextidx
+end
+
+"""
+    (pivstrat::MimicryPivotingFunctor)(npivot::Int)
+
+Select the next pivot by index count rather than residual data, as used by [`IACA`](@ref).
+
+Note that unlike [`TreeMimicryPivoting`](@ref), `MimicryPivoting` resolves pivots to
+positions in the `idcs` array it was built with, not to global indices; it is therefore
+only valid within `IACA` when the corresponding row/column index range is the identity
+range `1:n` (i.e. `MimicryPivoting` is not usable for nested/sub-block compression).
+"""
+function (pivstrat::MimicryPivotingFunctor{D,F})(npivot::Int) where {D,F}
+    nactive = pivstrat.nactive
+    if all(iszero, view(pivstrat.h, 1:nactive))
+        leja2_init!(pivstrat, pivstrat.idcs[1], nactive)
+    end
+
+    nextidx = bestindex(
+        view(pivstrat.leja, 1:nactive),
+        view(pivstrat.h, 1:nactive),
+        view(pivstrat.w, 1:nactive),
+        nactive,
+        npivot,
+    )
+
+    leja2!(pivstrat, pivstrat.idcs[nextidx], nactive)
+    return nextidx
+end
+
+function update_refcentroid!(
+    functor::MimicryPivotingFunctor, refidcs::AbstractVector{<:Integer}
+)
+    functor.refcentroid = _centroid(functor.pivoting.refpos, refidcs)
+    return functor
 end

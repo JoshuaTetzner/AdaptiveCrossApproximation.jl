@@ -35,7 +35,7 @@ mutable struct RandomSamplingFunctor{F<:Real,K,M,T} <: ConvCritFunctor
     convergence::T
     mat::M
     nactive::Int
-    normUV²::F
+    normUV::F
     indices::Vector{Tuple{Int,Int}}
     rest::Vector{K}
 end
@@ -145,7 +145,7 @@ function reset!(
     _sampleindices!(convcrit.indices, rowlen, collen, nsamples)
     _fillrest!(convcrit.rest, convcrit.indices, convcrit.mat, rowidcs, colidcs, nsamples)
     convcrit.nactive = nsamples
-    convcrit.normUV² = zero(convcrit.normUV²)
+    convcrit.normUV = zero(convcrit.normUV)
     return nothing
 end
 
@@ -171,10 +171,10 @@ function (convcrit::RandomSamplingFunctor{F,K,M})(
     (meanrest == 0.0 && rnorm == 0.0 && cnorm == 0.0) && (return npivot - 1, false)
 
     lhs = sqrt(meanrest * maxrows * maxcolumns)
-    rhs = tolerance(convcrit) * sqrt(convcrit.normUV²)
+    rhs = tolerance(convcrit) * convcrit.normUV
     (rnorm == 0.0 || cnorm == 0.0) && (return npivot - 1, lhs > rhs)
 
     normF!(convcrit, rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
-    rhs = tolerance(convcrit) * sqrt(convcrit.normUV²)
+    rhs = tolerance(convcrit) * convcrit.normUV
     return npivot, lhs > rhs
 end
