@@ -19,14 +19,14 @@ end
 
 function (convcrit::CombinedConvCrit)(
     K::Union{AbstractMatrix,AbstractKernelMatrix},
-    rowidcs::AbstractArray{Int},
-    colidcs::AbstractArray{Int};
+    nrowidcs::Int,
+    ncolidcs::Int;
     maxrank::Int=40,
 )
     curr_crits = Vector{ConvCritFunctor}(undef, length(convcrit.crits))
     for (i, crit) in enumerate(convcrit.crits)
         if isa(crit, RandomSampling)
-            curr_crits[i] = crit(K, rowidcs, colidcs)
+            curr_crits[i] = crit(K, nrowidcs, ncolidcs)
         elseif isa(crit, FNormExtrapolatorFunctor)
             curr_crits[i] = crit(maxrank)
         else
@@ -36,9 +36,16 @@ function (convcrit::CombinedConvCrit)(
     return CombinedConvCritFunctor(curr_crits, ones(Bool, length(curr_crits)))
 end
 
-_buildconvcrit(cc::CombinedConvCrit, A, rowidcs, colidcs, maxrank) = cc(
-    A, rowidcs, colidcs; maxrank=maxrank
-)
+_buildconvcrit(cc::CombinedConvCrit, A, rowidcs, colidcs, maxrank) =
+    cc(A, rowidcs, colidcs; maxrank=maxrank)
+
+_buildconvcrit(
+    cc::CombinedConvCrit,
+    A,
+    rowidcs::AbstractVector{Int},
+    colidcs::AbstractVector{Int},
+    maxrank,
+) = cc(A, length(rowidcs), length(colidcs); maxrank=maxrank)
 
 function reset!(
     convcrit::CombinedConvCritFunctor,
