@@ -179,14 +179,9 @@ end
     reset_phase!(fs.convcrit, dir)
 
 # --- direction phasing -----------------------------------------------------
-# True only when every active, non-empty far cluster carries a dominant-direction
-# set. When it is false (a block that is not uniformly directional — e.g. clusters
-# of sharp-edged / open geometry whose basis functions have no dominant
-# orientation), orientation phasing is disabled for the whole block and pivoting
-# falls back to the plain (directionless) tree-mimicry strategy. This all-or-
-# nothing gate matches the paper/workingstate behaviour; without it the filter
-# over-applies orientation-restricted pivoting to poorly-oriented blocks and
-# degrades their low-rank far compression.
+# True only when every active, non-empty far cluster has a dominant direction. If any
+# cluster lacks one (e.g. sharp-edged/open geometry), orientation phasing is disabled
+# for the whole block and pivoting falls back to the plain directionless strategy.
 function _farfield_has_node_directions(
     fs::EFIEDirectionalFilterState, functor::TreeMimicryPivotingFunctor
 )

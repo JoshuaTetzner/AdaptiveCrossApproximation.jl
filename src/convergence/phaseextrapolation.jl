@@ -19,11 +19,6 @@ struct PhaseExtrapolator{F} <: ConvCrit
     estimator::FNormEstimator{F}
 end
 
-"""
-    PhaseExtrapolator(tol::F)
-
-Construct a phase extrapolator with the given tolerance.
-"""
 function PhaseExtrapolator(tol::F) where {F<:Real}
     return PhaseExtrapolator(FNormEstimator(tol))
 end

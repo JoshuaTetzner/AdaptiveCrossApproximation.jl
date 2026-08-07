@@ -25,7 +25,7 @@ e = assemble((n × E) × n, X)
 
 u, stats = Krylov.gmres(T, e; rtol=1e-4)
 @assert stats.solved "GMRES failed to converge"
-ACA.storage(T); #hide
+ACA.storage(T)
 
 # Bistatic RCS in the plane φ=0: σ(θ) = 4π|E_far(θ)|² for unit-amplitude incidence
 Θ = range(0; stop=π, length=181)
@@ -60,5 +60,5 @@ add_trace!(
 )
 add_trace!(plt, patch(geo, norm.(fcr); caxis=(0, 2)); row=2, col=1)
 
-savefig(plt, "efie_results.html"); #hide
-nothing #hide
+outdir = get(ENV, "ACA_OUTPUT_DIR", @__DIR__)
+savefig(plt, joinpath(outdir, "efie_results.html"))

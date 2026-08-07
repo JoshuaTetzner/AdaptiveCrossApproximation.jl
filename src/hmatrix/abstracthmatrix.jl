@@ -83,54 +83,23 @@ end
 
 """
     testtree(tree)
-
-Return the sub-tree used for row (test space) clustering.
-
-Part of the tree backend interface required by [`HMatrix`](@ref) assembly and
-[`TreeMimicryPivoting`](@ref); implement this for a custom tree type (the
-ACAH2Trees extension implements it for `H2Trees.TwoNTree`). For a single shared
-tree, this may return `tree` itself.
-"""
-testtree(tree) = error("Requires implementation for $(typeof(tree))")
-
-"""
     trialtree(tree)
-
-Return the sub-tree used for column (trial space) clustering.
-
-Counterpart to [`testtree`](@ref) in the tree backend interface; see its
-docstring for details.
-"""
-trialtree(tree) = error("Requires implementation for $(typeof(tree))")
-
-"""
     levels(tree)
-
-Return an iterable of the levels of `tree`, coarsest first.
-
-Part of the tree backend interface required by [`HMatrix`](@ref) assembly;
-each level is iterated with [`LevelIterator`](@ref) to visit its nodes.
-"""
-levels(tree) = error("Requires implementation for $(typeof(tree))")
-
-"""
     LevelIterator(tree, level)
-
-Return an iterator over the nodes of `tree` at `level`.
-
-Part of the tree backend interface required by [`HMatrix`](@ref) assembly; used
-together with [`levels`](@ref) to drive near/far-field block assembly level by level.
-"""
-LevelIterator(tree, level) = error("Requires implementation for $(typeof(tree))")
-
-"""
     permutation(tree)
 
-Return the index permutation `tree` applies to its underlying space.
-
-Part of the tree backend interface required by [`HMatrix`](@ref) assembly; used by
-[`PermuteSpaceInPlace`](@ref) to reorder test/trial spaces to match tree clustering.
+Tree backend interface required by [`HMatrix`](@ref) assembly and
+[`TreeMimicryPivoting`](@ref); implement these for a custom tree type (the
+ACAH2Trees extension implements them for `H2Trees.TwoNTree`). `testtree`/`trialtree`
+return the row/column clustering sub-tree (for a single shared tree, this may
+return `tree` itself); `levels` returns tree levels coarsest first, visited via
+`LevelIterator`; `permutation` returns the index permutation the tree applies to
+its underlying space, used by [`PermuteSpaceInPlace`](@ref).
 """
+testtree(tree) = error("Requires implementation for $(typeof(tree))")
+trialtree(tree) = error("Requires implementation for $(typeof(tree))")
+levels(tree) = error("Requires implementation for $(typeof(tree))")
+LevelIterator(tree, level) = error("Requires implementation for $(typeof(tree))")
 permutation(tree) = error("Requires implementation for $(typeof(tree))")
 
 """

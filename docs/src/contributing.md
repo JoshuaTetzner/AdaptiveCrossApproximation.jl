@@ -27,6 +27,21 @@ Add documentation for any changes or new features following the style of the exi
 
 
 ---
+## Documentation plots
+
+The interactive plots on the [Application Examples](@ref) page are pre-rendered HTML
+files stored in `docs/src/assets/examples/` and committed to the repository; the docs
+build only serves these static files, it does not re-run the examples. After changing
+`example/efie.jl` or `example/mfie.jl`, regenerate them from the package root:
+
+```sh
+julia --project=docs docs/render_examples.jl
+```
+
+and commit the updated HTML files alongside your example changes.
+
+
+---
 ## [Tests](@id tests)
 
 Write tests for your code changes and verify that no errors occur, e.g., by running

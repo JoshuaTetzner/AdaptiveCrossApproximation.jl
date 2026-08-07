@@ -7,16 +7,10 @@ using Random
 using StaticArrays
 using AdaptiveCrossApproximation
 
-# JET.test_package is intentionally NOT wired in as a @testitem: JET.jl's analyzer
-# throws an internal "Expected MethodTableView" error whenever it runs inside
-# TestItemRunner's execution model (each @testitem is `Base.invokelatest`-eval'd
-# into a fresh anonymous module), regardless of ordering relative to other
-# testitems — confirmed reproducible with JET running first, last, and
-# immediately after/before Aqua.test_all. This is a JET.jl / TestItemRunner.jl
-# incompatibility, not a defect in this package: calling
-# `JET.report_package(AdaptiveCrossApproximation; target_modules=(AdaptiveCrossApproximation,))`
-# directly (outside the test harness, with BEAST/CUDA/H2Trees all loaded, both
-# before and after Aqua.test_all) reports zero errors. Run it manually instead:
+# JET.test_package is intentionally NOT wired in as a @testitem: run alongside
+# Aqua.test_all with BEAST/CUDA/CompScienceMeshes/H2Trees loaded, it never
+# finishes (still running, no output, after 35+ minutes vs. under 30s standalone).
+# Run it manually instead:
 #
 #   using JET, AdaptiveCrossApproximation
 #   JET.report_package(AdaptiveCrossApproximation; target_modules=(AdaptiveCrossApproximation,))

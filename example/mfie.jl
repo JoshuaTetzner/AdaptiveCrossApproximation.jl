@@ -67,5 +67,5 @@ add_trace!(
 )
 add_trace!(plt, patch(geo, norm.(fcr); caxis=(0, 2)); row=2, col=1)
 
-savefig(plt, "mfie_results.html"); #hide
-nothing #hide
+outdir = get(ENV, "ACA_OUTPUT_DIR", @__DIR__)
+savefig(plt, joinpath(outdir, "mfie_results.html"))

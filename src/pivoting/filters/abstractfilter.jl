@@ -51,12 +51,7 @@ the [`PivotingFilterState`](@ref) identity defaults.
 struct NoFilterState <: PivotingFilterState end
 
 # --- PivotingFilter interface (identity defaults) --------------------------
-# Every hook takes the filter state and the strategy functor. The defaults below
-# implement the identity filter (NoFilter): all nodes and indices are accepted, no
-# edge weighting is applied, and a single directionless phase runs until the
-# candidates are exhausted. Concrete filters override the subset they need. The
-# functor argument is typed against the abstract `PivStratFunctor`, so the
-# interface is not tied to a single strategy.
+# Concrete filters override the subset of hooks they need.
 @inline _reset_filterstate!(::PivotingFilterState) = nothing
 @inline _accepts_node(::PivotingFilterState, ::PivStratFunctor, ::Int, ::Int32) = true
 @inline _accepts_index(::PivotingFilterState, ::PivStratFunctor, ::Int, ::Int32) = true

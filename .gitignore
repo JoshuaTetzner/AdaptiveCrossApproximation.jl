@@ -4,5 +4,6 @@
 /Manifest.toml
 /docs/Manifest.toml
 /docs/build/
+/example/*.html
 lcov.info
 *.vscode

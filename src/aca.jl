@@ -179,7 +179,14 @@ function (aca::ACA)(
     # conv is true until convergence is reached
     npivot, conv = aca.convergence(rowbuffer, colbuffer, npivot, maxrows, maxcols)
 
+    # A convergence criterion may reject a pivot (return npivot - 1) while still
+    # signaling conv=true, e.g. when pivoting has switched to a random probe that
+    # can land on a spot with no residual left without that implying the whole
+    # block is resolved. `stall` bounds how many consecutive rejections we tolerate
+    # so this can't spin forever once a block's real rank is exhausted.
+    stall = 0
     while conv && npivot < maxrank
+        prevpivot = npivot
         npivot += 1
         @views nextrow = aca.rowpivoting(colbuffer[1:maxrows, max(1, npivot - 1)])
         rows[npivot] = rowidcs[nextrow]
@@ -214,6 +221,8 @@ function (aca::ACA)(
             end
         end
         npivot, conv = aca.convergence(rowbuffer, colbuffer, npivot, maxrows, maxcols)
+        stall = npivot > prevpivot ? 0 : stall + 1
+        stall >= maxrank && break
     end
     return npivot
 end

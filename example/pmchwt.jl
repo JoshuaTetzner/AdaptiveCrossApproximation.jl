@@ -4,6 +4,7 @@ using BEAST
 using ParallelKMeans
 using H2Trees
 using AdaptiveCrossApproximation
+using PlotlyJS
 
 const ACA = AdaptiveCrossApproximation
 
@@ -53,4 +54,30 @@ b = assemble(rhs, 𝕏)
 
 A⁻¹ = BEAST.GMRESSolver(A; reltol=1e-4, maxiter=1000)
 u = A⁻¹ * b
-nothing #hide
+
+# Bistatic RCS in the plane φ=0: σ(θ) = 4π|E_far(θ)|² for unit-amplitude incidence.
+# The exterior scattered far field combines the electric (j) and magnetic (m)
+# equivalent currents the same way the exterior block of `a` does (η*T[j] - K[m]).
+Θ = range(0; stop=π, length=181)
+pts = [point(sin(θ), 0, cos(θ)) for θ in Θ]
+ffd_e = potential(MWFarField3D(; wavenumber=κ), pts, u[j], X)
+ffd_m = potential(BEAST.MWDoubleLayerFarField3D(; wavenumber=κ), pts, u[m], X)
+rcs_dB = 10 .* log10.(4π .* abs2.(norm.(η .* ffd_e .- ffd_m)))
+
+fcr_j, geo = facecurrents(u[j], X)
+fcr_m, _ = facecurrents(u[m], X)
+
+plt = Plot(
+    Layout(
+        Subplots(;
+            rows=1, cols=3, specs=[Spec() Spec(; kind="mesh3d") Spec(; kind="mesh3d")]
+        );
+        title_text="PMCHWT: dielectric sphere scattering (ACA.assemble)",
+    ),
+)
+add_trace!(plt, scatter(; x=rad2deg.(Θ), y=rcs_dB, name="bistatic RCS [dB]"); row=1, col=1)
+add_trace!(plt, patch(geo, norm.(fcr_j); caxis=(0, 2)); row=1, col=2)
+add_trace!(plt, patch(geo, norm.(fcr_m); caxis=(0, 2)); row=1, col=3)
+
+outdir = get(ENV, "ACA_OUTPUT_DIR", @__DIR__)
+savefig(plt, joinpath(outdir, "pmchwt_results.html"))

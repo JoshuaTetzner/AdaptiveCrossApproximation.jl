@@ -7,9 +7,10 @@ solves the resulting linear system, and produces two plots: a near-field heatmap
 bistatic radar cross section (RCS) pattern, alongside the induced surface current.
 
 These snippets are based on the files in `example/` (`efie.jl`, `mfie.jl`, `pmchwt.jl`).
-They are left as plain (unexecuted) fenced code here rather than executed `@example`
-blocks, since a full BEAST + PlotlyJS scattering solve is too heavy to run on every
-docs build; run the scripts directly to reproduce the plots.
+The EFIE and MFIE plots below are pre-rendered from those scripts (via
+`docs/render_examples.jl`) rather than executed on every docs build, since a full
+BEAST + PlotlyJS scattering solve is too heavy for that; run the scripts directly to
+reproduce or modify them.
 
 ## EFIE Scattering from a PEC Sphere
 
@@ -82,6 +83,16 @@ add_trace!(
 add_trace!(plt, patch(geo, norm.(fcr); caxis=(0, 2)); row=2, col=1)
 
 savefig(plt, "efie_results.html")
+```
+
+Bistatic RCS (top left), near-field magnitude in the ``yz`` plane (top right), and
+surface-current magnitude (bottom):
+
+```@raw html
+<iframe src="../../assets/examples/efie_results.html"
+        style="width:100%;height:600px;border:none;"
+        loading="lazy">
+</iframe>
 ```
 
 ### Notes
@@ -174,6 +185,16 @@ add_trace!(plt, patch(geo, norm.(fcr); caxis=(0, 2)); row=2, col=1)
 savefig(plt, "mfie_results.html")
 ```
 
+Bistatic RCS (top left), near-field magnitude in the ``yz`` plane (top right), and
+surface-current magnitude (bottom):
+
+```@raw html
+<iframe src="../../assets/examples/mfie_results.html"
+        style="width:100%;height:600px;border:none;"
+        loading="lazy">
+</iframe>
+```
+
 ### Notes
 
 - `assemble(a, ∏(Y), ∏(X); materialize=materialize)` calls `materialize` once per
@@ -242,13 +263,45 @@ b = assemble(rhs, 𝕏)
 
 A⁻¹ = BEAST.GMRESSolver(A; reltol=1e-4, maxiter=1000)
 u = A⁻¹ * b
+
+# Bistatic RCS in the plane φ=0: σ(θ) = 4π|E_far(θ)|² for unit-amplitude incidence.
+# The exterior scattered far field combines the electric (j) and magnetic (m)
+# equivalent currents the same way the exterior block of `a` does (η*T[j] - K[m]).
+Θ = range(0; stop=π, length=181)
+pts = [point(sin(θ), 0, cos(θ)) for θ in Θ]
+ffd_e = potential(MWFarField3D(; wavenumber=κ), pts, u[j], X)
+ffd_m = potential(BEAST.MWDoubleLayerFarField3D(; wavenumber=κ), pts, u[m], X)
+rcs_dB = 10 .* log10.(4π .* abs2.(norm.(η .* ffd_e .- ffd_m)))
+
+fcr_j, geo = facecurrents(u[j], X)
+fcr_m, _ = facecurrents(u[m], X)
+
+plt = Plot(
+    Layout(
+        Subplots(;
+            rows=1, cols=3, specs=[Spec() Spec(; kind="mesh3d") Spec(; kind="mesh3d")]
+        );
+        title_text="PMCHWT: dielectric sphere scattering (ACA.assemble)",
+    ),
+)
+add_trace!(plt, scatter(; x=rad2deg.(Θ), y=rcs_dB, name="bistatic RCS [dB]"); row=1, col=1)
+add_trace!(plt, patch(geo, norm.(fcr_j); caxis=(0, 2)); row=1, col=2)
+add_trace!(plt, patch(geo, norm.(fcr_m); caxis=(0, 2)); row=1, col=3)
+
+savefig(plt, "pmchwt_results.html")
+```
+
+Bistatic RCS (left), electric surface current magnitude `|j|` (middle), and magnetic
+surface current magnitude `|m|` (right):
+
+```@raw html
+<iframe src="../../assets/examples/pmchwt_results.html"
+        style="width:100%;height:450px;border:none;"
+        loading="lazy">
+</iframe>
 ```
 
 ### Notes
 
 - PMCHWT has two coupled unknowns (electric current `j`, magnetic current `m`); the
   solved hilbert-space vector `u` is indexed per-unknown as `u[j]`, `u[m]`.
-- The near-field superposition trick (`nearfield_E` evaluated once with exterior
-  data `κ, η` and once with negated currents and interior data `κ′, η′`, then
-  summed) exploits the equivalence principle so a single evaluation grid gives the
-  correct total field both inside and outside the dielectric sphere.

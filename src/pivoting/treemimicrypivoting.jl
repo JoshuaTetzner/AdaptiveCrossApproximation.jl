@@ -36,16 +36,16 @@ end
 
 """
     TreeMimicryPivoting(refpos, pos, tree)
+    TreeMimicryPivoting(refpos, pos, tree, filter)
 
-Build a [`TreeMimicryPivoting`](@ref) strategy with the default [`NoFilter`](@ref),
-i.e. plain tree-aware mimicry pivoting with no directional restriction.
+Build a [`TreeMimicryPivoting`](@ref) strategy. `refpos`/`pos` are the reference
+positions to mimic (e.g. parent pivots) and the candidate point positions; `tree`
+is a tree adapter providing `center`, `values`, `children` and `firstchild` (the
+ACAH2Trees extension supplies a ready-made adapter for `H2Trees.TwoNTree`).
 
-# Arguments
-
-  - `refpos::Vector{SVector{D,T}}`: Reference positions to mimic (e.g., parent pivots).
-  - `pos::Vector{SVector{D,T}}`: Candidate point positions.
-  - `tree`: Tree adapter providing `center`, `values`, `children` and `firstchild`
-    (the ACAH2Trees extension supplies a ready-made adapter for `H2Trees.TwoNTree`).
+The three-argument form uses the default [`NoFilter`](@ref) (no directional
+restriction). Pass an explicit `filter` (a [`PivotingFilter`](@ref), e.g.
+[`EFIEDirectionalFilter`](@ref)) to restrict tree descent and pivot selection.
 """
 function TreeMimicryPivoting(
     refpos::Vector{SVector{D,T}}, pos::Vector{SVector{D,T}}, tree
@@ -53,20 +53,6 @@ function TreeMimicryPivoting(
     return TreeMimicryPivoting{D,T,typeof(tree),NoFilter}(refpos, pos, tree, NoFilter())
 end
 
-"""
-    TreeMimicryPivoting(refpos, pos, tree, filter)
-
-Build a [`TreeMimicryPivoting`](@ref) strategy with an explicit pivot `filter`
-(a [`PivotingFilter`](@ref), e.g. [`EFIEDirectionalFilter`](@ref)). Passing
-[`NoFilter`](@ref) is equivalent to the three-argument constructor.
-
-# Arguments
-
-  - `refpos::Vector{SVector{D,T}}`: Reference positions to mimic (e.g., parent pivots).
-  - `pos::Vector{SVector{D,T}}`: Candidate point positions.
-  - `tree`: Tree adapter (see the three-argument constructor).
-  - `filter::PivotingFilter`: Restriction on descent and pivot selection.
-"""
 function TreeMimicryPivoting(
     refpos::Vector{SVector{D,T}}, pos::Vector{SVector{D,T}}, tree, filter::PivotingFilter
 ) where {D,T<:Real}
@@ -167,56 +153,11 @@ end
 # The package expects the `tree` object to implement these functions. Adaptors
 # for concrete tree types should provide implementations in user code (the
 # ACAH2Trees extension implements them for H2Trees.TwoNTree).
-
-"""
-    center(tree, node::Int)
-
-Return the spatial centroid of `node` in `tree`.
-
-Part of the tree adapter interface required by [`TreeMimicryPivoting`](@ref);
-implement this for a custom tree type.
-"""
 center(tree::T, node::Int) where {T} = error("Not implemented for type $T")
-
-"""
-    values(tree, node)
-
-Return the point indices contained in `node` (or each node in a vector of nodes) of `tree`.
-
-Part of the tree adapter interface required by [`TreeMimicryPivoting`](@ref);
-implement this for a custom tree type.
-"""
 values(tree::T, node::Union{Int,Vector{Int}}) where {T} =
     error("Not implemented for type $T")
-
-"""
-    children(tree, node::Int)
-
-Return the child node indices of `node` in `tree`.
-
-Part of the tree adapter interface required by [`TreeMimicryPivoting`](@ref);
-implement this for a custom tree type.
-"""
 children(tree::T, node::Int) where {T} = error("Not implemented for type $T")
-
-"""
-    parent(tree, node::Int)
-
-Return the parent node index of `node` in `tree`.
-
-Part of the tree adapter interface required by [`TreeMimicryPivoting`](@ref);
-implement this for a custom tree type.
-"""
 parent(tree::T, node::Int) where {T} = error("Not implemented for type $T")
-
-"""
-    firstchild(tree, node::Int)
-
-Return the index of the first child of `node` in `tree`.
-
-Part of the tree adapter interface required by [`TreeMimicryPivoting`](@ref);
-implement this for a custom tree type.
-"""
 firstchild(tree::T, node::Int) where {T} = error("Not implemented for type $T")
 
 # --- empty-cluster bookkeeping ---------------------------------------------
@@ -297,8 +238,7 @@ end
 
 # Reusable per-recursion-depth candidate buffer, pooled on the functor so tree
 # descent doesn't allocate a fresh `Vector{Int}` at every level, for every pivot,
-# on every backtrack (this was the dominant allocation source in Phase 1: ~65% of
-# wall time was GC at 32 threads / 1M dofs before this change).
+# on every backtrack.
 function _depth_buffer!(pivstrat::TreeMimicryPivotingFunctor, depth::Int)
     buffers = pivstrat.candidatebuffers
     while length(buffers) < depth
