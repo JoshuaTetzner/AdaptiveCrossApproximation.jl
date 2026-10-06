@@ -53,12 +53,6 @@ function ACA(;
 end
 
 function (aca::ACA{RP,CP,C})(
-    rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}
-) where {RP<:MaximumValue,CP<:MaximumValue,C<:FNormEstimator}
-    return ACA(aca.rowpivoting(rowidcs), aca.columnpivoting(colidcs), aca.convergence())
-end
-
-function (aca::ACA{RP,CP,C})(
     A, rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}, maxrank::Int
 ) where {RP<:PivStrat,CP<:PivStrat,C<:ConvCrit}
     convcrit = _buildconvcrit(aca.convergence, A, rowidcs, colidcs, maxrank)
@@ -158,7 +152,7 @@ function (aca::ACA)(
     nextrc!(
         view(rowbuffer, npivot:npivot, 1:maxcols),
         A,
-        view(rowidcs, 1:1),
+        rowidcs[nextrow],
         view(colidcs, 1:maxcols),
     )
 
@@ -173,7 +167,7 @@ function (aca::ACA)(
         view(colbuffer, 1:maxrows, npivot:npivot),
         A,
         view(rowidcs, 1:maxrows),
-        view(colidcs, nextcolumn:nextcolumn),
+        colidcs[nextcolumn],
     )
 
     # conv is true until convergence is reached
@@ -193,7 +187,7 @@ function (aca::ACA)(
         nextrc!(
             view(rowbuffer, npivot:npivot, 1:maxcols),
             A,
-            view(rowidcs, nextrow:nextrow),
+            rowidcs[nextrow],
             view(colidcs, 1:maxcols),
         )
 
@@ -211,7 +205,7 @@ function (aca::ACA)(
                 view(colbuffer, 1:maxrows, npivot:npivot),
                 A,
                 view(rowidcs, 1:maxrows),
-                view(colidcs, nextcolumn:nextcolumn),
+                colidcs[nextcolumn],
             )
         end
 

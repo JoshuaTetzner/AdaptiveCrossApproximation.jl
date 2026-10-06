@@ -135,8 +135,11 @@ function assemblefars(
                 localcompressor = compressor(kernelmatrix, rbsize, cbsize, maxrank)
             end
             for faridx in farptr[node]:(farptr[node + 1] - 1)
+                localmatrix = localkernelmatrix(
+                    kernelmatrix, values[node], farvalues[faridx]
+                )
                 npivots = localcompressor(
-                    kernelmatrix,
+                    localmatrix,
                     view(colbuffer, values[node], 1:maxrank),
                     rowbuffer,
                     maxrank;
@@ -245,8 +248,11 @@ function assemblefars(
                 localcompressor = compressor(kernelmatrix, rbsize, cbsize, maxrank)
             end
             for faridx in farptr[node]:(farptr[node + 1] - 1)
+                localmatrix = localkernelmatrix(
+                    kernelmatrix, values[node], farvalues[faridx]
+                )
                 npivots = localcompressor(
-                    kernelmatrix,
+                    localmatrix,
                     view(colbuffer, values[node], 1:maxrank),
                     rowbuffer,
                     maxrank;

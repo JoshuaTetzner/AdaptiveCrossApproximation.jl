@@ -20,7 +20,7 @@ tofarquadstrat(quadstrat) = quadstrat
 
 defaultfarmatrixdata(operator, testspace, trialspace) =
     tofarquadstrat(defaultmatrixdata(operator, testspace, trialspace))
-defaultcompressor(operator, testspace, trialspace) = ACA(; tol=1e-4)
+defaultcompressor(operator, testspace, trialspace; tol::Real=1e-4) = ACA(; tol=tol)
 
 # kernelmatrix code
 """
@@ -208,7 +208,7 @@ function HMatrix(
     trialspace,
     tree;
     tol=1e-4,
-    compressor=ACA(; tol=tol),
+    compressor=defaultcompressor(operator, testspace, trialspace; tol=tol),
     isnear=isnear(),
     maxrank=40,
     spaceordering::SpaceOrderingStyle=PreserveSpaceOrder(),
@@ -337,15 +337,7 @@ Prints to stdout:
 """
 function storage(hmat::HMatrix)
     refsize = size(hmat, 1) * size(hmat, 2) * sizeof(eltype(hmat))
-    matsize = 0
-    for blk in hmat.nearinteractions.blocks
-        matsize += length(blk)
-    end
-    for farmat in hmat.farinteractions
-        for blk in farmat.blocks
-            matsize += length(blk.U) + length(blk.V)
-        end
-    end
+    matsize = nnz(hmat)
     println("storage: ", matsize * sizeof(eltype(hmat)) * 10^-9, " GB")
     println("summary size: ", Base.summarysize(hmat) * 10^-9, " GB")
     println("compression ratio: ", (matsize * sizeof(eltype(hmat))) / refsize)
