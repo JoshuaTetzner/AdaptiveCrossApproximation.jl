@@ -84,13 +84,63 @@ fct32 = myfct32()
     end
 end
 
-##
+@testset "H-Matrix storage and decomposition" begin
+    points = [SVector(rand(), rand(), 0.0) for _ in 1:40]
+    tree = TwoNTree(points, points, 1 / 2^10; testminvalues=20, trialminvalues=20)
+    mat = AdaptiveCrossApproximation.HMatrix(
+        fct,
+        points,
+        points,
+        tree;
+        spaceordering=AdaptiveCrossApproximation.PreserveSpaceOrder(),
+        tol=1e-4,
+    )
+    near = AdaptiveCrossApproximation.nearmatrix(mat)
+    far = AdaptiveCrossApproximation.farmatrix(mat)
+    storedentries = sum(length, mat.nearinteractions.blocks) + sum(
+        length(block.U) + length(block.V) for level in mat.farinteractions for
+        block in level.blocks;
+        init=0,
+    )
+
+    @test Matrix(near) + Matrix(far) ≈ Matrix(mat)
+    @test AdaptiveCrossApproximation.nnz(mat) == storedentries
+    @test AdaptiveCrossApproximation.storage(mat) ==
+        storedentries * sizeof(eltype(mat)) * 1e-9
+end
+
+@testset "Permute shared tree and space" begin
+    points = [SVector(rand(), rand(), 0.0) for _ in 1:20]
+    tree = TwoNTree(points, points, 1 / 2^10; testminvalues=10, trialminvalues=10)
+    sharedtree = H2Trees.testtree(tree)
+    tree = H2Trees.BlockTree(sharedtree, sharedtree)
+
+    testspace, trialspace = AdaptiveCrossApproximation.PermuteSpaceInPlace()(
+        tree, points, points
+    )
+    @test testspace === trialspace && trialspace === points
+end
 
 using BEAST
 using CompScienceMeshes
+
+@testset "assemble default H2 tree" begin
+    Γhassemble = CompScienceMeshes.meshsphere(1.0, 0.3)
+    Xhassemble = raviartthomas(Γhassemble)
+    ophassemble = Maxwell3D.singlelayer(; wavenumber=1.0)
+
+    @test AdaptiveCrossApproximation.defaulttreebackend() isa
+        AdaptiveCrossApproximation.H2Tree
+
+    Tcompressed = AdaptiveCrossApproximation.assemble(
+        ophassemble, Xhassemble, Xhassemble; tol=1e-3, maxrank=40
+    )
+    Tdense = assemble(ophassemble, Xhassemble, Xhassemble)
+
+    @test norm(Matrix(Tcompressed) - Tdense) / norm(Tdense) < 1e-2
+end
+
 using ParallelKMeans
-using H2Trees
-using AdaptiveCrossApproximation
 
 k = 2.4567799554075624 + 0.0im
 
@@ -122,26 +172,11 @@ DL2 = DL2_op + (-0.5 .* Iop)
 using LinearAlgebra
 
 x = rand(eltype(DLop), size(DLop, 2))
-norm(DLop * x - DL2_op * x) / norm(DL2_op * x)
-println("HMatnorm = ", norm(DL * x - DL2 * x) / norm(DL2 * x))
-
-@testset "assemble default tree (BEAST spaces)" begin
-    # assemble's default `tree` keyword builds an H2Trees.TwoNTree straight from
-    # the BEAST space (via the H2BEASTTrees extension), unlike every other test in
-    # this file which passes a pre-built tree explicitly. Regression test for the
-    # `testminvalues`/`trialminvalues` keyword names expected by that call.
-    let
-        Γhassemble = CompScienceMeshes.meshsphere(1.0, 0.3)
-        Xhassemble = raviartthomas(Γhassemble)
-        ophassemble = Maxwell3D.singlelayer(; wavenumber=1.0)
-
-        Tcompressed = AdaptiveCrossApproximation.assemble(
-            ophassemble, Xhassemble, Xhassemble; tol=1e-3, maxrank=40
-        )
-        Tdense = assemble(ophassemble, Xhassemble, Xhassemble)
-
-        @test norm(Matrix(Tcompressed) - Tdense) / norm(Tdense) < 1e-2
-    end
+@testset "Complex H-Matrix products" begin
+    @test norm(DLop * x - DL2_op * x) / norm(DL2_op * x) < 1e-3
+    @test norm(adjoint(DLop) * x - adjoint(DL2_op) * x) / norm(adjoint(DL2_op) * x) <
+        1e-3
+    @test norm(DL * x - DL2 * x) / norm(DL2 * x) < 1e-3
 end
 
 @testset "assemble KMeans tree backend (ParallelKMeans loaded)" begin

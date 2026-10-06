@@ -143,7 +143,7 @@ function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
     nextrc!(
         view(rowbuffer, npivot:npivot, 1:maxcolumn),
         A,
-        view(rowpivs, npivot:npivot),
+        rowpivs[npivot],
         view(colidcs, 1:maxcolumn),
     )
     _iaca_normF!(iaca.convergence, view(rowbuffer, npivot, 1:maxcolumn), npivot)
@@ -159,7 +159,7 @@ function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
         nextrc!(
             view(rowbuffer, npivot:npivot, 1:maxcolumn),
             A,
-            view(rowpivs, npivot:npivot),
+            rowpivs[npivot],
             view(colidcs, 1:maxcolumn),
         )
 
@@ -270,7 +270,7 @@ function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
         view(colbuffer, 1:maxrow, npivot:npivot),
         A,
         view(rowidcs, 1:maxrow),
-        view(colpivs, npivot:npivot),
+        colpivs[npivot],
     )
     _iaca_normF!(iaca.convergence, view(colbuffer, 1:maxrow, npivot), npivot)
     rowbuffer[1, 1] = K(1.0)
@@ -287,7 +287,7 @@ function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
             view(colbuffer, 1:maxrow, npivot:npivot),
             A,
             view(rowidcs, 1:maxrow),
-            view(colpivs, npivot:npivot),
+            colpivs[npivot],
         )
 
         # Norm update

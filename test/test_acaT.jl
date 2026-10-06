@@ -47,6 +47,36 @@ using Test
             end
         end
     end
+
+    U, V = AdaptiveCrossApproximation.acaᵀ(Kc; tol=1e-4, maxrank=30, svdrecompress=true)
+    @test size(U, 1) == size(Kc, 1)
+    @test size(V, 2) == size(Kc, 2)
+    @test size(U, 2) == size(V, 1)
+    @test norm(U * V - Kc) / norm(Kc) < 2e-4
+
+    rowidcs = collect(1:2:size(Kc, 1))
+    colidcs = collect(1:2:size(Kc, 2))
+    maxrank = 20
+    compressor = AdaptiveCrossApproximation.ACAᵀ(; tol=1e-4)(
+        Kc, length(rowidcs), length(colidcs), maxrank
+    )
+    colbuffer = zeros(length(rowidcs), maxrank)
+    rowbuffer = zeros(maxrank, length(colidcs))
+    npivots = compressor(
+        Kc, colbuffer, rowbuffer, maxrank; rowidcs=rowidcs, colidcs=colidcs
+    )
+    @test norm(colbuffer[:, 1:npivots] * rowbuffer[1:npivots, :] - Kc[rowidcs, colidcs]) /
+          norm(Kc[rowidcs, colidcs]) < 2e-4
+
+    reverse!(rowidcs)
+    reverse!(colidcs)
+    fill!(colbuffer, 0)
+    fill!(rowbuffer, 0)
+    npivots = compressor(
+        Kc, colbuffer, rowbuffer, maxrank; rowidcs=rowidcs, colidcs=colidcs
+    )
+    @test norm(colbuffer[:, 1:npivots] * rowbuffer[1:npivots, :] - Kc[rowidcs, colidcs]) /
+          norm(Kc[rowidcs, colidcs]) < 2e-4
 end
 
 @testset "ACAᵀ Special Cases" begin
@@ -65,6 +95,33 @@ end
     U, V = AdaptiveCrossApproximation.acaᵀ(K; tol=10^-4, maxrank=5)
     @test size(U, 2) == 3
     @test size(V, 1) == 3
+end
+
+@testset "ACAᵀ maxrank cap" begin
+    Random.seed!(21)
+    M = randn(10, 10)
+    U, V = AdaptiveCrossApproximation.acaᵀ(M; tol=1e-14, maxrank=4)
+    @test size(U, 2) == 4
+    @test size(V, 1) == 4
+    @test norm(U * V - M) / norm(M) > 1e-8
+end
+
+@testset "ACAᵀ tie-break determinism (MaximumValue)" begin
+    M = zeros(8, 6)
+    M[3, 1] = 2.0
+    M[6, 1] = 2.0
+    M[2, 1] = 1.0
+
+    maxrank = 6
+    compressor = AdaptiveCrossApproximation.ACAᵀ(; tol=1e-12)
+    colbuffer = zeros(size(M, 1), maxrank)
+    rowbuffer = zeros(maxrank, size(M, 2))
+    rows = zeros(Int, maxrank)
+    cols = zeros(Int, maxrank)
+    compressor(M, colbuffer, rowbuffer, maxrank; rows=rows, cols=cols)
+
+    @test cols[1] == 1
+    @test rows[1] == 6
 end
 
 @testset "ACAᵀ is the transpose dual of ACA (MaximumValue)" begin

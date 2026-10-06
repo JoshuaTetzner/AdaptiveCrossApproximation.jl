@@ -129,6 +129,8 @@ end
 
 Base.eltype(::AbstractKernelMatrix{T}) where {T} = T
 
+localkernelmatrix(matrix::AbstractKernelMatrix, rows, columns) = matrix
+
 function _kernelmatrix_size(ntest::Int, ntrial::Int, dim)
     dim === nothing && return (ntest, ntrial)
     dim == 1 && return ntest

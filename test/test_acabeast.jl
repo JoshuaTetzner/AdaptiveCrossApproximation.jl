@@ -88,6 +88,73 @@ k = 2 * π / λ
     end
 end
 
+@testset "Local BEAST KernelMatrix" begin
+    mesh = meshicosphere(2, 1.0)
+    space = raviartthomas(mesh)
+    operator = Maxwell3D.singlelayer(; wavenumber=k)
+    quadstrat = BEAST.DoubleNumQStrat(1, 2)
+    matrix = AdaptiveCrossApproximation.AbstractKernelMatrix(
+        operator, space, space; matrixdata=quadstrat
+    )
+    rows = collect(1:3)
+    columns = collect(4:8)
+    localmatrix = AdaptiveCrossApproximation.localkernelmatrix(matrix, rows, columns)
+    extension_module = Base.get_extension(AdaptiveCrossApproximation, :ACABEAST)
+    fallbackmatrix = AdaptiveCrossApproximation.AbstractKernelMatrix(operator, space, space)
+
+    @test extension_module !== nothing
+    @test localmatrix isa extension_module.LocalBEASTKernelMatrix
+    @test AdaptiveCrossApproximation.localkernelmatrix(fallbackmatrix, rows, columns) ===
+        fallbackmatrix
+    @test size(localmatrix) == size(matrix)
+    @test size(localmatrix, 1) == size(matrix, 1)
+    @test size(localmatrix, 2) == size(matrix, 2)
+    @test eltype(localmatrix) == eltype(matrix)
+
+    fullblock = zeros(ComplexF64, length(rows), length(columns))
+    matrix(fullblock, rows, columns)
+
+    block = zeros(ComplexF64, length(rows), length(columns))
+    localmatrix(block, rows, columns)
+    @test block ≈ fullblock
+
+    rowblock = zeros(ComplexF64, 1, length(columns))
+    localmatrix(rowblock, rows[1], columns)
+    @test rowblock ≈ fullblock[1:1, :]
+
+    columnblock = zeros(ComplexF64, length(rows), 1)
+    localmatrix(columnblock, rows, columns[1])
+    @test columnblock ≈ fullblock[:, 1:1]
+
+    scalarblock = zeros(ComplexF64, 1, 1)
+    localmatrix(scalarblock, rows[1], columns[1])
+    @test scalarblock[1] ≈ fullblock[1, 1]
+
+    fill!(rowblock, 0)
+    AdaptiveCrossApproximation.nextrc!(rowblock, localmatrix, rows[1], columns)
+    @test rowblock ≈ fullblock[1:1, :]
+
+    fill!(columnblock, 0)
+    AdaptiveCrossApproximation.nextrc!(columnblock, localmatrix, rows, columns[1])
+    @test columnblock ≈ fullblock[:, 1:1]
+
+    fill!(rowblock, 0)
+    AdaptiveCrossApproximation.nextrc!(rowblock, matrix, rows[1], columns)
+    @test rowblock ≈ fullblock[1:1, :]
+
+    fill!(block, 0)
+    AdaptiveCrossApproximation.nextrc!(block, matrix, rows, columns)
+    @test block ≈ fullblock
+
+    fill!(columnblock, 0)
+    AdaptiveCrossApproximation.nextrc!(columnblock, matrix, rows, columns[1])
+    @test columnblock ≈ fullblock[:, 1:1]
+
+    fill!(scalarblock, 0)
+    AdaptiveCrossApproximation.nextrc!(scalarblock, matrix, rows[1], columns[1])
+    @test scalarblock[1] ≈ fullblock[1, 1]
+end
+
 @testset "ACA BEAST 2D" begin
     line = meshsegment(1.0, 0.05)
     facinglines = weld(line, translate(line, [0.0, 1.0]))

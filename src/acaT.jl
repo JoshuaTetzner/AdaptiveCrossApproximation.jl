@@ -50,12 +50,6 @@ function ACAᵀ(;
 end
 
 function (aca::ACAᵀ{RP,CP,C})(
-    rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}
-) where {RP<:MaximumValue,CP<:MaximumValue,C<:FNormEstimator}
-    return ACAᵀ(aca.rowpivoting(rowidcs), aca.columnpivoting(colidcs), aca.convergence())
-end
-
-function (aca::ACAᵀ{RP,CP,C})(
     A, rowidcs::AbstractVector{Int}, colidcs::AbstractVector{Int}, maxrank::Int
 ) where {RP<:PivStrat,CP<:PivStrat,C<:ConvCrit}
     convcrit = _buildconvcrit(aca.convergence, A, rowidcs, colidcs, maxrank)
@@ -156,7 +150,7 @@ function (aca::ACAᵀ)(
         view(colbuffer, 1:maxrows, npivot:npivot),
         A,
         view(rowidcs, 1:maxrows),
-        view(colidcs, 1:1),
+        colidcs[nextcol],
     )
     @views nextrow = aca.rowpivoting(colbuffer[1:maxrows, npivot])
     rows[npivot] = rowidcs[nextrow]
@@ -166,7 +160,7 @@ function (aca::ACAᵀ)(
     nextrc!(
         view(rowbuffer, npivot:npivot, 1:maxcols),
         A,
-        view(rowidcs, nextrow:nextrow),
+        rowidcs[nextrow],
         view(colidcs, 1:maxcols),
     )
 
@@ -181,7 +175,7 @@ function (aca::ACAᵀ)(
             view(colbuffer, 1:maxrows, npivot:npivot),
             A,
             view(rowidcs, 1:maxrows),
-            view(colidcs, nextcol:nextcol),
+            colidcs[nextcol],
         )
 
         for k in 1:(npivot - 1)
@@ -197,7 +191,7 @@ function (aca::ACAᵀ)(
             nextrc!(
                 view(rowbuffer, npivot:npivot, 1:maxcols),
                 A,
-                view(rowidcs, nextrow:nextrow),
+                rowidcs[nextrow],
                 view(colidcs, 1:maxcols),
             )
         end

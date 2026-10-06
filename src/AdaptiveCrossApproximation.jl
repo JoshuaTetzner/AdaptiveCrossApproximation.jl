@@ -117,6 +117,9 @@ The fallback here covers any `AbstractArray`; kernel-matrix backends
 [`PointMatrix`](@ref)) provide their own methods that evaluate entries on demand.
 """
 nextrc!(buf, A::AbstractArray, i, j) = (buf .= view(A, i, j))
+nextrc!(buf, A::AbstractArray, i::Integer, j) = (buf .= view(A, i:i, j))
+nextrc!(buf, A::AbstractArray, i, j::Integer) = (buf .= view(A, i, j:j))
+nextrc!(buf, A::AbstractArray, i::Integer, j::Integer) = (buf .= view(A, i:i, j:j))
 
 include("aca.jl")
 include("fullpivotedaca.jl")
@@ -209,6 +212,8 @@ function assemble(
     quadstrat=defaultmatrixdata(op, testspace, trialspace),
     nearquadstrat=quadstrat,
     farquadstrat=tofarquadstrat(quadstrat),
+    tol=1e-4,
+    compressor=defaultcompressor(op, testspace, trialspace; tol=tol),
     kwargs...,
 )
     return HMatrix(
@@ -216,6 +221,8 @@ function assemble(
         testspace,
         trialspace,
         tree;
+        tol=tol,
+        compressor=compressor,
         nearmatrixdata=nearquadstrat,
         farmatrixdata=farquadstrat,
         kwargs...,

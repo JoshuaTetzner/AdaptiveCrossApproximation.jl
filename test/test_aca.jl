@@ -47,6 +47,36 @@ using Test
             end
         end
     end
+
+    U, V = AdaptiveCrossApproximation.aca(Kc; tol=1e-4, maxrank=30, svdrecompress=true)
+    @test size(U, 1) == size(Kc, 1)
+    @test size(V, 2) == size(Kc, 2)
+    @test size(U, 2) == size(V, 1)
+    @test norm(U * V - Kc) / norm(Kc) < 2e-4
+
+    rowidcs = collect(1:2:size(Kc, 1))
+    colidcs = collect(1:2:size(Kc, 2))
+    maxrank = 20
+    compressor = AdaptiveCrossApproximation.ACA(; tol=1e-4)(
+        Kc, length(rowidcs), length(colidcs), maxrank
+    )
+    colbuffer = zeros(length(rowidcs), maxrank)
+    rowbuffer = zeros(maxrank, length(colidcs))
+    npivots = compressor(
+        Kc, colbuffer, rowbuffer, maxrank; rowidcs=rowidcs, colidcs=colidcs
+    )
+    @test norm(colbuffer[:, 1:npivots] * rowbuffer[1:npivots, :] - Kc[rowidcs, colidcs]) /
+          norm(Kc[rowidcs, colidcs]) < 2e-4
+
+    reverse!(rowidcs)
+    reverse!(colidcs)
+    fill!(colbuffer, 0)
+    fill!(rowbuffer, 0)
+    npivots = compressor(
+        Kc, colbuffer, rowbuffer, maxrank; rowidcs=rowidcs, colidcs=colidcs
+    )
+    @test norm(colbuffer[:, 1:npivots] * rowbuffer[1:npivots, :] - Kc[rowidcs, colidcs]) /
+          norm(Kc[rowidcs, colidcs]) < 2e-4
 end
 
 @testset "ACA Special Cases" begin
