@@ -86,7 +86,14 @@ end
 
 @testset "H-Matrix storage and decomposition" begin
     points = [SVector(rand(), rand(), 0.0) for _ in 1:40]
-    tree = TwoNTree(points, points, 1 / 2^10; testminvalues=20, trialminvalues=20)
+    tree = H2Trees.buildtree(
+        points,
+        points;
+        builder=H2Trees.BlockTreeBuilder(;
+            test=H2Trees.TwoNTreeBuilder(; minhalfsize=1 / 2^10, minvalues=20),
+            trial=H2Trees.TwoNTreeBuilder(; minhalfsize=1 / 2^10, minvalues=20),
+        ),
+    )
     mat = AdaptiveCrossApproximation.HMatrix(
         fct,
         points,
@@ -97,11 +104,12 @@ end
     )
     near = AdaptiveCrossApproximation.nearmatrix(mat)
     far = AdaptiveCrossApproximation.farmatrix(mat)
-    storedentries = sum(length, mat.nearinteractions.blocks) + sum(
-        length(block.U) + length(block.V) for level in mat.farinteractions for
-        block in level.blocks;
-        init=0,
-    )
+    storedentries =
+        sum(length, mat.nearinteractions.blocks) + sum(
+            length(block.U) + length(block.V) for level in mat.farinteractions for
+            block in level.blocks;
+            init=0,
+        )
 
     @test Matrix(near) + Matrix(far) ≈ Matrix(mat)
     @test AdaptiveCrossApproximation.nnz(mat) == storedentries
@@ -111,7 +119,14 @@ end
 
 @testset "Permute shared tree and space" begin
     points = [SVector(rand(), rand(), 0.0) for _ in 1:20]
-    tree = TwoNTree(points, points, 1 / 2^10; testminvalues=10, trialminvalues=10)
+    tree = H2Trees.buildtree(
+        points,
+        points;
+        builder=H2Trees.BlockTreeBuilder(;
+            test=H2Trees.TwoNTreeBuilder(; minhalfsize=1 / 2^10, minvalues=10),
+            trial=H2Trees.TwoNTreeBuilder(; minhalfsize=1 / 2^10, minvalues=10),
+        ),
+    )
     sharedtree = H2Trees.testtree(tree)
     tree = H2Trees.BlockTree(sharedtree, sharedtree)
 
@@ -174,8 +189,7 @@ using LinearAlgebra
 x = rand(eltype(DLop), size(DLop, 2))
 @testset "Complex H-Matrix products" begin
     @test norm(DLop * x - DL2_op * x) / norm(DL2_op * x) < 1e-3
-    @test norm(adjoint(DLop) * x - adjoint(DL2_op) * x) / norm(adjoint(DL2_op) * x) <
-        1e-3
+    @test norm(adjoint(DLop) * x - adjoint(DL2_op) * x) / norm(adjoint(DL2_op) * x) < 1e-3
     @test norm(DL * x - DL2 * x) / norm(DL2 * x) < 1e-3
 end
 

@@ -15,7 +15,10 @@ A subtype that supports lazy matrix entry access through the kernel matrix inter
 
 # Notes
 
-Implement this type when matrix entries are computed on demand from geometric/operator data.
+Implement this type when matrix entries are computed on demand from
+geometric/operator data. A concrete backend should implement `size(matrix)` and
+`matrix(block, rows, columns)`; [`nextrc!`](@ref) uses that callable interface to
+sample rows and columns without materializing the full matrix.
 
 # See also
 
@@ -73,6 +76,8 @@ function beastkernelmatrix end
 
 Fill each preallocated `blocks[i]` (sized `(length(rowidcs[i]), length(colidcs[i]))`)
 by calling `matrix(blocks[i], rowidcs[i], colidcs[i])` once per `i`.
+The built-in kernel backends accumulate into the supplied blocks, so callers should
+normally provide zero-initialized storage.
 
 `rowidcs`/`colidcs` need not describe disjoint or contiguous index ranges —
 this is the same shape of input as [`nearinteractions`](@ref) (dense near
@@ -109,13 +114,13 @@ end
 """
     assemble_blocks_sparse(matrix::AbstractKernelMatrix, blocks, rowidcs, colidcs; kwargs...) -> blocks
 
-Batched counterpart of [`assemble_blocks`](@ref): fills every preallocated
-`blocks[i]` in one combined pass instead of one `matrix(block, rowidcs[i], colidcs[i])` call per `i`. Same `rowidcs`/`colidcs`/`blocks` contract as
-`assemble_blocks`.
+Batched counterpart of [`assemble_blocks`](@ref), with the same
+`rowidcs`/`colidcs`/`blocks` contract. A specialized backend may fill all blocks in
+one combined pass instead of making one matrix call per block.
 
 Default (any `AbstractKernelMatrix`) implementation: just forwards to
-`assemble_blocks` (no batching benefit without a backend-specific override of
-`assemble_blocks` itself).
+`assemble_blocks`. Backends may specialize `assemble_blocks_sparse` when they can
+evaluate several blocks more efficiently in one pass.
 """
 function assemble_blocks_sparse(
     matrix::AbstractKernelMatrix, blocks, rowidcs, colidcs; kwargs...
@@ -129,6 +134,19 @@ end
 
 Base.eltype(::AbstractKernelMatrix{T}) where {T} = T
 
+"""
+    localkernelmatrix(matrix::AbstractKernelMatrix, rows, columns)
+
+Prepare a matrix-like object for repeated row and column sampling of one block.
+
+The fallback returns `matrix` unchanged. A backend may return a lightweight local
+wrapper that precomputes block-dependent assembly data. The returned object must
+accept the original global indices through the same `nextrc!` interface and report
+the same global `size` and `eltype` as `matrix`.
+
+This hook is called once per far-field block before ACA compression, so any cached
+state belongs to that block and must not be shared concurrently between blocks.
+"""
 localkernelmatrix(matrix::AbstractKernelMatrix, rows, columns) = matrix
 
 function _kernelmatrix_size(ntest::Int, ntrial::Int, dim)

@@ -3,6 +3,13 @@ using LinearAlgebra
 using LinearMaps
 using OhMyThreads
 
+"""
+    defaultmatrixdata(operator, testspace, trialspace)
+
+Return backend-specific data used to construct an [`AbstractKernelMatrix`](@ref)
+during hierarchical assembly. The fallback returns `nothing`; extensions may return
+quadrature rules or other reusable assembly data.
+"""
 defaultmatrixdata(operator, testspace, trialspace) = nothing
 
 """
@@ -20,6 +27,15 @@ tofarquadstrat(quadstrat) = quadstrat
 
 defaultfarmatrixdata(operator, testspace, trialspace) =
     tofarquadstrat(defaultmatrixdata(operator, testspace, trialspace))
+
+"""
+    defaultcompressor(operator, testspace, trialspace; tol=1e-4)
+
+Return the compressor used by [`HMatrix`](@ref) and
+[`AdaptiveCrossApproximation.assemble`](@ref) when none is supplied explicitly.
+The fallback is `ACA(; tol)`. Extensions may select a more robust compressor for
+particular operator and space combinations.
+"""
 defaultcompressor(operator, testspace, trialspace; tol::Real=1e-4) = ACA(; tol=tol)
 
 # kernelmatrix code
@@ -180,7 +196,8 @@ Assemble a hierarchical matrix approximation of an operator on test and trial sp
   - `trialspace`: trial space used for column indexing
   - `tree`: hierarchical clustering/tree structure controlling block partitioning
   - `tol`: compression tolerance (default `1e-4`)
-  - `compressor`: ACA-style compressor, e.g. `ACA(; tol=tol)`
+  - `compressor`: ACA-style compressor. Defaults to
+    `defaultcompressor(operator, testspace, trialspace; tol)`.
   - `isnear`: near-field predicate controlling admissibility
   - `maxrank`: maximum rank for far-field block compression
   - `spaceordering`: strategy for applying tree permutations to spaces
@@ -313,11 +330,10 @@ end
 """
     storage(hmat::HMatrix)
 
-Analyze and report memory storage requirements of a hierarchical matrix.
+Analyze and report the storage requirements of a hierarchical matrix.
 
-Prints detailed statistics (to stdout) comparing the actual storage needed
-for the hierarchical representation versus dense storage, including compression
-ratio. Also reports total memory footprint via Julia's `summarysize`.
+Prints the numerical block payload, its ratio to dense storage, and the complete
+Julia object footprint reported by `Base.summarysize`.
 
 # Arguments
 
@@ -325,13 +341,13 @@ ratio. Also reports total memory footprint via Julia's `summarysize`.
 
 # Returns
 
-  - `Float64`: Total storage in GB used by hierarchical blocks
+  - `Float64`: Numerical block payload in GB
 
 # Output
 
 Prints to stdout:
 
-  - `storage`: Total block storage in GB
+  - `storage`: Numerical block payload in GB
   - `summary size`: Total memory footprint including Julia object overhead (GB)
   - `compression ratio`: Ratio of hierarchical storage to dense storage
 """

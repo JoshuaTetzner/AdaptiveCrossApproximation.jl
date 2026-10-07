@@ -6,11 +6,13 @@ Incomplete Adaptive Cross Approximation (IACA) compressor.
 Unlike standard ACA, IACA computes only one side per iteration and relies on geometric
 pivoting strategies (for example mimicry or tree mimicry) to select pivots from spatial
 information. This reduces matrix entry evaluations in hierarchical matrix construction,
-where only selected row or column samples are required.
+where only selected row or column samples are required. One pivoting direction must be
+geometric and the other value-based; the algorithm returns the selected row and column
+indices rather than a materialized low-rank factorization.
 
 # Fields
 
-  - `rowpivoting::RowPivType`: Strategy for selecting row pivots (geometric)
+  - `rowpivoting::RowPivType`: Strategy for selecting row pivots
   - `columnpivoting::ColPivType`: Strategy for selecting column pivots
   - `convergence::ConvCritType`: Convergence criterion
 """
@@ -41,7 +43,8 @@ Create a default incomplete ACA compressor for geometrically indexed row/column 
 
 # Returns
 
-An `IACA` instance using `MaximumValue`/`MimicryPivoting` with `FNormExtrapolator`.
+An `IACA` instance using `MaximumValue` for rows, `MimicryPivoting` for columns,
+and `FNormExtrapolator` for convergence.
 
 # See also
 
@@ -100,20 +103,21 @@ function (iaca::IACA{RP,CP,CC})(
 end
 
 """
-    (iaca::IACA{GeoPivStratFunctor,ValuePivStratFunctor,ConvCritFunctor})(A, colbuffer, rowbuffer, maxrank, rows, cols, colidcs)
+    iaca(A, colbuffer, rowbuffer, rowpivots, colpivots, colidcs, maxrank)
 
-Main computational routine for row matrix IACA (geometric row pivoting, value-based column pivoting).
-Performs incomplete ACA compression where rows are selected geometrically and columns by maximum value.
+Low-level IACA iteration with geometric row pivoting and value-based column
+pivoting. This method operates on a stateful compressor built for a particular
+index block.
 
 # Arguments
 
   - `A`: Matrix to compress
   - `colbuffer::AbstractMatrix{K}`: Buffer for column data
   - `rowbuffer::AbstractMatrix{K}`: Buffer for row data
-  - `maxrank::Int`: Maximum rank
-  - `rows::Vector{Int}`: Row indices storage
-  - `cols::Vector{Int}`: Column indices storage
+  - `rowpivots::Vector{Int}`: Storage for selected row indices
+  - `colpivots::Vector{Int}`: Storage for selected column indices
   - `colidcs::Vector{Int}`: Column index range
+  - `maxrank::Int`: Maximum number of pivots
 
 # Returns
 
@@ -226,20 +230,21 @@ function (iaca::IACA{RP,CP,CC})(
 end
 
 """
-    (iaca::IACA{ValuePivStratFunctor,GeoPivStratFunctor,ConvCritFunctor})(A, colbuffer, rowbuffer, maxrank, rows, cols, rowidcs)
+    iaca(A, colbuffer, rowbuffer, rowpivots, colpivots, rowidcs, maxrank)
 
-Main computational routine for column matrix IACA (value-based row pivoting, geometric column pivoting).
-Performs incomplete ACA compression where columns are selected geometrically and rows by maximum value.
+Low-level IACA iteration with value-based row pivoting and geometric column
+pivoting. This method operates on a stateful compressor built for a particular
+index block.
 
 # Arguments
 
   - `A`: Matrix to compress
   - `colbuffer::AbstractArray{K}`: Buffer for column data
   - `rowbuffer::AbstractArray{K}`: Buffer for row data
-  - `maxrank::Int`: Maximum rank
-  - `rows::Vector{Int}`: Row indices storage
-  - `cols::Vector{Int}`: Column indices storage
+  - `rowpivots::Vector{Int}`: Storage for selected row indices
+  - `colpivots::Vector{Int}`: Storage for selected column indices
   - `rowidcs::Vector{Int}`: Row index range
+  - `maxrank::Int`: Maximum number of pivots
 
 # Returns
 

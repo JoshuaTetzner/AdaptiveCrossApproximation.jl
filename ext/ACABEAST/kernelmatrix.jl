@@ -61,6 +61,13 @@ function _localkernelmatrix(
     return LocalBEASTKernelMatrix(matrix, rows, columns, quadstrat)
 end
 
+# BEAST's CPU assembler computes these ids inline, so keep a local copy here.
+function _active_element_ids(space, ids)
+    return unique!(
+        sort!(collect(Int, shape.cellid for id in ids for shape in space.fns[id]))
+    )
+end
+
 function LocalBEASTKernelMatrix(
     matrix::AdaptiveCrossApproximation.BEASTKernelMatrix{T},
     rows,
@@ -73,8 +80,8 @@ function LocalBEASTKernelMatrix(
     rowtestspace = BEAST.subset(testspace, first(rows):first(rows))
     columntrialspace = BEAST.subset(trialspace, first(columns):first(columns))
 
-    testelementids = BEAST.active_element_ids(assembler.tfs, rows)
-    trialelementids = BEAST.active_element_ids(assembler.bfs, columns)
+    testelementids = _active_element_ids(assembler.tfs, rows)
+    trialelementids = _active_element_ids(assembler.bfs, columns)
     testelements = view(assembler.testelements, testelementids)
     trialelements = view(assembler.trialelements, trialelementids)
     testassemblydata = BEAST.reduce_assembly_data(

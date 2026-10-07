@@ -113,7 +113,8 @@ end
 Compute column-first ACA approximation with preallocated buffers (main computational routine).
 
 Fills `colbuffer` and `rowbuffer` with low-rank factors U and V such that
-`A[rowidcs, colidcs] ≈ U * V`. Uses deflation to ensure orthogonality of pivots.
+`A[rowidcs, colidcs] ≈ U * V`. Previously computed rank-one terms are subtracted
+from every newly sampled column and row.
 
 # Arguments
 
@@ -235,13 +236,14 @@ High-level convenience function that automatically allocates buffers and returns
   - `U::Matrix{K}`: Left factor, size `(size(M,1), r)` where `r ≤ maxrank`
   - `V::Matrix{K}`: Right factor, size `(r, size(M,2))`
 
-Satisfies `M ≈ U * V` with `norm(M - U*V) / norm(M) ≲ tol` (if maxrank sufficient).
+The convergence criterion targets the requested tolerance. The achieved matrix
+error also depends on the pivot sequence, convergence estimator, and `maxrank`.
 
 # SVD Recompression
 
 When `svdrecompress=true`, performs QR-SVD recompression: computes `M ≈ U*V`, then
-`U = Q*R`, `R*V = Û*Σ*V̂ᵀ`, truncates small singular values, and returns optimal
-rank factors at the cost of additional computation.
+`U = Q*R`, `R*V = Û*Σ*V̂ᵀ`, and truncates small singular values at the cost of
+additional computation.
 """
 function acaᵀ(
     M::AbstractMatrix{K};

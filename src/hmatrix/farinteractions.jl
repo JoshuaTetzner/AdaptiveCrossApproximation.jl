@@ -2,11 +2,11 @@
 """
     farinteractions(tree; args...)
 
-Extract far-field (inadmissible) block pairs requiring low-rank compression.
+Extract admissible far-field block pairs requiring low-rank compression.
 
 Should be implemented by tree backends (e.g., H2Trees) to return index ranges
-for pairs of clusters that do NOT satisfy the admissibility criterion. These
-blocks are compressed via ACA or similar algorithms.
+for well-separated cluster pairs (`isnear == false`). These blocks are compressed
+via ACA or similar algorithms.
 
 # Arguments
 
@@ -58,8 +58,9 @@ end
 
 Assemble far-field blocks without reordering test and trial spaces.
 
-Compresses inadmissible cluster pairs using ACA-style algorithms, maintaining the
-original space ordering. Produces a collection of level-by-level block-sparse matrices.
+Compresses admissible, well-separated cluster pairs using ACA-style algorithms,
+maintaining the original space ordering. Produces a collection of level-by-level
+block-sparse matrices.
 
 # Arguments
 
@@ -180,9 +181,9 @@ end
 
 Assemble far-field blocks with tree-aligned space reordering.
 
-Compresses inadmissible cluster pairs using ACA-style algorithms, with both spaces
-permuted to align with the hierarchical tree structure. Produces a specialized storage
-format optimized for the reordered layout.
+Compresses admissible, well-separated cluster pairs using ACA-style algorithms,
+with both spaces permuted to align with the hierarchical tree structure. Produces
+a specialized storage format optimized for the reordered layout.
 
 # Arguments
 

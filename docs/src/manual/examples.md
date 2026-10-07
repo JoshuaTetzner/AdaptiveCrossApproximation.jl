@@ -3,45 +3,52 @@
 This section contains end-to-end examples that show how AdaptiveCrossApproximation
 is used in realistic BEAST scattering workflows. Each example assembles a boundary
 integral operator as a compressed H-matrix through `AdaptiveCrossApproximation.assemble`,
-solves the resulting linear system, and produces two plots: a near-field heatmap and a
-bistatic radar cross section (RCS) pattern, alongside the induced surface current.
+solves a system with roughly 10,000--20,000 unknowns, and constructs the corresponding
+far-field, near-field, and surface-current plots.
+
+The examples report the bistatic radar cross section normalized by λ² for a
+unit-amplitude incident electric field.
 
 These snippets are based on the files in `example/` (`efie.jl`, `mfie.jl`, `pmchwt.jl`).
-The EFIE and MFIE plots below are pre-rendered from those scripts (via
-`docs/render_examples.jl`) rather than executed on every docs build, since a full
-BEAST + PlotlyJS scattering solve is too heavy for that; run the scripts directly to
-reproduce or modify them.
+The plots below are pre-rendered from those scripts via `docs/render_examples.jl`
+rather than recomputed during every documentation build. The plotting commands remain
+in each example; saving the documentation assets is kept separate from the examples.
 
 ## EFIE Scattering from a PEC Sphere
 
 Solves a PEC sphere scattering problem with the Electric Field Integral Equation
-(EFIE). `assemble` builds the H2Trees cluster tree automatically from the RWG
-basis positions, so no manual tree construction is needed.
+(EFIE). A k-means cluster tree is constructed from the RWG basis positions and passed
+to `assemble`. The unpreconditioned EFIE is a first-kind formulation and may converge
+slowly for more demanding geometries or finer meshes.
 
 ```julia
 using LinearAlgebra
 using CompScienceMeshes
 using BEAST
+using ParallelKMeans
 using H2Trees
 using AdaptiveCrossApproximation
 using Krylov
-using PlotlyJS
+using PlotlyBase
 
 const ACA = AdaptiveCrossApproximation
 
 # Geometry and function space: PEC sphere
-Γ = meshsphere(1.0, 0.1)
+Γ = meshsphere(1.0, 0.06)
 X = raviartthomas(Γ)
+@show numfunctions(X) # 13,485 unknowns
+
+builder = KMeansTreeBuilder(; numberofclusters=2, minvalues=200)
+cluster = KMeansTree(X; builder=builder)
+tree = BlockTree(cluster, cluster)
 
 # Problem setup: EFIE for a PEC sphere illuminated by a plane wave
 κ, η = 1.0, 1.0
 t = Maxwell3D.singlelayer(; wavenumber=κ)
 E = Maxwell3D.planewave(; direction=ẑ, polarization=x̂, wavenumber=κ)
 
-# Assemble the compressed EFIE operator directly through ACA's high-level entry
-# point. `assemble` builds an H2Trees cluster tree from the RWG basis positions
-# and compresses admissible (far) blocks with ACA -- no manual tree needed.
-T = ACA.assemble(t, X, X; tol=1e-3, maxrank=60)
+# Assemble the compressed EFIE operator using the shared block tree.
+T = ACA.assemble(t, X, X; tree=tree, tol=1e-3, maxrank=60)
 e = assemble((n × E) × n, X)
 
 u, stats = Krylov.gmres(T, e; rtol=1e-4)
@@ -49,19 +56,21 @@ u, stats = Krylov.gmres(T, e; rtol=1e-4)
 
 ACA.storage(T)
 
-# Bistatic RCS in the plane φ=0: σ(θ) = 4π|E_far(θ)|² for unit-amplitude incidence
+# Normalized bistatic RCS in the plane φ=0 for unit-amplitude incidence
 Θ = range(0; stop=π, length=181)
 pts = [point(sin(θ), 0, cos(θ)) for θ in Θ]
-ffd = potential(MWFarField3D(; wavenumber=κ), pts, u, X)
-rcs_dB = 10 .* log10.(4π .* abs2.(norm.(ffd)))
+ffj = potential(MWFarField3D(; wavenumber=κ), pts, u, X)
+ff = im * κ * η / (4π) * ffj
+λ = 2π / κ
+rcs_dB = 10 .* log10.(4π .* norm.(ff) .^ 2 ./ λ^2)
 
 # Near-field heatmap: total-field magnitude in the y-z plane
 ys = range(-2; stop=2, length=60)
 zs = range(-3; stop=3, length=120)
 gridpoints = [point(0, y, z) for y in ys, z in zs]
-Esc = potential(MWSingleLayerField3D(; wavenumber=κ), gridpoints, u, X)
+Epot = potential(MWSingleLayerField3D(; wavenumber=κ), gridpoints, u, X)
 Ein = E.(gridpoints)
-Etot = norm.(Esc + Ein)
+Etot = norm.(Epot - Ein)
 
 fcr, geo = facecurrents(u, X)
 
@@ -73,7 +82,7 @@ plt = Plot(
         title_text="EFIE: PEC sphere scattering (ACA.assemble)",
     ),
 )
-add_trace!(plt, scatter(; x=rad2deg.(Θ), y=rcs_dB, name="bistatic RCS [dB]"); row=1, col=1)
+add_trace!(plt, scatter(; x=rad2deg.(Θ), y=rcs_dB, name="bistatic RCS / λ² [dB]"); row=1, col=1)
 add_trace!(
     plt,
     contour(; x=zs, y=ys, z=Etot, colorscale="Viridis", showscale=true, name="|E_total|");
@@ -81,11 +90,9 @@ add_trace!(
     col=2,
 )
 add_trace!(plt, patch(geo, norm.(fcr); caxis=(0, 2)); row=2, col=1)
-
-savefig(plt, "efie_results.html")
 ```
 
-Bistatic RCS (top left), near-field magnitude in the ``yz`` plane (top right), and
+Normalized bistatic RCS (top left), near-field magnitude in the ``yz`` plane (top right), and
 surface-current magnitude (bottom):
 
 ```@raw html
@@ -116,16 +123,23 @@ the callback is a thin pass-through rather than a manual branch.
 using LinearAlgebra
 using CompScienceMeshes
 using BEAST
+using ParallelKMeans
 using H2Trees
 using AdaptiveCrossApproximation
-using PlotlyJS
+using PlotlyBase
 
 const ACA = AdaptiveCrossApproximation
 
 # Geometry and function spaces: PEC sphere, primal (RWG) and dual (BC) meshes
-Γ = meshsphere(1.0, 0.1)
+Γ = meshsphere(1.0, 0.06)
 X = raviartthomas(Γ)
 Y = buffachristiansen(Γ)
+@show numfunctions(X) # 13,485 unknowns
+
+builder = KMeansTreeBuilder(; numberofclusters=2, minvalues=200)
+testtree = KMeansTree(Y; builder=builder)
+trialtree = KMeansTree(X; builder=builder)
+tree = BlockTree(testtree, trialtree)
 
 # Problem setup: MFIE for a PEC sphere illuminated by a plane wave
 ϵ, μ, ω = 1.0, 1.0, 1.0
@@ -143,25 +157,32 @@ h = (n × H) × n
 a = K[m, j] + 0.5 * N[m, j]
 l = h[m]
 
-A = assemble(a, ∏(Y), ∏(X); materialize=ACA.assemble)
+materialize(op, testspace, trialspace; kwargs...) =
+    ACA.assemble(
+        op, testspace, trialspace; tree=tree, tol=1e-3, maxrank=60, kwargs...
+    )
+
+A = assemble(a, ∏(Y), ∏(X); materialize=materialize)
 b = assemble(l, ∏(Y))
 
 A⁻¹ = BEAST.GMRESSolver(A; reltol=1e-4, maxiter=1000)
 u = A⁻¹ * b
 
-# Bistatic RCS in the plane φ=0: σ(θ) = 4π|E_far(θ)|² for unit-amplitude incidence
+# Normalized bistatic RCS in the plane φ=0 for unit-amplitude incidence
 Θ = range(0; stop=π, length=181)
 pts = [point(sin(θ), 0, cos(θ)) for θ in Θ]
-ffd = potential(MWFarField3D(; wavenumber=κ), pts, u, X)
-rcs_dB = 10 .* log10.(4π .* abs2.(norm.(ffd)))
+ffj = potential(MWFarField3D(; wavenumber=κ), pts, u, X)
+ff = im * κ * η / (4π) * ffj
+λ = 2π / κ
+rcs_dB = 10 .* log10.(4π .* norm.(ff) .^ 2 ./ λ^2)
 
 # Near-field heatmap: total-field magnitude in the y-z plane
 ys = range(-2; stop=2, length=60)
 zs = range(-3; stop=3, length=120)
 gridpoints = [point(0, y, z) for y in ys, z in zs]
-Esc = potential(MWSingleLayerField3D(; wavenumber=κ), gridpoints, u, X)
+Epot = potential(MWSingleLayerField3D(; wavenumber=κ), gridpoints, u, X)
 Ein = E.(gridpoints)
-Etot = norm.(Esc + Ein)
+Etot = norm.(Epot - Ein)
 
 fcr, geo = facecurrents(u, X)
 
@@ -173,7 +194,7 @@ plt = Plot(
         title_text="MFIE: PEC sphere scattering (ACA.assemble)",
     ),
 )
-add_trace!(plt, scatter(; x=rad2deg.(Θ), y=rcs_dB, name="bistatic RCS [dB]"); row=1, col=1)
+add_trace!(plt, scatter(; x=rad2deg.(Θ), y=rcs_dB, name="bistatic RCS / λ² [dB]"); row=1, col=1)
 add_trace!(
     plt,
     contour(; x=zs, y=ys, z=Etot, colorscale="Viridis", showscale=true, name="|E_total|");
@@ -181,11 +202,9 @@ add_trace!(
     col=2,
 )
 add_trace!(plt, patch(geo, norm.(fcr); caxis=(0, 2)); row=2, col=1)
-
-savefig(plt, "mfie_results.html")
 ```
 
-Bistatic RCS (top left), near-field magnitude in the ``yz`` plane (top right), and
+Normalized bistatic RCS (top left), near-field magnitude in the ``yz`` plane (top right), and
 surface-current magnitude (bottom):
 
 ```@raw html
@@ -197,7 +216,7 @@ surface-current magnitude (bottom):
 
 ### Notes
 
-- `assemble(a, ∏(Y), ∏(X); materialize=materialize)` calls `materialize` once per
+- `assemble(a, ∏(Y), ∏(X); materialize=materialize)` calls the callback once per
   bilinear-form block (`K` and `N` here); `ACA.assemble` itself decides whether
   ACA compression applies, based on the operator's type.
 - MFIE converges in far fewer GMRES iterations than EFIE since it is a well-conditioned
@@ -213,15 +232,21 @@ four integral operators (`T`, `T′`, `K`, `K′`), all of which are compressibl
 using LinearAlgebra
 using CompScienceMeshes
 using BEAST
+using ParallelKMeans
 using H2Trees
 using AdaptiveCrossApproximation
-using PlotlyJS
+using PlotlyBase
 
 const ACA = AdaptiveCrossApproximation
 
 # Geometry and function space: dielectric sphere (exterior/interior contrast)
-Γ = meshsphere(1.0, 0.1)
+Γ = meshsphere(1.0, 0.08)
 X = raviartthomas(Γ)
+@show 2 * numfunctions(X) # 14,940 coupled unknowns
+
+builder = KMeansTreeBuilder(; numberofclusters=2, minvalues=200)
+cluster = KMeansTree(X; builder=builder)
+tree = BlockTree(cluster, cluster)
 
 # Problem setup: PMCHWT for a dielectric sphere illuminated by a plane wave.
 # Exterior wavenumber/impedance κ, η; interior κ′, η′.
@@ -243,7 +268,9 @@ h = (n × H) × n
 # T, T′, K, K′ are integral operators here); `ACA.assemble` dispatches any local
 # operator straight to BEAST's own dense assembly instead, without a manual check.
 materialize(op, testspace, trialspace; kwargs...) =
-    ACA.assemble(op, testspace, trialspace; tol=1e-3, maxrank=60, kwargs...)
+    ACA.assemble(
+        op, testspace, trialspace; tree=tree, tol=1e-3, maxrank=60, kwargs...
+    )
 
 @hilbertspace j m
 @hilbertspace k l
@@ -264,14 +291,15 @@ b = assemble(rhs, 𝕏)
 A⁻¹ = BEAST.GMRESSolver(A; reltol=1e-4, maxiter=1000)
 u = A⁻¹ * b
 
-# Bistatic RCS in the plane φ=0: σ(θ) = 4π|E_far(θ)|² for unit-amplitude incidence.
-# The exterior scattered far field combines the electric (j) and magnetic (m)
-# equivalent currents the same way the exterior block of `a` does (η*T[j] - K[m]).
+# Bistatic RCS in the plane φ=0. The far field contains contributions from both
+# equivalent currents.
 Θ = range(0; stop=π, length=181)
 pts = [point(sin(θ), 0, cos(θ)) for θ in Θ]
-ffd_e = potential(MWFarField3D(; wavenumber=κ), pts, u[j], X)
-ffd_m = potential(BEAST.MWDoubleLayerFarField3D(; wavenumber=κ), pts, u[m], X)
-rcs_dB = 10 .* log10.(4π .* abs2.(norm.(η .* ffd_e .- ffd_m)))
+ffj = potential(MWFarField3D(; wavenumber=κ), pts, u[j], X)
+ffm = potential(MWFarField3D(; wavenumber=κ), pts, u[m], X)
+ff = -im * κ / (4π) * (-η * ffj + cross.(pts, ffm))
+λ = 2π / κ
+rcs_dB = 10 .* log10.(4π .* norm.(ff) .^ 2 ./ λ^2)
 
 fcr_j, geo = facecurrents(u[j], X)
 fcr_m, _ = facecurrents(u[m], X)
@@ -284,14 +312,12 @@ plt = Plot(
         title_text="PMCHWT: dielectric sphere scattering (ACA.assemble)",
     ),
 )
-add_trace!(plt, scatter(; x=rad2deg.(Θ), y=rcs_dB, name="bistatic RCS [dB]"); row=1, col=1)
+add_trace!(plt, scatter(; x=rad2deg.(Θ), y=rcs_dB, name="bistatic RCS / λ² [dB]"); row=1, col=1)
 add_trace!(plt, patch(geo, norm.(fcr_j); caxis=(0, 2)); row=1, col=2)
 add_trace!(plt, patch(geo, norm.(fcr_m); caxis=(0, 2)); row=1, col=3)
-
-savefig(plt, "pmchwt_results.html")
 ```
 
-Bistatic RCS (left), electric surface current magnitude `|j|` (middle), and magnetic
+Normalized bistatic RCS (left), electric surface current magnitude `|j|` (middle), and magnetic
 surface current magnitude `|m|` (right):
 
 ```@raw html

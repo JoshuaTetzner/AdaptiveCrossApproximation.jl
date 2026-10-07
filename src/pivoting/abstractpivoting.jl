@@ -52,7 +52,7 @@ matrix values. Useful when geometric information about rows/columns is available
 # Concrete Types
 
   - [`FillDistance`](@ref): Maximizes minimum distance to already selected points
-  - [`Leja2`](@ref): Maximizes product of distances to selected points
+  - [`Leja2`](@ref): Selects the point farthest from the current pivot set
 """
 abstract type GeoPivStrat <: PivStrat end
 
@@ -67,7 +67,7 @@ ACA algorithm. Most common approach for general matrices.
 # Concrete Types
 
   - [`MaximumValue`](@ref): Selects index with maximum absolute value (standard ACA)
-  - [`RandomSampling`](@ref): Random selection (for statistical approaches)
+  - [`FullPivoting`](@ref): Selects the largest residual entry in the complete matrix
 """
 abstract type ValuePivStrat <: PivStrat end
 
@@ -81,7 +81,8 @@ randomization to improve robustness.
 
 # Concrete Types
 
-  - [`RandomSampling`](@ref): Random pivot selection for convergence estimation
+  - [`AdaptiveCrossApproximation.RandomSamplingPivoting`](@ref): Selects pivots from
+    convergence samples
 """
 abstract type ConvPivStrat <: PivStrat end
 

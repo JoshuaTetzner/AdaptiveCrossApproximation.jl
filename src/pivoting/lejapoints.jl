@@ -1,12 +1,11 @@
 """
     Leja2{D,F<:Real} <: GeoPivStrat
 
-Geometric pivoting strategy based on Leja points (product of distances).
+Geometric pivoting strategy based on modified Leja points.
 
-A modified more efficient version of the fill distance approach.
-This leads to well-separated point sequences.
-These points have been introduced as modified leja points and will, therefore,
-be referred to as Leja2 points within this package.
+After the first point, each pivot maximizes its minimum distance to the points
+selected so far. This produces a well-separated sequence and is referred to as
+Leja2 pivoting within this package.
 
 # Fields
 
