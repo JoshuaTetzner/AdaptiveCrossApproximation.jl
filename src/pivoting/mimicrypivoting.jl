@@ -125,20 +125,43 @@ function (pivstrat::MimicryPivotingFunctor{D,F})(rc::AbstractArray) where {D,F}
     return nextidx
 end
 
+function mimicry_init!(pivstrat::MimicryPivotingFunctor, nextidx::Int, nactive::Int)
+    pos = _positions(pivstrat)
+    @inbounds for i in 1:nactive
+        pivstrat.h[i] = norm(pos[pivstrat.idcs[i]] - pos[nextidx])
+        pivstrat.leja[i] = pivstrat.h[i]
+    end
+    return nothing
+end
+
+function mimicry!(pivstrat::MimicryPivotingFunctor, nextidx::Int, nactive::Int)
+    pos = _positions(pivstrat)
+    @inbounds for i in 1:nactive
+        d = norm(pos[pivstrat.idcs[i]] - pos[nextidx])
+        if d < pivstrat.h[i]
+            pivstrat.h[i] = d
+        end
+        pivstrat.leja[i] *= d
+    end
+    return nothing
+end
+
 """
     (pivstrat::MimicryPivotingFunctor)(npivot::Int)
 
-Select the next pivot by index count rather than residual data, as used by [`IACA`](@ref).
+Select the `npivot`-th pivot by index count rather than residual data, as used by
+[`IACA`](@ref).
 
-Note that unlike [`TreeMimicryPivoting`](@ref), `MimicryPivoting` resolves pivots to
-positions in the `idcs` array it was built with, not to global indices; it is therefore
-only valid within `IACA` when the corresponding row/column index range is the identity
-range `1:n` (i.e. `MimicryPivoting` is not usable for nested/sub-block compression).
+Returns the global index of the pivot, i.e. an entry of the `idcs` the functor was built
+with. The first pivot is the candidate closest to the reference centroid; the selection
+is the one [`TreeMimicryPivoting`](@ref) makes within a single leaf.
 """
 function (pivstrat::MimicryPivotingFunctor{D,F})(npivot::Int) where {D,F}
     nactive = pivstrat.nactive
-    if all(iszero, view(pivstrat.h, 1:nactive))
-        leja2_init!(pivstrat, pivstrat.idcs[1], nactive)
+    if npivot == 1
+        nextidx = _first_index(pivstrat.w, nactive)
+        mimicry_init!(pivstrat, pivstrat.idcs[nextidx], nactive)
+        return pivstrat.idcs[nextidx]
     end
 
     nextidx = bestindex(
@@ -149,8 +172,8 @@ function (pivstrat::MimicryPivotingFunctor{D,F})(npivot::Int) where {D,F}
         npivot,
     )
 
-    leja2!(pivstrat, pivstrat.idcs[nextidx], nactive)
-    return nextidx
+    mimicry!(pivstrat, pivstrat.idcs[nextidx], nactive)
+    return pivstrat.idcs[nextidx]
 end
 
 function update_refcentroid!(

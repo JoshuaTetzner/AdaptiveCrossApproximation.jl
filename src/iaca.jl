@@ -143,7 +143,7 @@ function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
     maxcolumn = length(colidcs)
     npivot = 1
 
-    rowpivs[npivot] = iaca.rowpivoting()
+    rowpivs[npivot] = iaca.rowpivoting(npivot)
     nextrc!(
         view(rowbuffer, npivot:npivot, 1:maxcolumn),
         A,
@@ -270,7 +270,7 @@ function (iaca::IACA{RowPivType,ColPivType,ConvCritType})(
     maxrow = length(rowidcs)
     npivot = 1
 
-    colpivs[npivot] = iaca.columnpivoting()
+    colpivs[npivot] = iaca.columnpivoting(npivot)
     nextrc!(
         view(colbuffer, 1:maxrow, npivot:npivot),
         A,

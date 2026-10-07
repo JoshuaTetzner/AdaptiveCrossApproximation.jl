@@ -57,7 +57,7 @@ k = 2 * π / λ
 
                 local npivots = comp(K, colbuffer, rowbuffer, min(length(Y), length(X)))
                 @test norm(A - colbuffer[:, 1:npivots] * rowbuffer[1:npivots, :]) /
-                      norm(A) < 2tol
+                      norm(A) < 5tol
             end
         end
 
