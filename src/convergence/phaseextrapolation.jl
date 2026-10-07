@@ -3,9 +3,9 @@
 
 Convergence criterion using polynomial extrapolation of pivot norms across multiple phases.
 
-Extends [`FNormExtrapolator`](@ref) with per-phase direction tracking: convergence requires
-that all active phases individually show extrapolated convergence, and that two consecutive
-pivots both satisfy the criterion.
+Extends [`FNormExtrapolator`](@ref) with per-phase direction tracking. A pivot satisfies
+the criterion when the global and current-phase histories extrapolate below the requested
+tolerance. Stopping requires two consecutive pivots that satisfy the criterion.
 
 # Fields
 

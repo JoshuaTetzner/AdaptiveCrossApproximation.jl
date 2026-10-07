@@ -3,13 +3,14 @@ struct IsNearFunctor{F}
 end
 
 """
-    isnear(η::Real=Float64(1.0))
+    isnear(η::Real=1.0)
 
 Create an admissibility predicate for near-field block detection.
 
-Clusters with scaled geometric distance less than `η` are considered admissible
-for near-field assembly (direct evaluation). The scaling factor η controls the
-geometric separation required for far-field low-rank approximation.
+The resulting functor returns `true` when a cluster pair is too close for low-rank
+compression and must be subdivided or assembled as a dense near-field block. It
+returns `false` for a well-separated, admissible far-field pair. The scaling factor
+`η` controls this separation test.
 
 # Arguments
 
@@ -21,9 +22,8 @@ geometric separation required for far-field low-rank approximation.
 
 # Notes
 
-For well-separated clusters (distance > η × cluster diameter), the interaction
-is computed via ACA compression; otherwise, via direct near-field assembly.
-Typical values: `η ≈ 1.0` to `3.0` depending on required accuracy.
+The exact geometric test is implemented by the tree backend. For the H2Trees
+backend, larger `η` classifies more cluster pairs as far field.
 """
 function isnear(η::Real=1.0)
     return IsNearFunctor{typeof(η)}(η)
@@ -32,11 +32,11 @@ end
 """
     nearinteractions(tree; args...)
 
-Extract near-field (admissible) block pairs from a hierarchical tree structure.
+Extract near-field block pairs from a hierarchical tree structure.
 
 Should be implemented by tree backends (e.g., H2Trees) to return index ranges
-for pairs of clusters that satisfy the admissibility criterion. This is the
-primary method when space ordering is not modified.
+for cluster pairs selected for direct near-field assembly. This is the primary
+method when space ordering is not modified.
 
 # Arguments
 
@@ -50,8 +50,8 @@ primary method when space ordering is not modified.
 # Notes
 
 Implemented by tree backend extensions (e.g., ACAH2Trees for H2Trees). Should
-return rows and corresponding near-field column indices that are admissible for
-direct (non-low-rank) assembly.
+return rows and corresponding near-field column indices selected for direct
+(non-low-rank) assembly.
 """
 function nearinteractions(tree; args...)
     return error("Needs to be implemented for $(typeof(tree))")
@@ -88,7 +88,7 @@ end
 
 Assemble near-field blocks without reordering test and trial spaces.
 
-Computes dense (non-low-rank) matrix blocks for all admissible cluster pairs,
+Computes dense (non-low-rank) matrix blocks for all near-field cluster pairs,
 retaining the original ordering of test and trial spaces. The resulting
 block-sparse matrix stores these near-field interactions.
 
@@ -163,7 +163,7 @@ end
 
 Assemble near-field blocks with tree-aligned space reordering.
 
-Computes dense matrix blocks for admissible cluster pairs, with both spaces
+Computes dense matrix blocks for near-field cluster pairs, with both spaces
 permuted to align with the hierarchical tree structure. Produces a specialized
 block storage format optimized for the reordered layout.
 

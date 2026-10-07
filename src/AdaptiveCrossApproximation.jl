@@ -3,7 +3,7 @@
 
 Adaptive Cross Approximation (ACA) algorithms for hierarchical low-rank matrix compression.
 
-Provides full-rank and incomplete adaptive cross approximation algorithms optimized for
+Provides standard and incomplete adaptive cross approximation algorithms optimized for
 boundary integral operators and other kernel-based matrices. Key features:
 
   - **ACA**: Standard adaptive cross approximation selecting pivots by alternating rows/columns
@@ -110,6 +110,10 @@ include("pivoting/randomsampling.jl")
 
 Fill `buf` in place with the entries `A[i, j]` (a sampled row/column block).
 
+Either index may be an integer for a single row or column, or an index collection
+for a larger block. `buf` must retain the corresponding two-dimensional shape; for
+example, a single row is written into a `1 × length(j)` buffer.
+
 Interface method used by [`ACA`](@ref), [`ACAᵀ`](@ref) and [`IACA`](@ref) to pull the
 row/column samples they pivot on, so `A` need not materialize as a dense matrix.
 The fallback here covers any `AbstractArray`; kernel-matrix backends
@@ -173,7 +177,8 @@ This is the recommended entry point for most applications.
 
       + `tol`: Convergence tolerance (default `1e-4`)
       + `maxrank`: Maximum rank for compression (default `40`)
-      + `compressor`: ACA or IACA instance (default `ACA(tol=tol)`)
+      + `compressor`: ACA-style compressor. The default is selected by
+        `defaultcompressor(op, testspace, trialspace; tol)` and is usually `ACA`.
       + `isnear`: Admissibility predicate (default `isnear()`)
       + `spaceordering`: Space ordering strategy (default `PreserveSpaceOrder()`)
       + `verbose`: Enable progress output (default `true`)
@@ -231,6 +236,7 @@ end
 
 export HMatrix
 export ACA
+export aca
 export ACAᵀ
 export IACA
 export FNormEstimator, FNormExtrapolator, PhaseExtrapolator

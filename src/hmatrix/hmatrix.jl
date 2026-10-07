@@ -50,8 +50,9 @@ end
 Count the number of stored scalars in a hierarchical matrix.
 
 Sums the near-field block-sparse storage with the far-field low-rank factor
-storage (`length(U) + length(V)` per block), i.e. the actual memory footprint
-in matrix entries rather than the dense `size(A,1) * size(A,2)`. See also
+storage (`length(U) + length(V)` per block), i.e. the number of stored numerical
+entries rather than the dense `size(A,1) * size(A,2)`. It does not include object
+or index-array overhead. See also
 [`storage`](@ref) for a GB-scale report including compression ratio.
 """
 function nnz(A::HMatrix)

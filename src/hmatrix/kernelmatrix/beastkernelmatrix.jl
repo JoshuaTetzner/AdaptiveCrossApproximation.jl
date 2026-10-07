@@ -3,8 +3,8 @@
 
 Kernel matrix wrapper for BEAST operator assembly.
 
-Provides lazy matrix entry evaluation through a BEAST near-field block assembler,
-which computes matrix entries on demand from operator and basis function data.
+Provides lazy matrix entry evaluation through a BEAST block assembler, which
+computes matrix entries on demand from operator and basis-function data.
 
 # Fields
 

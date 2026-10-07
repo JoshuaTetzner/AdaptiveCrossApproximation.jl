@@ -15,14 +15,14 @@ makedocs(;
     pages=[
         "Introduction" => "index.md",
         "Manual" => Any[
-            "General Usage" => "./manual/manual.md",
+            "Adaptive Cross Approximation" => "./manual/aca.md",
+            "Incomplete Adaptive Cross Approximation" => "./manual/iaca.md",
+            "Hierarchical Matrices" => "./manual/hmatrix.md",
             "Application Examples" => "./manual/examples.md",
         ],
-        "Further Details" => Any[
-            "ACA" => "./details/aca.md",
-            "iACA" => "./details/iaca.md",
-            "Pivoting Strategies" => "./details/pivoting.md",
-            "Convergence Criteria" => "./details/convergence.md",
+        "Theory" => Any[
+            "Adaptive Cross Approximation" => "./details/aca.md",
+            "Incomplete Adaptive Cross Approximation" => "./details/iaca.md",
             "Hierarchical Matrices" => "./details/hmatrix.md",
         ],
         "Contributing" => "contributing.md",
