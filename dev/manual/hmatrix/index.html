@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Hierarchical Matrices · AdaptiveCrossApproximation.jl</title><meta name="title" content="Hierarchical Matrices · AdaptiveCrossApproximation.jl"/><meta property="og:title" content="Hierarchical Matrices · AdaptiveCrossApproximation.jl"/><meta property="twitter:title" content="Hierarchical Matrices · AdaptiveCrossApproximation.jl"/><meta name="description" content="Documentation for AdaptiveCrossApproximation.jl."/><meta property="og:description" content="Documentation for AdaptiveCrossApproximation.jl."/><meta property="twitter:description" content="Documentation for AdaptiveCrossApproximation.jl."/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="AdaptiveCrossApproximation.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">AdaptiveCrossApproximation.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Introduction</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../aca/">Adaptive Cross Approximation</a></li><li><a class="tocitem" href="../iaca/">Incomplete Adaptive Cross Approximation</a></li><li class="is-active"><a class="tocitem" href>Hierarchical Matrices</a><ul class="internal"><li><a class="tocitem" href="#Basic-Usage"><span>Basic Usage</span></a></li><li><a class="tocitem" href="#Point-Kernel-Matrices"><span>Point-Kernel Matrices</span></a></li><li><a class="tocitem" href="#Configuring-Assembly"><span>Configuring Assembly</span></a></li><li><a class="tocitem" href="#Working-with-the-Result"><span>Working with the Result</span></a></li></ul></li><li><a class="tocitem" href="../examples/">Application Examples</a></li></ul></li><li><span class="tocitem">Theory</span><ul><li><a class="tocitem" href="../../details/aca/">Adaptive Cross Approximation</a></li><li><a class="tocitem" href="../../details/iaca/">Incomplete Adaptive Cross Approximation</a></li><li><a class="tocitem" href="../../details/hmatrix/">Hierarchical Matrices</a></li></ul></li><li><a class="tocitem" href="../../contributing/">Contributing</a></li><li><a class="tocitem" href="../../apiref/">API Reference</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Manual</a></li><li class="is-active"><a href>Hierarchical Matrices</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Hierarchical Matrices</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/JoshuaTetzner/AdaptiveCrossApproximation.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/JoshuaTetzner/AdaptiveCrossApproximation.jl/blob/main/docs/src/manual/hmatrix.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Using-Hierarchical-Matrices"><a class="docs-heading-anchor" href="#Using-Hierarchical-Matrices">Using Hierarchical Matrices</a><a id="Using-Hierarchical-Matrices-1"></a><a class="docs-heading-anchor-permalink" href="#Using-Hierarchical-Matrices" title="Permalink"></a></h1><p>An <a href="../../apiref/#AdaptiveCrossApproximation.HMatrix"><code>HMatrix</code></a> stores near-field interactions as dense blocks and compresses admissible far-field interactions with a low-rank compressor. It supports matrix-vector products, transpose and adjoint products, and conversion to a dense <code>Matrix</code>.</p><h2 id="Basic-Usage"><a class="docs-heading-anchor" href="#Basic-Usage">Basic Usage</a><a id="Basic-Usage-1"></a><a class="docs-heading-anchor-permalink" href="#Basic-Usage" title="Permalink"></a></h2><p>For BEAST operators, <a href="../../apiref/#AdaptiveCrossApproximation.assemble"><code>AdaptiveCrossApproximation.assemble</code></a> constructs the cluster tree and quadrature data automatically:</p><pre><code class="language-julia hljs">using AdaptiveCrossApproximation
+using BEAST
+using CompScienceMeshes
+using H2Trees
+
+mesh = CompScienceMeshes.meshsphere(1.0, 0.3)
+space = raviartthomas(mesh)
+operator = Maxwell3D.singlelayer(; wavenumber=1.0)
+
+hmat = AdaptiveCrossApproximation.assemble(
+    operator,
+    space,
+    space;
+    tol=1e-4,
+    maxrank=40,
+)</code></pre><p>The result contains the directly assembled near field and the ACA-compressed far field. The operator-specific default compressor is used unless <code>compressor</code> is provided explicitly. For supported BEAST double-layer operators, this is the <a href="../aca/#Robust-ACA-for-Integral-Equations">robust ACA configuration</a> combining maximum-value and random-sampling pivoting.</p><p>BEAST local operators such as <code>Identity</code> and <code>NCross</code> are assembled directly and do not produce an <code>HMatrix</code>, because their sparse local interactions do not benefit from hierarchical low-rank compression.</p><h2 id="Point-Kernel-Matrices"><a class="docs-heading-anchor" href="#Point-Kernel-Matrices">Point-Kernel Matrices</a><a id="Point-Kernel-Matrices-1"></a><a class="docs-heading-anchor-permalink" href="#Point-Kernel-Matrices" title="Permalink"></a></h2><p>Point kernels provide a self-contained way to experiment with hierarchical matrices without a boundary-element space or quadrature rule. Define a callable kernel with an <code>eltype</code>, cluster its points, and pass both to <code>HMatrix</code>:</p><pre><code class="language-julia hljs">using AdaptiveCrossApproximation
+using H2Trees
+using LinearAlgebra
+using ParallelKMeans
+using StaticArrays
+
+struct SoftenedKernel{T}
+    radius::T
+end
+
+Base.eltype(::SoftenedKernel{T}) where {T} = T
+(kernel::SoftenedKernel)(x, y) =
+    inv(sqrt(sum(abs2, x - y) + kernel.radius^2))
+
+points = [
+    SVector(cos(t), sin(t), 0.2sin(2t))
+    for t in range(0, 2pi; length=129)[1:(end - 1)]
+]
+builder = KMeansTreeBuilder(; numberofclusters=2, minvalues=16)
+cluster = KMeansTree(points; builder=builder)
+tree = BlockTree(cluster, cluster)
+kernel = SoftenedKernel(0.05)
+
+hmat = HMatrix(
+    kernel,
+    points,
+    points,
+    tree;
+    tol=1e-4,
+    maxrank=30,
+)
+
+dense = [kernel(x, y) for x in points, y in points]
+norm(Matrix(hmat) - dense) / norm(dense)</code></pre><p>The vector-space constructor creates an <a href="../../apiref/#AdaptiveCrossApproximation.PointMatrix"><code>AdaptiveCrossApproximation.PointMatrix</code></a>, which evaluates only the entries requested during near-field assembly and ACA compression. This makes point kernels useful both as toy problems and as a lightweight interface for kernel methods on point clouds.</p><h2 id="Configuring-Assembly"><a class="docs-heading-anchor" href="#Configuring-Assembly">Configuring Assembly</a><a id="Configuring-Assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Configuring-Assembly" title="Permalink"></a></h2><h3 id="Compression-and-Admissibility"><a class="docs-heading-anchor" href="#Compression-and-Admissibility">Compression and Admissibility</a><a id="Compression-and-Admissibility-1"></a><a class="docs-heading-anchor-permalink" href="#Compression-and-Admissibility" title="Permalink"></a></h3><p>The most important compression controls are:</p><pre><code class="language-julia hljs">hmat = AdaptiveCrossApproximation.assemble(
+    operator,
+    space,
+    space;
+    tol=1e-4,
+    maxrank=40,
+    isnear=AdaptiveCrossApproximation.isnear(1.0),
+)</code></pre><p><code>tol</code> controls each far-block compressor and <code>maxrank</code> places a hard limit on its rank. Reaching <code>maxrank</code> can indicate that the requested tolerance was not attained. The admissibility parameter controls which cluster pairs enter the far field; for the H2Trees backend, increasing it classifies more interactions as far field.</p><p>Pass <code>compressor=ACA(...)</code> to override the operator-specific default. In particular, avoid replacing the robust default for a double-layer operator unless the alternative has been validated for that problem.</p><h3 id="Cluster-Tree-Backend"><a class="docs-heading-anchor" href="#Cluster-Tree-Backend">Cluster-Tree Backend</a><a id="Cluster-Tree-Backend-1"></a><a class="docs-heading-anchor-permalink" href="#Cluster-Tree-Backend" title="Permalink"></a></h3><p>For general use, the k-means backend is the recommended choice. Its balanced, geometry-adapted clusters usually provide better block partitions, particularly for large or nonuniformly distributed spaces. For BEAST assembly, load ParallelKMeans together with H2Trees to select it automatically:</p><pre><code class="language-julia hljs">using ParallelKMeans
+
+hmat = AdaptiveCrossApproximation.assemble(
+    operator,
+    space,
+    space;
+    treekwargs=(; numberofclusters=2, minvalues=100),
+    tol=1e-4,
+    maxrank=40,
+)</code></pre><p><code>treekwargs</code> is forwarded only when the tree is constructed automatically. Larger leaf sizes reduce tree depth and construction overhead but create larger terminal blocks. Smaller leaves expose more compression opportunities at the cost of more blocks and tree traversal. The <code>TwoNTree</code> backend remains a useful lightweight choice for small examples and regularly distributed spaces when ParallelKMeans is not loaded.</p><h3 id="Supplying-an-Existing-Tree"><a class="docs-heading-anchor" href="#Supplying-an-Existing-Tree">Supplying an Existing Tree</a><a id="Supplying-an-Existing-Tree-1"></a><a class="docs-heading-anchor-permalink" href="#Supplying-an-Existing-Tree" title="Permalink"></a></h3><p>When a compatible block tree already exists, pass it to the explicit constructor:</p><pre><code class="language-julia hljs">hmat = HMatrix(
+    operator,
+    testspace,
+    trialspace,
+    tree;
+    tol=1e-4,
+    maxrank=40,
+    compressor=ACA(; tol=1e-4),
+    isnear=AdaptiveCrossApproximation.isnear(1.0),
+    spaceordering=AdaptiveCrossApproximation.PreserveSpaceOrder(),
+)</code></pre><p>This entry point is useful when several operators share the same cluster structure or when the application controls tree construction itself.</p><h3 id="Near-and-Far-Field-Quadrature"><a class="docs-heading-anchor" href="#Near-and-Far-Field-Quadrature">Near- and Far-Field Quadrature</a><a id="Near-and-Far-Field-Quadrature-1"></a><a class="docs-heading-anchor-permalink" href="#Near-and-Far-Field-Quadrature" title="Permalink"></a></h3><p>The <code>quadstrat</code> keyword follows the convention of <code>BEAST.assemble</code>:</p><pre><code class="language-julia hljs">quadrature = BEAST.defaultquadstrat(operator, space, space)
+hmat = AdaptiveCrossApproximation.assemble(
+    operator,
+    space,
+    space;
+    quadstrat=quadrature,
+    tol=1e-4,
+)</code></pre><p>The strategy is used directly for dense near-field blocks. For BEAST&#39;s default Wilton–Sauter strategy, <code>tofarquadstrat</code> extracts the nonsingular far-field rules because singular quadrature is unnecessary for well-separated interactions. Use <code>nearquadstrat</code> and <code>farquadstrat</code> when the two parts require explicit, different strategies.</p><h3 id="Space-Ordering-and-Parallel-Assembly"><a class="docs-heading-anchor" href="#Space-Ordering-and-Parallel-Assembly">Space Ordering and Parallel Assembly</a><a id="Space-Ordering-and-Parallel-Assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Space-Ordering-and-Parallel-Assembly" title="Permalink"></a></h3><p>The default <code>PreserveSpaceOrder()</code> leaves the test and trial spaces unchanged and stores their tree indices with the blocks. <code>PermuteSpaceInPlace()</code> instead reorders the spaces to follow the tree layout:</p><pre><code class="language-julia hljs">hmat = AdaptiveCrossApproximation.assemble(
+    operator,
+    space,
+    space;
+    spaceordering=AdaptiveCrossApproximation.PermuteSpaceInPlace(),
+)</code></pre><p>The latter mutates the supplied spaces and should only be selected when the caller expects this reordered layout. Assembly uses a dynamic thread scheduler by default. Kernel backends may implement <code>localkernelmatrix</code> to create independent block-local assembly caches while sharing the global kernel matrix between threads.</p><h2 id="Working-with-the-Result"><a class="docs-heading-anchor" href="#Working-with-the-Result">Working with the Result</a><a id="Working-with-the-Result-1"></a><a class="docs-heading-anchor-permalink" href="#Working-with-the-Result" title="Permalink"></a></h2><p><code>HMatrix</code> follows Julia&#39;s matrix interface:</p><pre><code class="language-julia hljs">x = ones(eltype(hmat), size(hmat, 2))
+xt = ones(eltype(hmat), size(hmat, 1))
+y = hmat * x
+yt = transpose(hmat) * xt
+yh = adjoint(hmat) * xt</code></pre><p>Converting to a dense matrix is useful for validation of small problems but defeats the storage advantage for large ones:</p><pre><code class="language-julia hljs">A = Matrix(hmat)</code></pre><p>The near- and far-field contributions can be inspected separately:</p><pre><code class="language-julia hljs">near = AdaptiveCrossApproximation.nearmatrix(hmat)
+far = AdaptiveCrossApproximation.farmatrix(hmat)
+stored_gigabytes = AdaptiveCrossApproximation.storage(hmat)</code></pre><p>For block partitioning, admissibility, storage complexity, and the assembly model, see the <a href="../../details/hmatrix/">H-matrix theory</a>.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../iaca/">« Incomplete Adaptive Cross Approximation</a><a class="docs-footer-nextpage" href="../examples/">Application Examples »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Wednesday 7 October 2026 14:14">Wednesday 7 October 2026</span>. Using Julia version 1.13.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

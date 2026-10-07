@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="430" viewBox="0 0 920 430" role="img" aria-labelledby="title desc">
+  <title id="title">Matrix entries evaluated by ACA and IACA</title>
+  <desc id="desc">ACA evaluates complete pivot rows and columns. IACA predicts one pivot direction geometrically and evaluates complete vectors only in the other direction.</desc>
+  <defs>
+    <pattern id="grid" width="25" height="25" patternUnits="userSpaceOnUse">
+      <path d="M25 0H0V25" fill="none" stroke="#9558B2" stroke-opacity=".22" stroke-width="1"/>
+    </pattern>
+    <style>
+      .frame { fill: url(#grid); stroke: #9558B2; stroke-width: 2; }
+      .column { fill: #4063D8; fill-opacity: .55; }
+      .row { fill: #CB3C33; fill-opacity: .5; }
+      .unused { fill: none; stroke: #CB3C33; stroke-width: 2; stroke-dasharray: 7 6; }
+      .heading { font: 600 22px sans-serif; fill: #000000; text-anchor: middle; }
+      .label { font: 17px sans-serif; fill: #000000; text-anchor: middle; }
+      .legend { font: 15px sans-serif; fill: #000000; }
+    </style>
+  </defs>
+  <rect width="920" height="430" rx="12" fill="#ffffff"/>
+
+  <text class="heading" x="245" y="42">ACA</text>
+  <rect class="frame" x="95" y="70" width="300" height="250"/>
+  <rect class="column" x="145" y="70" width="25" height="250"/>
+  <rect class="column" x="295" y="70" width="25" height="250"/>
+  <rect class="row" x="95" y="120" width="300" height="25"/>
+  <rect class="row" x="95" y="245" width="300" height="25"/>
+  <text class="label" x="245" y="350">Complete pivot rows and columns</text>
+
+  <text class="heading" x="675" y="42">IACA</text>
+  <rect class="frame" x="525" y="70" width="300" height="250"/>
+  <rect class="column" x="575" y="70" width="25" height="250"/>
+  <rect class="column" x="725" y="70" width="25" height="250"/>
+  <rect class="unused" x="525" y="120" width="300" height="25"/>
+  <rect class="unused" x="525" y="245" width="300" height="25"/>
+  <text class="label" x="675" y="350">Geometrically selected columns</text>
+  <text class="label" x="675" y="374">without complete pivot rows</text>
+
+  <rect class="column" x="220" y="397" width="24" height="18"/>
+  <text class="legend" x="252" y="412">evaluated columns</text>
+  <rect class="row" x="400" y="397" width="24" height="18"/>
+  <text class="legend" x="432" y="412">evaluated rows</text>
+  <rect class="unused" x="577" y="397" width="24" height="18"/>
+  <text class="legend" x="609" y="412">rows avoided by IACA</text>
+</svg>

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="420" viewBox="0 0 920 420" role="img" aria-labelledby="title desc">
+  <title id="title">Combined ACA pivoting and convergence strategy</title>
+  <desc id="desc">Maximum-value pivoting continues until the standard criterion is satisfied. The random-sampling criterion then either stops the algorithm or activates random-sampling pivoting.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#9558B2"/>
+    </marker>
+    <style>
+      .box { fill: #9558B2; fill-opacity: .12; stroke: #9558B2; stroke-width: 2; }
+      .decision { fill: #4063D8; fill-opacity: .12; stroke: #4063D8; stroke-width: 2; }
+      .stop { fill: #389826; fill-opacity: .14; stroke: #389826; stroke-width: 2; }
+      .line { fill: none; stroke: #9558B2; stroke-width: 2; marker-end: url(#arrow); }
+      .label { font: 18px sans-serif; fill: #000000; text-anchor: middle; dominant-baseline: middle; }
+      .edge { font: 16px sans-serif; fill: #000000; text-anchor: middle; }
+    </style>
+  </defs>
+  <rect width="920" height="420" rx="12" fill="#ffffff"/>
+  <rect class="box" x="35" y="165" width="190" height="70" rx="10"/>
+  <text class="label" x="130" y="190">Maximum-value</text>
+  <text class="label" x="130" y="214">pivoting</text>
+  <polygon class="decision" points="355,135 470,200 355,265 240,200"/>
+  <text class="label" x="355" y="190">SCC</text>
+  <text class="label" x="355" y="214">satisfied?</text>
+  <polygon class="decision" points="630,135 745,200 630,265 515,200"/>
+  <text class="label" x="630" y="190">RSCC</text>
+  <text class="label" x="630" y="214">satisfied?</text>
+  <rect class="stop" x="775" y="165" width="110" height="70" rx="35"/>
+  <text class="label" x="830" y="200">Stop</text>
+  <rect class="box" x="520" y="325" width="220" height="70" rx="10"/>
+  <text class="label" x="630" y="350">Random-sampling</text>
+  <text class="label" x="630" y="374">pivoting</text>
+  <path class="line" d="M225,200 L238,200"/>
+  <path class="line" d="M470,200 L513,200"/>
+  <path class="line" d="M745,200 L773,200"/>
+  <path class="line" d="M630,265 L630,323"/>
+  <path class="line" d="M520,360 L355,360 L355,267"/>
+  <path class="line" d="M355,135 L355,65 L130,65 L130,163"/>
+  <text class="edge" x="490" y="188">yes</text>
+  <text class="edge" x="760" y="188">yes</text>
+  <text class="edge" x="650" y="300">no</text>
+  <text class="edge" x="330" y="92">no</text>
+</svg>
