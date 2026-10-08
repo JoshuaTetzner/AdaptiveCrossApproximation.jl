@@ -245,5 +245,5 @@ export MimicryPivoting, TreeMimicryPivoting
 export PivotingFilter, NoFilter, EFIEDirectionalFilter
 export reset!
 export AbstractKernelMatrix
-export assemble_blocks, assemble_blocks_sparse
+export assemble_blocks
 end

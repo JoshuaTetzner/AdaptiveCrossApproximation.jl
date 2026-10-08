@@ -111,23 +111,6 @@ function assemble_blocks(
     return blocks
 end
 
-"""
-    assemble_blocks_sparse(matrix::AbstractKernelMatrix, blocks, rowidcs, colidcs; kwargs...) -> blocks
-
-Batched counterpart of [`assemble_blocks`](@ref), with the same
-`rowidcs`/`colidcs`/`blocks` contract. A specialized backend may fill all blocks in
-one combined pass instead of making one matrix call per block.
-
-Default (any `AbstractKernelMatrix`) implementation: just forwards to
-`assemble_blocks`. Backends may specialize `assemble_blocks_sparse` when they can
-evaluate several blocks more efficiently in one pass.
-"""
-function assemble_blocks_sparse(
-    matrix::AbstractKernelMatrix, blocks, rowidcs, colidcs; kwargs...
-)
-    return assemble_blocks(matrix, blocks, rowidcs, colidcs; kwargs...)
-end
-
 function (M::AbstractKernelMatrix)(_, _, _)
     return throw(ArgumentError("callable is not implemented for $(typeof(M))."))
 end
