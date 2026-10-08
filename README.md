@@ -86,6 +86,8 @@ for configuration options and point-kernel examples.
 - [BEAST.jl](https://github.com/krcools/BEAST.jl) boundary element toolkit in Julia
 - [H2Trees.jl](https://github.com/djukic14/H2Trees.jl) hierarchical tree construction for $\mathcal{H}$- and $\mathcal{H}^2$-matrices
 - [NestedCrossApproximation.jl](https://github.com/JoshuaTetzner/NestedCrossApproximation.jl) nested low-rank approximation for $\mathcal{H}^2$-matrices
+- [BlockSparseMatrices.jl](https://github.com/djukic14/BlockSparseMatrices.jl)
+  stores and applies the dense near field.
 
 ## References
 
