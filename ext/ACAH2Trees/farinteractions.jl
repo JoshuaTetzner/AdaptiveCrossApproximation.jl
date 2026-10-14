@@ -1,6 +1,6 @@
 import H2Trees: isleaf, testtree, trialtree, root, children, numberofvalues
 
-function fars_consecutive!(
+function fars!(
     treea,
     treeb,
     values::U,
@@ -21,7 +21,7 @@ function fars_consecutive!(
     farvalues[tnode] = localfarnodes
     !isempty(localfarnodes) && (values[tnode] = range(treea, tnode))
     for child in children(treea, tnode)
-        fars_consecutive!(treea, treeb, values, farvalues, child, childnodes; isnear=isnear)
+        fars!(treea, treeb, values, farvalues, child, childnodes; isnear=isnear)
     end
 end
 
@@ -51,18 +51,33 @@ function fars!(
 end
 
 function AdaptiveCrossApproximation.farinteractions(
-    tree::BlockTree; isnear=AdaptiveCrossApproximation.isnear(1.0)
+    tree::BlockTree, isnear::IsNearFunctor, spaceordering::SpaceOrderingStyle
 )
     return AdaptiveCrossApproximation.farinteractions(
-        testtree(tree), trialtree(tree); isnear=isnear
+        testtree(tree), trialtree(tree), isnear, spaceordering
     )
 end
 
 function AdaptiveCrossApproximation.farinteractions(
-    treea, treeb; isnear=AdaptiveCrossApproximation.isnear(1.0)
+    treea::H2Trees.H2ClusterTree,
+    treeb::H2Trees.H2ClusterTree;
+    isnear=AdaptiveCrossApproximation.isnear(),
+    spaceordering::SpaceOrderingStyle=PreserveSpaceOrder(),
 )
+    return AdaptiveCrossApproximation.farinteractions(
+        treea, treeb, IsNearFunctor(isnear), spaceordering
+    )
+end
+
+function AdaptiveCrossApproximation.farinteractions(
+    treea::H2Trees.H2ClusterTree,
+    treeb::H2Trees.H2ClusterTree,
+    isnear::IsNearFunctor,
+    ::PreserveSpaceOrder,
+)
+    AdaptiveCrossApproximation._checkcrosslevel(isnear)
     vals = Vector{Vector{Int}}(undef, length(treea.nodes))
-    nestedfarvals = Vector{Vector{Vector{Int}}}(undef, length(treea.nodes))
+    nestedfarvals = [Vector{Int}[] for _ in eachindex(treea.nodes)]
     if !isnear(treea, treeb, root(treea), root(treeb))
         vals[root(treea)] = H2Trees.values(treea, root(treea))
         nestedfarvals[root(treea)] = [H2Trees.values(treeb, root(treeb))]
@@ -73,26 +88,21 @@ function AdaptiveCrossApproximation.farinteractions(
     return vals, farptr, farvals
 end
 
-function AdaptiveCrossApproximation.farinteractions_consecutive(
-    tree::BlockTree; isnear=AdaptiveCrossApproximation.isnear(1.0)
+function AdaptiveCrossApproximation.farinteractions(
+    treea::H2Trees.H2ClusterTree,
+    treeb::H2Trees.H2ClusterTree,
+    isnear::IsNearFunctor,
+    ::PermuteSpaceInPlace,
 )
-    return AdaptiveCrossApproximation.farinteractions_consecutive(
-        testtree(tree), trialtree(tree); isnear=isnear
-    )
-end
-
-function AdaptiveCrossApproximation.farinteractions_consecutive(
-    treea, treeb; isnear=AdaptiveCrossApproximation.isnear(1.0)
-)
+    AdaptiveCrossApproximation._checkcrosslevel(isnear)
     vals = Vector{UnitRange{Int}}(undef, length(treea.nodes))
-    farvals = Vector{Vector{UnitRange{Int}}}(undef, length(treea.nodes))
+    farvals = [UnitRange{Int}[] for _ in eachindex(treea.nodes)]
     if !isnear(treea, treeb, root(treea), root(treeb))
-        farvals[root(treea)] = range(testtree(treea), root(treeb))
-        vals[root(treea)] = [range(testtree(treea), root(treea))]
+        vals[root(treea)] = range(treea, root(treea))
+        farvals[root(treea)] = [range(treeb, root(treeb))]
+    else
+        fars!(treea, treeb, vals, farvals, root(treea), [root(treeb)]; isnear=isnear)
     end
-    fars_consecutive!(
-        treea, treeb, vals, farvals, root(treea), [root(treeb)]; isnear=isnear
-    )
     farptr, farvals = AdaptiveCrossApproximation.linearizestorage(farvals)
     return vals, farptr, farvals
 end

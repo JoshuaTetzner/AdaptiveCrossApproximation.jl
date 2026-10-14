@@ -28,6 +28,8 @@ struct LowRankMatrix{K} <: LinearMaps.LinearMap{K}
     z::Vector{K}
 end
 
+_storedfarblockentries(block::LowRankMatrix) = length(block.U) + length(block.V)
+
 function LowRankMatrix(U::AbstractMatrix{K}, V::AbstractMatrix{K}) where {K}
     @assert size(V, 1) == size(U, 2)
     return LowRankMatrix{K}(

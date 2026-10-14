@@ -49,10 +49,10 @@ function (convcrit::FNormEstimatorFunctor{F})(
 ) where {F<:Real,K}
     @views rnorm = norm(rowbuffer[npivot, 1:maxcolumns])
     @views cnorm = norm(colbuffer[1:maxrows, npivot])
-    zerotol = _zeroresidualtol(convcrit)
-    (rnorm <= zerotol && cnorm <= zerotol) && (return npivot - 1, false)
-    if (rnorm <= zerotol || cnorm <= zerotol)
-        (npivot == 1) ? (return npivot - 1, true) : (return npivot - 1, false)
+    # The row is scaled by the pivot, so only the update norm `rnorm * cnorm`
+    # carries the matrix scale. A one-sided zero first pivot retries another row.
+    if rnorm * cnorm <= _zeroresidualtol(convcrit, K)
+        return npivot - 1, npivot == 1 && !(iszero(rnorm) && iszero(cnorm))
     end
     normF!(convcrit, rowbuffer, colbuffer, npivot, maxrows, maxcolumns)
     return npivot, rnorm * cnorm > convcrit.tol * convcrit.normUV
@@ -62,6 +62,6 @@ function (convcrit::FNormEstimatorFunctor{F})(
     rcbuffer::AbstractVector{K}, npivot::Int
 ) where {F<:Real,K}
     rcnorm = norm(rcbuffer)
-    (rcnorm <= _zeroresidualtol(convcrit)) && (return npivot - 1, false)
+    (rcnorm <= _zeroresidualtol(convcrit, K)) && (return npivot - 1, false)
     return npivot, rcnorm > convcrit.tol * convcrit.normUV
 end

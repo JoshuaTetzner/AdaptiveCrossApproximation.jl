@@ -60,25 +60,27 @@ fct32 = myfct32()
                     tol
                 @test norm(adjoint(mat) * x - adjoint(A) * x) / norm(adjoint(A) * x) < tol
 
+                # Float32 tolerances below 1e-5 approach roundoff.
+                tol32 = max(tol, 1e-5)
                 mat = AdaptiveCrossApproximation.HMatrix(
-                    fct32, mesh[1], mesh[2], tree; spaceordering=spaceordering, tol=tol
+                    fct32, mesh[1], mesh[2], tree; spaceordering=spaceordering, tol=tol32
                 )
                 @test eltype(mat) == Float32
                 A = [fct32(x, y) for x in mesh[1], y in mesh[2]]
-                @test norm(Matrix(mat) - A) / norm(A) < tol
+                @test norm(Matrix(mat) - A) / norm(A) < tol32
 
                 x = rand(eltype(mat), size(mat, 2))
                 y = mat * x
                 @test eltype(y) == Float32
-                @test norm(y - A * x) / norm(A * x) < tol
+                @test norm(y - A * x) / norm(A * x) < tol32
 
                 x = rand(eltype(mat), size(mat, 1))
                 y = transpose(mat) * x
                 @test eltype(y) == Float32
-                @test norm(y - transpose(A) * x) / norm(transpose(A) * x) < tol
+                @test norm(y - transpose(A) * x) / norm(transpose(A) * x) < tol32
                 y = adjoint(mat) * x
                 @test eltype(y) == Float32
-                @test norm(y - adjoint(A) * x) / norm(adjoint(A) * x) < tol
+                @test norm(y - adjoint(A) * x) / norm(adjoint(A) * x) < tol32
             end
         end
     end

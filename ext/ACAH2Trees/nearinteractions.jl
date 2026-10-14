@@ -1,6 +1,6 @@
 function (isnear::AdaptiveCrossApproximation.IsNearFunctor{F})(
     treea::H2Trees.TwoNTree, treeb::H2Trees.TwoNTree, nodea::Int, nodeb::Int
-) where {F}
+) where {F<:Real}
     ths = H2Trees.halfsize(treea, nodea) * sqrt(3)
     shs = H2Trees.halfsize(treeb, nodeb) * sqrt(3)
     dist = norm(H2Trees.center(treea, nodea) - H2Trees.center(treeb, nodeb)) - (ths + shs)
@@ -10,7 +10,7 @@ end
 
 function (isnear::AdaptiveCrossApproximation.IsNearFunctor{F})(
     treea::H2Trees.BoundingBallTree, treeb::H2Trees.BoundingBallTree, nodea::Int, nodeb::Int
-) where {F}
+) where {F<:Real}
     ths = H2Trees.radius(treea, nodea)
     shs = H2Trees.radius(treeb, nodeb)
     dist = norm(H2Trees.center(treea, nodea) - H2Trees.center(treeb, nodeb)) - (ths + shs)
@@ -28,7 +28,7 @@ function (isnear::AdaptiveCrossApproximation.IsNearFunctor{F})(
     (2 * maxhs <= isnear.η * sep) ? (return false) : (return true)
 end
 
-function nears_consecutive!(
+function nears!(
     tree,
     values::Vector{R},
     nearvalues::Vector{V},
@@ -58,9 +58,7 @@ function nears_consecutive!(
 
     if !isempty(childnearnodes)
         for child in children(testtree(tree), tnode)
-            nears_consecutive!(
-                tree, values, nearvalues, hasnears, child, childnearnodes; isnear=isnear
-            )
+            nears!(tree, values, nearvalues, hasnears, child, childnearnodes; isnear=isnear)
         end
     end
 end
@@ -99,8 +97,9 @@ function nears!(
 end
 
 function AdaptiveCrossApproximation.nearinteractions(
-    tree::H2Trees.BlockTree; isnear=AdaptiveCrossApproximation.isnear(1.0)
+    tree::H2Trees.BlockTree, isnear::IsNearFunctor, ::PreserveSpaceOrder
 )
+    AdaptiveCrossApproximation._checkcrosslevel(isnear)
     !isnear(testtree(tree), trialtree(tree), root(testtree(tree)), root(trialtree(tree))) &&
         return Vector{Int}[], Vector{Int}[]
     values = Vector{Vector{Int}}(undef, length(testtree(tree).nodes))
@@ -117,15 +116,16 @@ function AdaptiveCrossApproximation.nearinteractions(
     AdaptiveCrossApproximation.collectassigned(nearvalues)
 end
 
-function AdaptiveCrossApproximation.nearinteractions_consecutive(
-    tree::H2Trees.BlockTree; isnear=AdaptiveCrossApproximation.isnear(1.0)
+function AdaptiveCrossApproximation.nearinteractions(
+    tree::H2Trees.BlockTree, isnear::IsNearFunctor, ::PermuteSpaceInPlace
 )
+    AdaptiveCrossApproximation._checkcrosslevel(isnear)
     !isnear(testtree(tree), trialtree(tree), root(testtree(tree)), root(trialtree(tree))) &&
         return UnitRange{Int}[], Vector{UnitRange{Int}}[]
     values = Vector{UnitRange{Int}}(undef, length(testtree(tree).nodes))
     nearvalues = Vector{Vector{UnitRange{Int}}}(undef, length(testtree(tree).nodes))
     hasnear = zeros(Bool, length(testtree(tree).nodes))
-    nears_consecutive!(
+    nears!(
         tree,
         values,
         nearvalues,

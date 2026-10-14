@@ -20,6 +20,9 @@ via `Matrix`.
 
 `HMatrix` is typically created through the high-level constructor
 `HMatrix(operator, testspace, trialspace, tree; kwargs...)` or `assemble(...)`.
+For transpose-symmetric operators, `HMatrix(operator, space, tree; kwargs...)`
+and `assemble(operator, space; kwargs...)` share off-diagonal storage between
+both orientations. The two-space constructors use general storage.
 
 # See also
 
@@ -50,17 +53,26 @@ end
 Count the number of stored scalars in a hierarchical matrix.
 
 Sums the near-field block-sparse storage with the far-field low-rank factor
-storage (`length(U) + length(V)` per block), i.e. the number of stored numerical
-entries rather than the dense `size(A,1) * size(A,2)`. It does not include object
-or index-array overhead. See also
+storage (`length(U) + length(V)` per stored block). Symmetric blocks count their
+shared factors once; a far self block assembled as dense storage counts its
+stored entries. This does not include object or index-array overhead. See also
 [`storage`](@ref) for a GB-scale report including compression ratio.
 """
 function nnz(A::HMatrix)
-    farnnz = sum(
-        length(blk.U) + length(blk.V) for f in A.farinteractions for blk in f.blocks; init=0
-    )
-    return BlockSparseMatrices.nnz(A.nearinteractions) + farnnz
+    farnnz = sum(_storedfarentries(f) for f in A.farinteractions; init=0)
+    return _storednearentries(A.nearinteractions) + farnnz
 end
+
+_storednearentries(nears) = BlockSparseMatrices.nnz(nears)
+_storednearentries(nears::SymmetricBlockMatrix) =
+    sum(length, nears.diagonals; init=0) + sum(length, nears.offdiagonals; init=0)
+
+_storedfarblockentries(block::AbstractMatrix) = length(block)
+_storedfarentries(fars::BlockSparseMatrix) =
+    sum(_storedfarblockentries, fars.blocks; init=0)
+_storedfarentries(fars::SymmetricBlockMatrix) =
+    sum(length, fars.diagonals; init=0) +
+    sum(_storedfarblockentries, fars.offdiagonals; init=0)
 
 function Base.size(A::HMatrix, dim=nothing)
     dim === nothing && return (A.dim[1], A.dim[2])

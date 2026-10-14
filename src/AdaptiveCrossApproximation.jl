@@ -191,6 +191,9 @@ This is the recommended entry point for most applications.
 
 Requires H2Trees.jl to be loaded for automatic tree generation. If providing
 a custom tree, ensure it implements the tree interface expected by HMatrix assembly.
+The two-space call uses general assembly even when `testspace === trialspace`.
+For a transpose-symmetric operator, use `assemble(op, space; kwargs...)` to select
+symmetric assembly explicitly.
 For operators whose matrix is cheap to build directly and never benefits from
 low-rank compression (e.g. BEAST's local operators `Identity`/`NCross`), the
 `ACABEAST` extension adds a more specific `assemble` method that bypasses tree
@@ -213,7 +216,9 @@ function assemble(
     testspace,
     trialspace;
     treekwargs=(;),
-    tree=_tree(defaulttreebackend(), testspace, trialspace; treekwargs...),
+    tree=_tree(
+        defaulttreebackend(testspace, trialspace), testspace, trialspace; treekwargs...
+    ),
     quadstrat=defaultmatrixdata(op, testspace, trialspace),
     nearquadstrat=quadstrat,
     farquadstrat=tofarquadstrat(quadstrat),
@@ -225,6 +230,60 @@ function assemble(
         op,
         testspace,
         trialspace,
+        tree;
+        tol=tol,
+        compressor=compressor,
+        nearmatrixdata=nearquadstrat,
+        farmatrixdata=farquadstrat,
+        kwargs...,
+    )
+end
+
+"""
+    assemble(op, space; tree=..., quadstrat=..., kwargs...)
+
+Assemble a transpose-symmetric H-matrix on one space. Automatic tree construction
+builds one shared cluster tree. With an explicit `tree`, only its test cluster tree
+is used for both axes.
+
+The operator and any custom `isnear` predicate must be transpose-symmetric;
+this is a caller-supplied assumption and is not checked. Opposite off-diagonal
+blocks use a transpose, without complex conjugation. Diagonal near blocks are
+assembled in full and symmetrized. Each unordered far-field pair is compressed
+once with the configured compressor.
+
+Accepts the tree, quadrature, compression, and scheduling keywords of the
+two-space overload. Only `PreserveSpaceOrder()` is supported: symmetric
+`PermuteSpaceInPlace()` assembly requires symmetric VBCRS storage in
+BlockSparseMatrices. The call `assemble(op, space, space)` uses general assembly.
+BEAST local operators such as `Identity` and `NCross` are assembled directly.
+
+# Examples
+
+```julia
+hmat = AdaptiveCrossApproximation.assemble(op, space; tol=1e-5)
+hmat = AdaptiveCrossApproximation.assemble(op, space; tree=tree, tol=1e-5)
+```
+
+# See also
+
+[`HMatrix`](@ref)
+"""
+function assemble(
+    op,
+    space;
+    treekwargs=(;),
+    tree=_tree(defaulttreebackend(space, space), space; treekwargs...),
+    quadstrat=defaultmatrixdata(op, space, space),
+    nearquadstrat=quadstrat,
+    farquadstrat=tofarquadstrat(quadstrat),
+    tol=1e-4,
+    compressor=defaultcompressor(op, space, space; tol=tol),
+    kwargs...,
+)
+    return HMatrix(
+        op,
+        space,
         tree;
         tol=tol,
         compressor=compressor,

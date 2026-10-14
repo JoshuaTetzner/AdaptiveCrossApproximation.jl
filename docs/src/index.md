@@ -6,6 +6,11 @@ convergence criteria [[2, 4, 5]](@ref refs). The package also contains the
 incomplete adaptive cross approximation for efficient pivot selection in the
 construction of $\mathcal{H}^2$-matrices [[7]](@ref refs).
 
+The package also assembles $\mathcal{H}$-matrices for point kernels and BEAST
+operators. For transpose-symmetric operators, single-space assembly shares
+off-diagonal near blocks and far-field factors. See
+[Symmetric Assembly on One Space](@ref symmetric-hmatrix-assembly).
+
 ## Installation 
 Installing AdaptiveCrossApproximation is done by entering the package manager (enter `]` at the julia REPL) and issuing:
 

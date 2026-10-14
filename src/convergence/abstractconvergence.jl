@@ -63,6 +63,12 @@ function normF!(
     @views rnorm = norm(rowbuffer[npivot, 1:maxcolumns])
     @views cnorm = norm(colbuffer[1:maxrows, npivot])
     delta_sq = (rnorm * cnorm)^2
+    # Squared norms underflow long before the entries themselves do.
+    if npivot == 1 && delta_sq < floatmin(real(K))
+        @warn "ACA residual norms underflow in $(real(K)); convergence checks are " *
+            "unreliable for entries this small. Rescale the operator or use Float64." maxlog =
+            1
+    end
     for j in 1:(npivot - 1)
         @views delta_sq +=
             2 * real.(
@@ -74,9 +80,10 @@ function normF!(
     return nothing
 end
 
-# Scale below which a residual is numerically zero and its pivot redundant. A
-# rank-deficient block drives the residual to ~eps relative to the block rather than
-# exactly zero, so `sqrt(eps)·normUV` catches it while staying below any real
-# tolerance-level residual.
-@inline _zeroresidualtol(convcrit::ConvCritFunctor) =
-    sqrt(eps(typeof(convcrit.normUV))) * convcrit.normUV
+# Size below which a residual update is numerically zero and its pivot redundant.
+# The buffer is a few ulps relative to the current approximation norm, so the test
+# is independent of the matrix scale; it must stay well below any tolerance used
+# for `K` (at least 1e-5 for Float32). Roundoff left after an exact rank can exceed
+# it; the tolerance test then stops one pivot later.
+@inline _zeroresidualtol(convcrit::ConvCritFunctor, ::Type{K}) where {K} =
+    10 * eps(real(K)) * convcrit.normUV

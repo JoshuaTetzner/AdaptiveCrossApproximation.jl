@@ -5,6 +5,8 @@ using BEAST.CompScienceMeshes: cells, vertices
 using LinearAlgebra
 using AdaptiveCrossApproximation
 
+AdaptiveCrossApproximation._treepositions(space::BEAST.Space) = BEAST.positions(space)
+
 include("kernelmatrix.jl")
 include("rwgorientations.jl")
 
@@ -66,6 +68,15 @@ function AdaptiveCrossApproximation.assemble(
     kwargs...,
 )
     return BEAST.assemble(operator, testspace, trialspace; quadstrat=quadstrat)
+end
+
+function AdaptiveCrossApproximation.assemble(
+    operator::BEAST.LocalOperator,
+    space::BEAST.Space;
+    quadstrat=BEAST.defaultquadstrat(operator, space, space),
+    kwargs...,
+)
+    return BEAST.assemble(operator, space, space; quadstrat=quadstrat)
 end
 
 function AdaptiveCrossApproximation.scalartype(operator::BEAST.IntegralOperator)
