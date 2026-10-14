@@ -21,10 +21,14 @@ function AdaptiveCrossApproximation.assemble_blocks(
     isempty(blocks) && return blocks
     timing = get(ENV, "ACA_GPU_TIMING", "0") == "1"
 
-    bext = Base.get_extension(BEAST, :BEASTCUDAExt)
-    t_assemble = @elapsed bext.gpu_batched_blockassemble!(blocks, matrix.functors, rowidcs, colidcs)
-    timing && println("[assemble_blocks] gpu_batched_blockassemble! total: ",
-        "$(round(t_assemble; digits=4))s")
+    bext = _beastcudaext()
+    t_assemble = @elapsed bext.gpu_batched_blockassemble!(
+        blocks, matrix.functors, rowidcs, colidcs
+    )
+    timing && println(
+        "[assemble_blocks] gpu_batched_blockassemble! total: ",
+        "$(round(t_assemble; digits=4))s",
+    )
 
     update!(pbar, length(blocks))
     return blocks
@@ -40,5 +44,7 @@ function AdaptiveCrossApproximation.assemblenears(
     ::AdaptiveCrossApproximation.PermuteSpaceInPlace;
     kwargs...,
 )
-    throw(ArgumentError("GPU near assembly currently supports PreserveSpaceOrder only"))
+    return throw(
+        ArgumentError("GPU near assembly currently supports PreserveSpaceOrder only")
+    )
 end

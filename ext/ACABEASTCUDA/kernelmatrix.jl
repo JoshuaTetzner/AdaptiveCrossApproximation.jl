@@ -13,10 +13,12 @@ function _select_free_devices(n::Int)
         i for i in 0:(CUDA.ndevices() - 1) if
         all(==(self), keys(CUDA.NVML.compute_processes(CUDA.NVML.Device(i))))
     ]
-    length(free) >= n || throw(ArgumentError(
-        "requested $n free GPU device(s), only $(length(free)) of $(CUDA.ndevices()) " *
-        "are currently idle (busy: $(setdiff(0:(CUDA.ndevices() - 1), free)))"
-    ))
+    length(free) >= n || throw(
+        ArgumentError(
+            "requested $n free GPU device(s), only $(length(free)) of $(CUDA.ndevices()) " *
+            "are currently idle (busy: $(setdiff(0:(CUDA.ndevices() - 1), free)))",
+        ),
+    )
     return free[1:n]
 end
 
@@ -27,11 +29,13 @@ function AdaptiveCrossApproximation.beastkernelmatrix(
     data::AdaptiveCrossApproximation.GPUMatrixData,
 )
     devices = data.devices !== nothing ? data.devices : _select_free_devices(data.ndevices)
-    bext = Base.get_extension(BEAST, :BEASTCUDAExt)
+    bext = _beastcudaext()
     functors = bext.gpu_blockassemblers(
         operator, testspace, trialspace; quadstrat=data.quadstrat, devices=devices
     )
-    return AdaptiveCrossApproximation.GPUBEASTKernelMatrix{BEAST.scalartype(operator, testspace, trialspace)}(
+    return AdaptiveCrossApproximation.GPUBEASTKernelMatrix{
+        BEAST.scalartype(operator, testspace, trialspace)
+    }(
         functors
     )
 end

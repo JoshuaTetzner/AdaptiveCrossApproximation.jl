@@ -153,6 +153,103 @@ end
     fill!(scalarblock, 0)
     AdaptiveCrossApproximation.nextrc!(scalarblock, matrix, rows[1], columns[1])
     @test scalarblock[1] ≈ fullblock[1, 1]
+
+    # One-sided local matrices: only the given side is prepared, the other falls back.
+    rowsonly = AdaptiveCrossApproximation.localkernelmatrix(matrix, rows, nothing)
+    columnsonly = AdaptiveCrossApproximation.localkernelmatrix(matrix, nothing, columns)
+    @test rowsonly isa extension_module.LocalBEASTKernelMatrix
+    @test columnsonly isa extension_module.LocalBEASTKernelMatrix
+    @test rowsonly.rowdata === nothing
+    @test columnsonly.columndata === nothing
+    @test AdaptiveCrossApproximation.localkernelmatrix(fallbackmatrix, rows, nothing) ===
+        fallbackmatrix
+    for onesided in (rowsonly, columnsonly)
+        @test size(onesided) == size(matrix)
+        @test eltype(onesided) == eltype(matrix)
+
+        fill!(rowblock, 0)
+        AdaptiveCrossApproximation.nextrc!(rowblock, onesided, rows[1], columns)
+        @test rowblock ≈ fullblock[1:1, :]
+
+        fill!(columnblock, 0)
+        AdaptiveCrossApproximation.nextrc!(columnblock, onesided, rows, columns[1])
+        @test columnblock ≈ fullblock[:, 1:1]
+
+        fill!(block, 0)
+        AdaptiveCrossApproximation.nextrc!(block, onesided, rows, columns)
+        @test block ≈ fullblock
+
+        fill!(scalarblock, 0)
+        AdaptiveCrossApproximation.nextrc!(scalarblock, onesided, rows[1], columns[1])
+        @test scalarblock[1] ≈ fullblock[1, 1]
+    end
+
+    # Sampled indices need not lie in the prepared index set of the other side.
+    otherrows = collect(20:24)
+    othercolumns = collect(30:33)
+    reference = zeros(ComplexF64, length(rows), length(othercolumns))
+    matrix(reference, rows, othercolumns)
+    for (j, column) in enumerate(othercolumns)
+        fill!(columnblock, 0)
+        AdaptiveCrossApproximation.nextrc!(columnblock, rowsonly, rows, column)
+        @test columnblock ≈ reference[:, j:j]
+    end
+    reference = zeros(ComplexF64, length(otherrows), length(columns))
+    matrix(reference, otherrows, columns)
+    for (i, row) in enumerate(otherrows)
+        fill!(rowblock, 0)
+        AdaptiveCrossApproximation.nextrc!(rowblock, columnsonly, row, columns)
+        @test rowblock ≈ reference[i:i, :]
+    end
+end
+
+@testset "Far quadstrat and local BEAST KernelMatrix 2D" begin
+    line = meshsegment(1.0, 0.05)
+    testspace = lagrangec0d1(line)
+    trialspace = lagrangec0d1(translate(line, [0.0, 2.0]))
+    extension_module = Base.get_extension(AdaptiveCrossApproximation, :ACABEAST)
+    rows = collect(2:6)
+    columns = collect(8:15)
+
+    for operator in (
+        Helmholtz2D.singlelayer(; wavenumber=k),
+        Helmholtz2D.doublelayer(; wavenumber=k),
+        Helmholtz2D.hypersingular(; wavenumber=k),
+    )
+        quadstrat = BEAST.defaultquadstrat(operator, testspace, trialspace)
+        farquadstrat = AdaptiveCrossApproximation.defaultfarmatrixdata(
+            operator, testspace, trialspace
+        )
+        @test quadstrat isa BEAST.DoubleNumSauterQstrat
+        @test farquadstrat ==
+            BEAST.DoubleNumQStrat(quadstrat.outer_rule, quadstrat.inner_rule)
+        @test AdaptiveCrossApproximation.tofarquadstrat(quadstrat) == farquadstrat
+
+        # Well-separated elements: the far quadrature reproduces the default one.
+        reference = assemble(operator, testspace, trialspace; quadstrat=quadstrat)
+        matrix = AdaptiveCrossApproximation.AbstractKernelMatrix(
+            operator, testspace, trialspace; matrixdata=farquadstrat
+        )
+        fullblock = zeros(eltype(matrix), length(rows), length(columns))
+        matrix(fullblock, rows, columns)
+        @test fullblock ≈ reference[rows, columns]
+
+        for (localrows, localcolumns) in
+            ((rows, columns), (rows, nothing), (nothing, columns))
+            localmatrix = AdaptiveCrossApproximation.localkernelmatrix(
+                matrix, localrows, localcolumns
+            )
+            @test localmatrix isa extension_module.LocalBEASTKernelMatrix
+
+            rowblock = zeros(eltype(matrix), 1, length(columns))
+            AdaptiveCrossApproximation.nextrc!(rowblock, localmatrix, rows[2], columns)
+            @test rowblock ≈ fullblock[2:2, :]
+
+            columnblock = zeros(eltype(matrix), length(rows), 1)
+            AdaptiveCrossApproximation.nextrc!(columnblock, localmatrix, rows, columns[3])
+            @test columnblock ≈ fullblock[:, 3:3]
+        end
+    end
 end
 
 @testset "ACA BEAST 2D" begin

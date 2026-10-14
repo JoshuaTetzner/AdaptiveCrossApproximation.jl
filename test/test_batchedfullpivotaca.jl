@@ -166,3 +166,70 @@ end
         @test _cur_relerr(A, rank, rowpivots, colpivots) > 1e-10  # genuinely capped
     end
 end
+
+@testset "Fully-pivoted ACA rescales sampled residuals" begin
+    acaext = Base.get_extension(AdaptiveCrossApproximation, :ACACUDA)
+    for T in (Float32, Float64, ComplexF32, ComplexF64), m in (3, 5)
+        A = zeros(T, m, 3)
+        A[1, 1], A[2, 2], A[3, 3] = 1, 0.009, 0.001
+        tol = real(T)(1e-2)
+        aca = ACA(FullPivoting(), FullPivoting(), FNormEstimator(tol))
+        @test first(aca(copy(A), 3)) == 1
+        rank, rp, cp = aca(copy(A), 3; sampled=true)
+        @test rank == 2
+        @test rp == collect(1:rank)
+        @test cp == collect(1:rank)
+        residual = A - A[:, cp] * (A[rp, cp] \ A[rp, :])
+        estimated_error = norm(residual) / norm(A) * sqrt(3 / (3-rank))
+        @test estimated_error <= tol
+        # Applying s/(s-r) to the norm instead of its square is too strict:
+        # this sample must stop at rank 1 with the square-root norm correction.
+        B = copy(A)
+        B[2, 2] = 0.0075
+        @test first(aca(copy(B), 3; sampled=true)) == 1
+        if CUDA.functional()
+            ranks_d, rows_d, cols_d = aca(CuArray(A), [0, m], [3], 3; sampled=true)
+            @test Array(ranks_d) == [rank]
+            @test Int.(Array(rows_d)[1:rank, 1]) == rp
+            @test Int.(Array(cols_d)[1:rank, 1]) == cp
+            ranks_d, _, _ = aca(CuArray(B), [0, m], [3], 3; sampled=true)
+            @test Array(ranks_d) == [1]
+        end
+        # Different sampled widths use their own factors, without full counts.
+        buffer = zeros(T, 3m, 8)
+        for i in 1:3
+            buffer[((i - 1) * m + 1):(i * m), 1:3] = A
+        end
+        offsets = [0, m, 2m, 3m]
+        ncols = [3, 4, 8]
+        ranks, rows, cols = acaext.batched_fullpivot_aca_reference!(
+            aca, copy(buffer), offsets, ncols, 8; sampled=true
+        )
+        @test ranks == [2, 2, 1]
+        if CUDA.functional()
+            ranks_d, rows_d, cols_d = aca(CuArray(buffer), offsets, ncols, 8; sampled=true)
+            @test Int.(Array(ranks_d)) == ranks
+            @test Int.(Array(rows_d)) == rows
+            gpu_cols = Int.(Array(cols_d))
+            for i in eachindex(ranks)
+                @test gpu_cols[1:ranks[i], i] == cols[1:ranks[i], i]
+            end
+        end
+    end
+
+    # Exhausting either dimension terminates without dividing by zero.
+    # Zero blocks keep rank zero in both ordinary and sampled modes.
+    for A in (reshape([2.0, 1.0], 1, 2), reshape([2.0, 1.0], 2, 1), zeros(3, 2)),
+        sampled in (false, true)
+
+        aca = ACA(FullPivoting(), FullPivoting(), FNormEstimator(1e-3))
+        rank, rp, cp = aca(copy(A), min(size(A)...); sampled)
+        @test rank == (iszero(norm(A)) ? 0 : 1)
+        if CUDA.functional()
+            ranks_d, _, _ = aca(
+                CuArray(A), [0, size(A, 1)], [size(A, 2)], size(A, 2); sampled
+            )
+            @test Array(ranks_d) == [rank]
+        end
+    end
+end

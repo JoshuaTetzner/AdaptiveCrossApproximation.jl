@@ -7,6 +7,10 @@ Passed as the `matrixdata` keyword argument to [`AbstractKernelMatrix`](@ref) to
 a [`GPUBEASTKernelMatrix`](@ref) instead of a plain `BEASTKernelMatrix`; requires the
 ACABEASTCUDA package extension to be loaded (BEAST.jl and CUDA.jl available).
 
+Experimental: GPU assembly also needs BEAST's `BEASTCUDAExt`, which released BEAST
+versions do not provide yet. Without it, building the kernel matrix throws an
+`ArgumentError`.
+
 Physical device selection is automatic: unless `devices` is given explicitly, the
 extension picks `ndevices` currently-idle GPUs (no active compute processes) at
 [`AdaptiveCrossApproximation.beastkernelmatrix`](@ref) build time. Devices are
@@ -31,9 +35,11 @@ struct GPUMatrixData{QuadStratType}
     function GPUMatrixData(quadstrat; ndevices::Union{Int,Nothing}=nothing, devices=nothing)
         if devices !== nothing
             if ndevices !== nothing && ndevices != length(devices)
-                throw(ArgumentError(
-                    "ndevices=$ndevices does not match length(devices)=$(length(devices))"
-                ))
+                throw(
+                    ArgumentError(
+                        "ndevices=$ndevices does not match length(devices)=$(length(devices))",
+                    ),
+                )
             end
             ndevices = length(devices)
         elseif ndevices === nothing
@@ -69,7 +75,8 @@ extension to be loaded.
   - `NearBlockAssemblerType`: type of `nearassembler` (a single device's assembler)
   - `FunctorsType`: type of `functors` (a vector of per-device assemblers)
 """
-struct GPUBEASTKernelMatrix{T,NearBlockAssemblerType,FunctorsType} <: AbstractKernelMatrix{T}
+struct GPUBEASTKernelMatrix{T,NearBlockAssemblerType,FunctorsType} <:
+       AbstractKernelMatrix{T}
     nearassembler::NearBlockAssemblerType
     functors::FunctorsType
     function GPUBEASTKernelMatrix{T}(functors) where {T}
@@ -79,7 +86,10 @@ end
 
 function Base.size(matrix::GPUBEASTKernelMatrix, dim=nothing)
     if dim === nothing
-        return (length(matrix.nearassembler.test_space), length(matrix.nearassembler.trial_space))
+        return (
+            length(matrix.nearassembler.test_space),
+            length(matrix.nearassembler.trial_space),
+        )
     elseif dim == 1
         return length(matrix.nearassembler.test_space)
     elseif dim == 2
