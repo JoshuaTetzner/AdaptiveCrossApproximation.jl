@@ -297,8 +297,11 @@ function assemblenears(
         tree; spaceordering=spaceordering, isnear=isnear
     )
     T = eltype(nearmatrix)
-    diagonals = [zeros(T, length(indices), length(indices)) for indices in diagindices]
-    offdiagonals = [
+    # Typed comprehensions: Julia 1.10 infers Vector{Any} for an empty block list.
+    diagonals = Matrix{T}[
+        zeros(T, length(indices), length(indices)) for indices in diagindices
+    ]
+    offdiagonals = Matrix{T}[
         zeros(T, length(rowindices[i]), length(colindices[i])) for
         i in eachindex(rowindices)
     ]
