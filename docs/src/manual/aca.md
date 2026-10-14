@@ -174,5 +174,12 @@ This method overwrites its matrix argument while computing the residual, which i
 why the example passes `copy(A)`. It returns the selected row and column indices,
 not low-rank factors, and does not use the row/column sampling interface.
 
+For a matrix containing all cluster rows and only representative far-field
+columns, pass `sampled=true`. The squared relative residual is then multiplied
+by `s/(s-r)`, where `s` is the sampled column count and `r` the current rank.
+This assumes a far field much larger than the sample and representative remaining
+residual entries. It requires no full far-field column count. NCA's batched
+bottom-up compressor enables this mode on both CPU and GPU.
+
 For the algorithms and the available combinations of pivoting and convergence
 strategies, see the [ACA theory](../details/aca.md).

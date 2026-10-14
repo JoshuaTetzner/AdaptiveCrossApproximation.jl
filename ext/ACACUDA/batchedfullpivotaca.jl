@@ -6,7 +6,8 @@ function (aca::AdaptiveCrossApproximation.ACA{RP,CP,C})(
     buffer::CUDA.AnyCuMatrix{T},
     rowoffsets::AbstractVector{Int},
     ncols::AbstractVector{Int},
-    maxrank::Int,
+    maxrank::Int;
+    sampled::Bool=false,
 ) where {
     T,
     RP<:AdaptiveCrossApproximation.FullPivoting,
@@ -14,12 +15,17 @@ function (aca::AdaptiveCrossApproximation.ACA{RP,CP,C})(
     C<:AdaptiveCrossApproximation.FNormEstimator,
 }
     return batched_fullpivot_aca!(
-        buffer, rowoffsets, ncols, Int(maxrank), real(T)(aca.convergence.tol)
+        buffer,
+        rowoffsets,
+        ncols,
+        Int(maxrank),
+        real(T)(aca.convergence.tol);
+        sampled=sampled,
     )
 end
 
 """
-    batched_fullpivot_aca!(buffer, rowoffsets, ncols, maxrank, tol) -> ranks, rowpivots, colpivots
+    batched_fullpivot_aca!(buffer, rowoffsets, ncols, maxrank, tol; sampled=false) -> ranks, rowpivots, colpivots
 
 Batched fully-pivoted ACA over a flat, column-padded buffer holding multiple blocks
 as contiguous row-slices — one CUDA thread-block per matrix block, all launched
@@ -40,7 +46,11 @@ smallest column-major linear index wins.
   - `ncols::AbstractVector{<:Integer}`: length `nblocks`, each block's true column
     count.
   - `maxrank::Int`: buffer column width and per-block rank cap.
-  - `tol::Real`: relative Frobenius-norm convergence tolerance.
+  - `tol::Real`: relative Frobenius tolerance.
+  - `sampled::Bool`: multiply the relative residual by `sqrt(s/(s-r))`, where
+    `s=ncols[i]` and `r` is the current rank. This assumes representative remaining
+    residual entries and a far field much larger than the sample. Defaults to
+    `false`, giving ordinary relative Frobenius convergence.
 
 # Returns
 
@@ -54,7 +64,8 @@ function batched_fullpivot_aca!(
     rowoffsets::AbstractVector{<:Integer},
     ncols::AbstractVector{<:Integer},
     maxrank::Int,
-    tol::Real,
+    tol::Real;
+    sampled::Bool=false,
 ) where {T}
     nblocks = length(ncols)
     length(rowoffsets) == nblocks + 1 ||
@@ -71,7 +82,15 @@ function batched_fullpivot_aca!(
 
     threads = _ACA_NT
     @cuda threads = threads blocks = nblocks _fullpivot_aca_block_kernel!(
-        buffer, rowoffsets_d, ncols_d, Int32(maxrank), tol², ranks, rowpivots, colpivots
+        buffer,
+        rowoffsets_d,
+        ncols_d,
+        sampled,
+        Int32(maxrank),
+        tol²,
+        ranks,
+        rowpivots,
+        colpivots,
     )
 
     return ranks, rowpivots, colpivots
@@ -82,7 +101,7 @@ end
 # loop (`for j in k:n, i in k:m` with strict `>`): among trailing-submatrix entries
 # of equal magnitude, the smallest column-major linear index wins.
 function _fullpivot_aca_block_kernel!(
-    buffer, rowoffsets, ncols, maxrank, tol², ranks, rowpivots, colpivots
+    buffer, rowoffsets, ncols, sampled, maxrank, tol², ranks, rowpivots, colpivots
 )
     bi = blockIdx().x
     tid = threadIdx().x
@@ -213,7 +232,12 @@ function _fullpivot_aca_block_kernel!(
         end
 
         rank = k
-        sval[1] <= tol² * snorm0[1] && break
+        k == min(m, n) && break  # No residual entries remain; avoid 0/0.
+        # Estimate the full-block relative Frobenius residual. All rows were
+        # sampled, so their remaining count cancels. Use the large-far-field
+        # limit without counting its columns.
+        correction² = sampled ? R(n) / R(n - k) : one(R)
+        sval[1] * correction² <= tol² * snorm0[1] && break
     end
 
     if tid == Int32(1)
@@ -226,7 +250,7 @@ function _fullpivot_aca_block_kernel!(
 end
 
 """
-    batched_fullpivot_aca_reference!(aca, buffer, rowoffsets, ncols, maxrank) -> ranks, rowpivots, colpivots
+    batched_fullpivot_aca_reference!(aca, buffer, rowoffsets, ncols, maxrank; sampled=false) -> ranks, rowpivots, colpivots
 
 Host CPU reference over the same flat layout as [`batched_fullpivot_aca!`](@ref):
 runs the single-block fully-pivoted ACA method (`src/fullpivotedaca.jl`) on each
@@ -239,7 +263,8 @@ function batched_fullpivot_aca_reference!(
     buffer::AbstractMatrix{T},
     rowoffsets::AbstractVector{<:Integer},
     ncols::AbstractVector{<:Integer},
-    maxrank::Int,
+    maxrank::Int;
+    sampled::Bool=false,
 ) where {
     T,
     RP<:AdaptiveCrossApproximation.FullPivoting,
@@ -253,7 +278,7 @@ function batched_fullpivot_aca_reference!(
     for i in 1:nblocks
         rows = (rowoffsets[i] + 1):rowoffsets[i + 1]
         A = view(buffer, rows, 1:ncols[i])
-        r, rp, cp = aca(A, maxrank)
+        r, rp, cp = aca(A, maxrank; sampled=sampled)
         ranks[i] = r
         @views rowpivots[1:r, i] .= rp
         @views colpivots[1:r, i] .= cp

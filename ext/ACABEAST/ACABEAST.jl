@@ -14,6 +14,10 @@ function AdaptiveCrossApproximation.tofarquadstrat(qs::BEAST.DoubleNumWiltonSaut
     return BEAST.DoubleNumQStrat(qs.outer_rule_far, qs.inner_rule_far)
 end
 
+function AdaptiveCrossApproximation.tofarquadstrat(qs::BEAST.DoubleNumSauterQstrat)
+    return BEAST.DoubleNumQStrat(qs.outer_rule, qs.inner_rule)
+end
+
 function AdaptiveCrossApproximation.defaultmatrixdata(
     operator::BEAST.IntegralOperator, testspace::BEAST.Space, trialspace::BEAST.Space
 )

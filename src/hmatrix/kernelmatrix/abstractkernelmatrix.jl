@@ -75,7 +75,7 @@ function beastkernelmatrix end
     assemble_blocks(matrix::AbstractKernelMatrix, blocks, rowidcs, colidcs; scheduler, pbar) -> blocks
 
 Fill each preallocated `blocks[i]` (sized `(length(rowidcs[i]), length(colidcs[i]))`)
-by calling `matrix(blocks[i], rowidcs[i], colidcs[i])` once per `i`.
+with the requested kernel entries.
 The built-in kernel backends accumulate into the supplied blocks, so callers should
 normally provide zero-initialized storage.
 
@@ -126,6 +126,12 @@ The fallback returns `matrix` unchanged. A backend may return a lightweight loca
 wrapper that precomputes block-dependent assembly data. The returned object must
 accept the original global indices through the same `nextrc!` interface and report
 the same global `size` and `eltype` as `matrix`.
+
+Rows are sampled against exactly `columns` and columns against exactly `rows`, in the
+given order. If only one kind is sampled, the other index set may be `nothing`:
+`localkernelmatrix(matrix, rows, nothing)` prepares only column sampling and
+`localkernelmatrix(matrix, nothing, columns)` only row sampling, which avoids preparing
+data for a side that is never used as an index list.
 
 This hook is called once per far-field block before ACA compression, so any cached
 state belongs to that block and must not be shared concurrently between blocks.

@@ -68,6 +68,62 @@ function _active_element_ids(space, ids)
     )
 end
 
+function _localzlocal(::Type{T}, assembler) where {T}
+    return zeros(
+        T,
+        size(assembler.testassemblydata.data, 2),
+        size(assembler.trialassemblydata.data, 2),
+    )
+end
+
+# Data for sampling rows against the fixed `columns`; `nothing` if no columns are given.
+_localrowdata(::Type, assembler, ::Nothing) = nothing
+
+function _localrowdata(::Type{T}, assembler, columns) where {T}
+    testspace = assembler.tfs
+    trialspace = assembler.bfs
+    trialelementids = _active_element_ids(trialspace, columns)
+    return (;
+        testspace=BEAST.subset(testspace, 1:1),
+        testshapes=BEAST.refspace(testspace),
+        trialspace,
+        trialelements=view(assembler.trialelements, trialelementids),
+        trialassemblydata=BEAST.reduce_assembly_data(
+            assembler.trialassemblydata, columns, trialelementids
+        ),
+        trialshapes=BEAST.refspace(trialspace),
+        quadraturedata=(
+            assembler.quadraturedata[1],
+            view(assembler.quadraturedata[2], :, trialelementids),
+        ),
+        zlocal=_localzlocal(T, assembler),
+    )
+end
+
+# Data for sampling columns against the fixed `rows`; `nothing` if no rows are given.
+_localcolumndata(::Type, assembler, ::Nothing) = nothing
+
+function _localcolumndata(::Type{T}, assembler, rows) where {T}
+    testspace = assembler.tfs
+    trialspace = assembler.bfs
+    testelementids = _active_element_ids(testspace, rows)
+    return (;
+        testspace,
+        testelements=view(assembler.testelements, testelementids),
+        testassemblydata=BEAST.reduce_assembly_data(
+            assembler.testassemblydata, rows, testelementids
+        ),
+        testshapes=BEAST.refspace(testspace),
+        trialspace=BEAST.subset(trialspace, 1:1),
+        trialshapes=BEAST.refspace(trialspace),
+        quadraturedata=(
+            view(assembler.quadraturedata[1], :, testelementids),
+            assembler.quadraturedata[2],
+        ),
+        zlocal=_localzlocal(T, assembler),
+    )
+end
+
 function LocalBEASTKernelMatrix(
     matrix::AdaptiveCrossApproximation.BEASTKernelMatrix{T},
     rows,
@@ -75,56 +131,8 @@ function LocalBEASTKernelMatrix(
     ::BEAST.DoubleNumQStrat,
 ) where {T}
     assembler = matrix.nearassembler
-    testspace = assembler.tfs
-    trialspace = assembler.bfs
-    rowtestspace = BEAST.subset(testspace, first(rows):first(rows))
-    columntrialspace = BEAST.subset(trialspace, first(columns):first(columns))
-
-    testelementids = _active_element_ids(assembler.tfs, rows)
-    trialelementids = _active_element_ids(assembler.bfs, columns)
-    testelements = view(assembler.testelements, testelementids)
-    trialelements = view(assembler.trialelements, trialelementids)
-    testassemblydata = BEAST.reduce_assembly_data(
-        assembler.testassemblydata, rows, testelementids
-    )
-    trialassemblydata = BEAST.reduce_assembly_data(
-        assembler.trialassemblydata, columns, trialelementids
-    )
-    testshapes = BEAST.refspace(testspace)
-    trialshapes = BEAST.refspace(trialspace)
-
-    rowquadraturedata = (
-        assembler.quadraturedata[1], view(assembler.quadraturedata[2], :, trialelementids)
-    )
-    columnquadraturedata = (
-        view(assembler.quadraturedata[1], :, testelementids), assembler.quadraturedata[2]
-    )
-    zlocal = zeros(
-        T,
-        size(assembler.testassemblydata.data, 2),
-        size(assembler.trialassemblydata.data, 2),
-    )
-
-    rowdata = (;
-        testspace=rowtestspace,
-        testshapes,
-        trialspace,
-        trialelements,
-        trialassemblydata,
-        trialshapes,
-        quadraturedata=rowquadraturedata,
-        zlocal=copy(zlocal),
-    )
-    columndata = (;
-        testspace,
-        testelements,
-        testassemblydata,
-        testshapes,
-        trialspace=columntrialspace,
-        trialshapes,
-        quadraturedata=columnquadraturedata,
-        zlocal,
-    )
+    rowdata = _localrowdata(T, assembler, columns)
+    columndata = _localcolumndata(T, assembler, rows)
     return LocalBEASTKernelMatrix{T,typeof(matrix),typeof(rowdata),typeof(columndata)}(
         matrix, rowdata, columndata
     )
@@ -134,8 +142,9 @@ function (matrix::LocalBEASTKernelMatrix)(
     matrixblock, row::Integer, columns::AbstractVector{<:Integer}
 )
     assembler = matrix.matrix.nearassembler
-    store = BlockStoreFunctor(matrixblock)
     data = matrix.rowdata
+    data === nothing && return matrix.matrix(matrixblock, row:row, columns)
+    store = BlockStoreFunctor(matrixblock)
     testspace = data.testspace
     testspace.fns[1] = assembler.tfs.fns[row]
     testspace.pos[1] = assembler.tfs.pos[row]
@@ -160,8 +169,9 @@ function (matrix::LocalBEASTKernelMatrix)(
     matrixblock, rows::AbstractVector{<:Integer}, column::Integer
 )
     assembler = matrix.matrix.nearassembler
-    store = BlockStoreFunctor(matrixblock)
     data = matrix.columndata
+    data === nothing && return matrix.matrix(matrixblock, rows, column:column)
+    store = BlockStoreFunctor(matrixblock)
     trialspace = data.trialspace
     trialspace.fns[1] = assembler.bfs.fns[column]
     trialspace.pos[1] = assembler.bfs.pos[column]
