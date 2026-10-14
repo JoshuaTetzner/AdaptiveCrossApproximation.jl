@@ -25,7 +25,7 @@ using AdaptiveCrossApproximation
 
 @testitem "Code quality (Aqua.jl)" begin
     using Aqua
-    Aqua.test_all(AdaptiveCrossApproximation; deps_compat=false)
+    Aqua.test_all(AdaptiveCrossApproximation)
 end
 
 @testitem "Code formatting (JuliaFormatter.jl)" begin
