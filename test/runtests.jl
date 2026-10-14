@@ -57,9 +57,12 @@ end
     include("test_acaT.jl")
     include("test_iaca.jl")
     include("test_acabeast.jl")
+    include("test_beast_blockassembly.jl")
     include("test_batchedfullpivotaca.jl")
 
     include("test_hmatrix.jl")
+    include("test_interactions.jl")
+    include("test_symmetric_nearinteractions.jl")
 end
 
 @run_package_tests verbose = true

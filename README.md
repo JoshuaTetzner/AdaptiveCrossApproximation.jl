@@ -34,6 +34,7 @@ The following capabilities are implemented (✔) and planned (⌛):
 ### Hierarchical Matrices
 
 - ✔ $\mathcal H$-matrices for point kernels and BEAST integral operators
+- ✔ Transpose-symmetric $\mathcal H$-matrices through single-space assembly
 - ✔ Clustering based on H2Trees.jl with geometry-adapted k-means clustering
 - ✔ Multithreaded near-field assembly and ACA-compressed far-field assembly
 - ✔ Matrix-vector, transpose, and adjoint products through the Julia matrix interface
@@ -76,6 +77,12 @@ hmat = AdaptiveCrossApproximation.assemble(
 x = ones(eltype(hmat), size(hmat, 2))
 y = hmat * x
 ```
+
+For a transpose-symmetric operator such as the single-layer operator above, use
+`AdaptiveCrossApproximation.assemble(operator, space; tol=1e-4)` to share
+off-diagonal storage and use one cluster tree for both axes. The two-space call
+continues to use general assembly. Symmetric assembly currently supports
+`PreserveSpaceOrder()` only.
 
 The result behaves as a matrix-free linear operator while retaining direct access
 to its near- and far-field representations. See the

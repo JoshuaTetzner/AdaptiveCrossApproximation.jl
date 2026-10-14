@@ -11,6 +11,7 @@ during hierarchical assembly. The fallback returns `nothing`; extensions may ret
 quadrature rules or other reusable assembly data.
 """
 defaultmatrixdata(operator, testspace, trialspace) = nothing
+_treepositions(space) = space
 
 """
     tofarquadstrat(quadstrat)
@@ -97,6 +98,16 @@ function defaulttreebackend()
     end
 end
 
+defaulttreebackend(testspace, trialspace) = defaulttreebackend()
+
+# The ParallelKMeans tree extension builds BEAST trees. Point vectors use the
+# H2Trees backend even when both extensions have been loaded.
+function defaulttreebackend(::AbstractVector, ::AbstractVector)
+    isnothing(Base.get_extension(AdaptiveCrossApproximation, :ACAH2Trees)) &&
+        error("Please load H2Trees.jl to build a point-space cluster tree.")
+    return H2Tree()
+end
+
 """
     testtree(tree)
     trialtree(tree)
@@ -141,8 +152,20 @@ tree's internal point ordering, rather than leaving them untouched.
 Pass as `HMatrix(...; spaceordering=PermuteSpaceInPlace())`. Useful when downstream
 code expects a space physically reordered to tree order; compare with the default
 [`PreserveSpaceOrder`](@ref).
+
+The single-space call `ordering(tree, space)` uses only `testtree(tree)` and
+permutes the space once.
+
+This ordering is currently unsupported by the single-space symmetric
+`assemble` and `HMatrix` constructors because symmetric VBCRS storage is not
+available in BlockSparseMatrices. Use [`PreserveSpaceOrder`](@ref) there.
 """
 struct PermuteSpaceInPlace <: SpaceOrderingStyle end
+function (::PermuteSpaceInPlace)(tree, space)
+    permute!(space, permutation(testtree(tree)))
+    return space
+end
+
 function (::PermuteSpaceInPlace)(tree, testspace, trialspace)
     testperm = permutation(testtree(tree))
     if testspace === trialspace && testtree(tree) === trialtree(tree)
@@ -173,14 +196,32 @@ end
 assembly indexes through the tree's permutation instead. This is the default
 for `HMatrix(...; spaceordering=PreserveSpaceOrder())`. Compare with
 [`PermuteSpaceInPlace`](@ref).
+
+The single-space call `ordering(tree, space)` returns the space unchanged.
 """
 struct PreserveSpaceOrder <: SpaceOrderingStyle end
+function (::PreserveSpaceOrder)(tree, space)
+    return space
+end
+
 function (::PreserveSpaceOrder)(tree, testspace, trialspace)
     return testspace, trialspace
 end
 
+_check_symmetric_ordering(::SpaceOrderingStyle) = nothing
+function _check_symmetric_ordering(::PermuteSpaceInPlace)
+    return throw(
+        ArgumentError(
+            "Symmetric H-matrix assembly does not support PermuteSpaceInPlace: " *
+            "symmetric VBCRS storage is not available in BlockSparseMatrices. " *
+            "Use PreserveSpaceOrder() instead.",
+        ),
+    )
+end
+
 include("hmatrix.jl")
 include("nearinteractions.jl")
+include("symmetricblockmatrix.jl")
 include("skeleton.jl")
 include("farinteractions.jl")
 
@@ -214,6 +255,9 @@ An `HMatrix` containing assembled near and far interactions.
 
 Use this constructor as the main entry point when you already have a tree. For a convenience
 entry point, use `assemble`.
+This two-space constructor uses general assembly even when the spaces are the
+same object. Use `HMatrix(operator, space, tree; kwargs...)` for a
+transpose-symmetric operator.
 
 # See also
 
@@ -265,21 +309,77 @@ function HMatrix(
     return HMatrix{eltype(nears)}(nears, fars, (length(testspace), length(trialspace)))
 end
 
+"""
+    HMatrix(operator, space, tree; kwargs...)
+
+Assemble a transpose-symmetric H-matrix on one space. Only `testtree(tree)`
+is used for both axes. The operator and any custom `isnear` predicate must
+be transpose-symmetric; this assumption is not checked. Complex symmetric
+operators use a transpose, without conjugation, for the opposite block.
+
+Off-diagonal near columns are combined per row cluster and assembled directly
+into their final-sized blocks. Diagonal near blocks are assembled separately in
+full, then made symmetric by copying their upper triangles into their lower
+triangles. Far blocks use the configured compressor once per unordered pair and
+share its factors with the transposed block.
+
+Compression and assembly-data keywords follow the two-space constructor.
+`scheduler` controls assembly; `mvpscheduler=scheduler` controls matrix-vector
+products. For automatic tree construction, use `assemble(operator, space)`.
+
+Only `PreserveSpaceOrder()` is supported. `PermuteSpaceInPlace()` requires
+symmetric VBCRS storage in BlockSparseMatrices and is rejected before reordering
+or assembling the space.
+
+# Examples
+
+```julia
+hmat = HMatrix(operator, space, tree; tol=1e-5)
+```
+"""
 function HMatrix(
     operator,
     space,
     tree;
     tol=1e-4,
-    compressor=ACA(; tol=tol),
+    compressor=defaultcompressor(operator, space, space; tol=tol),
     isnear=isnear(),
     maxrank=40,
     spaceordering::SpaceOrderingStyle=PreserveSpaceOrder(),
     nearmatrixdata=defaultmatrixdata(operator, space, space),
     farmatrixdata=defaultfarmatrixdata(operator, space, space),
     scheduler=DynamicScheduler(),
+    mvpscheduler=scheduler,
     verbose::Bool=true,
 )
-    return error("Symmetric version not implemented yet")
+    _check_symmetric_ordering(spaceordering)
+    space = spaceordering(tree, space)
+
+    nears = assemblenears(
+        operator,
+        space,
+        tree,
+        spaceordering;
+        isnear=isnear,
+        scheduler=scheduler,
+        mvpscheduler=mvpscheduler,
+        matrixdata=nearmatrixdata,
+        verbose=verbose,
+    )
+    fars = assemblefars(
+        operator,
+        space,
+        tree,
+        spaceordering;
+        maxrank=maxrank,
+        compressor=compressor,
+        isnear=isnear,
+        matrixdata=farmatrixdata,
+        scheduler=scheduler,
+        mvpscheduler=mvpscheduler,
+        verbose=verbose,
+    )
+    return HMatrix{eltype(nears)}(nears, fars, (length(space), length(space)))
 end
 
 """
@@ -321,7 +421,7 @@ operations specific to dense blocks.
 
 # Returns
 
-  - `BlockSparseMatrix`: Near-field interactions as block-sparse matrix
+  - `AbstractBlockMatrix`: Near-field interactions as a block-sparse matrix
 """
 function nearmatrix(hmat::HMatrix)
     return hmat.nearinteractions

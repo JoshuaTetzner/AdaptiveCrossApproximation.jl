@@ -1,56 +1,62 @@
-
 """
-    farinteractions(tree; args...)
+    farinteractions(tree; isnear=isnear(), spaceordering=PreserveSpaceOrder())
+    farinteractions(tree, isnear, spaceordering)
 
-Extract admissible far-field block pairs requiring low-rank compression.
+Extract admissible far-field cluster pairs. The keyword entry point forwards to
+positional backend methods, dispatching on the admissibility functor and space
+ordering.
 
-Should be implemented by tree backends (e.g., H2Trees) to return index ranges
-for well-separated cluster pairs (`isnear == false`). These blocks are compressed
-via ACA or similar algorithms.
+Return `(values, farptr, farvalues)`, grouping admissible column clusters by row
+cluster. Use `symmetricfarinteractions` to visit each unordered pair once.
 
-# Arguments
-
-  - `tree`: Hierarchical tree object implementing the tree interface
-  - `args...`: Additional keyword arguments passed by the assembly routine (e.g., `isnear`)
-
-# Returns
-
-  - `(values, farptr, farvalues)`: Triple of row indices, far-field pointers, and column ranges
-
-# Notes
-
-Implemented by tree backend extensions. The pointer array `farptr` enables
-efficient lookup of far-field couples for each node, reducing access overhead
-during level-by-level assembly.
+`PreserveSpaceOrder()` returns indices in the original space order.
+`PermuteSpaceInPlace()` returns indices for spaces already permuted to tree order.
+The traversal does not permute spaces itself.
 """
-function farinteractions(tree; args...)
-    return error("Needs to be implemented for $(typeof(tree))")
+function farinteractions(
+    tree; isnear=isnear(), spaceordering::SpaceOrderingStyle=PreserveSpaceOrder(), kwargs...
+)
+    return farinteractions(tree, IsNearFunctor(isnear), spaceordering; kwargs...)
+end
+
+function farinteractions(
+    tree, isnear::IsNearFunctor, spaceordering::SpaceOrderingStyle; kwargs...
+)
+    return error(
+        "Far interactions are not implemented for $(typeof(tree)), " *
+        "$(typeof(isnear)), $(typeof(spaceordering))",
+    )
 end
 
 """
-    farinteractions_consecutive(tree; args...)
+    symmetricfarinteractions(tree; isnear=isnear(), spaceordering=PreserveSpaceOrder())
+    symmetricfarinteractions(tree, isnear, spaceordering)
 
-Extract far-field blocks with consecutive storage layout.
+Return `(values, farptr, farvalues, diagonalflags)`, grouping unordered admissible
+pairs by row cluster. For a row node `i`, `farptr[i]:(farptr[i + 1] - 1)` indexes
+its column clusters in `farvalues`; `diagonalflags[j]` marks a self block.
+Only the test cluster tree is used for both axes. The admissibility predicate
+must be transpose-symmetric.
 
-Variant used when spaces are permuted to align with tree ordering. Returns
-far-field block structure compatible with permuted space layout.
-
-# Arguments
-
-  - `tree`: Hierarchical tree object
-  - `args...`: Additional keyword arguments (e.g., `isnear`)
-
-# Returns
-
-  - `(values, farptr, farvalues)`: Index structure for consecutive far-field layout
-
-# Notes
-
-Implemented by tree backend extensions. Must account for space permutation
-applied by `PermuteSpaceInPlace()` ordering strategy.
+`PreserveSpaceOrder()` returns indices in the original space order.
+`PermuteSpaceInPlace()` returns indices for spaces already permuted to tree order.
+The keyword entry point forwards to positional backend methods for each ordering.
+Both orderings support traversal, although symmetric matrix assembly currently
+supports only `PreserveSpaceOrder()`.
 """
-function farinteractions_consecutive(tree; args...)
-    return error("Needs to be implemented for $(typeof(tree))")
+function symmetricfarinteractions(
+    tree; isnear=isnear(), spaceordering::SpaceOrderingStyle=PreserveSpaceOrder(), kwargs...
+)
+    return symmetricfarinteractions(tree, IsNearFunctor(isnear), spaceordering; kwargs...)
+end
+
+function symmetricfarinteractions(
+    tree, isnear::IsNearFunctor, spaceordering::SpaceOrderingStyle; kwargs...
+)
+    return error(
+        "Symmetric far interactions are not implemented for $(typeof(tree)), " *
+        "$(typeof(isnear)), $(typeof(spaceordering))",
+    )
 end
 
 """
@@ -91,7 +97,7 @@ function assemblefars(
     testspace,
     trialspace,
     tree,
-    ::PreserveSpaceOrder;
+    spaceordering::PreserveSpaceOrder;
     compressor=ACA(),
     isnear=isnear(),
     matrixdata=defaultfarmatrixdata(operator, testspace, trialspace),
@@ -102,7 +108,9 @@ function assemblefars(
     kernelmatrix = AbstractKernelMatrix(
         operator, testspace, trialspace; matrixdata=matrixdata
     )
-    values, farptr, farvalues = farinteractions(tree; isnear=isnear)
+    values, farptr, farvalues = farinteractions(
+        tree; spaceordering=spaceordering, isnear=isnear
+    )
 
     (farptr[end] == 1) && return [
         BlockSparseMatrix(
@@ -214,7 +222,7 @@ function assemblefars(
     testspace,
     trialspace,
     tree,
-    ::PermuteSpaceInPlace;
+    spaceordering::PermuteSpaceInPlace;
     compressor=ACA(),
     isnear=isnear(),
     matrixdata=defaultfarmatrixdata(operator, testspace, trialspace),
@@ -225,7 +233,9 @@ function assemblefars(
     kernelmatrix = AbstractKernelMatrix(
         operator, testspace, trialspace; matrixdata=matrixdata
     )
-    values, farptr, farvalues = farinteractions_consecutive(tree; isnear=isnear)
+    values, farptr, farvalues = farinteractions(
+        tree; spaceordering=spaceordering, isnear=isnear
+    )
 
     total_work = sum(
         length(values[i]) * length(farvalues[j]) for i in eachindex(values) for
@@ -292,5 +302,153 @@ function assemblefars(
     end
     finish!(progress)
 
+    return farinteractionmatrix
+end
+
+"""
+    assemblefars(operator, space, tree, spaceordering; kwargs...)
+
+Compress each unordered far-field pair once and use its transpose for the
+opposite matrix block. The admissibility predicate and operator must be
+transpose-symmetric.
+
+Only `PreserveSpaceOrder()` is supported; symmetric VBCRS storage is required
+before `PermuteSpaceInPlace()` can be used.
+"""
+function assemblefars(
+    operator,
+    space,
+    tree,
+    spaceordering::SpaceOrderingStyle;
+    compressor=ACA(),
+    isnear=isnear(),
+    matrixdata=defaultfarmatrixdata(operator, space, space),
+    maxrank=50,
+    scheduler=SerialScheduler(),
+    mvpscheduler=scheduler,
+    verbose::Bool=true,
+)
+    _check_symmetric_ordering(spaceordering)
+    kernelmatrix = AbstractKernelMatrix(operator, space, space; matrixdata=matrixdata)
+    values, farptr, farvalues, diagonalflags = symmetricfarinteractions(
+        tree; spaceordering=spaceordering, isnear=isnear
+    )
+    T = eltype(kernelmatrix)
+    farinteractionmatrix = BlockSparseMatrices.AbstractBlockMatrix{T}[]
+    farptr[end] == 1 && return farinteractionmatrix
+
+    total_work = sum(
+        length(values[i]) * length(farvalues[j]) for i in eachindex(values) for
+        j in farptr[i]:(farptr[i + 1] - 1);
+        init=0,
+    )
+    progress = Progress(
+        total_work;
+        desc="Assembling symmetric far interactions: ",
+        showspeed=true,
+        enabled=verbose,
+    )
+
+    blocks = Vector{LowRankMatrix{T}}(undef, length(farvalues))
+    colbuffer = zeros(T, length(space), maxrank)
+    for level in levels(testtree(tree))
+        levelnodes = collect(LevelIterator(testtree(tree), level))
+        rbsize, cbsize = buffersize(values, farptr, farvalues, levelnodes)
+        cbsize == 0 && continue
+        @tasks for node in levelnodes
+            @set scheduler = scheduler
+            @local begin
+                rowbuffer = zeros(T, maxrank, cbsize)
+                localcompressor = compressor(kernelmatrix, rbsize, cbsize, maxrank)
+            end
+            for faridx in farptr[node]:(farptr[node + 1] - 1)
+                localmatrix = localkernelmatrix(
+                    kernelmatrix, values[node], farvalues[faridx]
+                )
+                npivots = localcompressor(
+                    localmatrix,
+                    view(colbuffer, values[node], 1:maxrank),
+                    rowbuffer,
+                    maxrank;
+                    rowidcs=values[node],
+                    colidcs=farvalues[faridx],
+                )
+                npivots == maxrank && @warn "Maximum rank block"
+                blocks[faridx] = LowRankMatrix(
+                    colbuffer[values[node], 1:npivots],
+                    rowbuffer[1:npivots, 1:length(farvalues[faridx])],
+                )
+                colbuffer[values[node], 1:npivots] .= zero(T)
+                rowbuffer[1:npivots, 1:length(farvalues[faridx])] .= zero(T)
+                next!(progress; step=length(values[node]) * length(farvalues[faridx]))
+            end
+        end
+
+        levelrows, levelcols, levelidcs = blockvalues(values, farptr, farvalues, levelnodes)
+        diagonals = Matrix{T}[]
+        diagindices = Vector{Int}[]
+        offdiagonals = LowRankMatrix{T}[]
+        offrows = Vector{Int}[]
+        offcols = Vector{Int}[]
+        for i in eachindex(levelidcs)
+            faridx = levelidcs[i]
+            if diagonalflags[faridx]
+                block = Matrix(blocks[faridx])
+                for j in axes(block, 2), k in (j + 1):size(block, 1)
+                    block[k, j] = block[j, k]
+                end
+                push!(diagonals, block)
+                push!(diagindices, levelrows[i])
+            else
+                push!(offdiagonals, blocks[faridx])
+                push!(offrows, levelrows[i])
+                push!(offcols, levelcols[i])
+            end
+        end
+
+        if isempty(offdiagonals)
+            push!(
+                farinteractionmatrix,
+                BlockSparseMatrix(
+                    diagonals,
+                    diagindices,
+                    diagindices,
+                    size(kernelmatrix);
+                    scheduler=mvpscheduler,
+                ),
+            )
+        elseif mvpscheduler isa SerialScheduler
+            push!(
+                farinteractionmatrix,
+                _serialsymmetricblockmatrix(
+                    diagonals,
+                    diagindices,
+                    offdiagonals,
+                    offrows,
+                    offcols,
+                    size(kernelmatrix),
+                    mvpscheduler,
+                ),
+            )
+        else
+            if isempty(diagonals)
+                push!(diagonals, zeros(T, 1, 1))
+                push!(diagindices, [1])
+            end
+            push!(
+                farinteractionmatrix,
+                SymmetricBlockMatrix(
+                    diagonals,
+                    diagindices,
+                    offdiagonals,
+                    offrows,
+                    offcols,
+                    size(kernelmatrix);
+                    scheduler=mvpscheduler,
+                ),
+            )
+        end
+    end
+    finish!(progress)
     return farinteractionmatrix
 end

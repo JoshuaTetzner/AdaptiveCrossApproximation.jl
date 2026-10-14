@@ -161,6 +161,42 @@ hmat = HMatrix(
 This entry point is useful when several operators share the same cluster structure
 or when the application controls tree construction itself.
 
+### [Symmetric Assembly on One Space](@id symmetric-hmatrix-assembly)
+
+For a transpose-symmetric operator, use the single-space call:
+
+```julia
+hmat = AdaptiveCrossApproximation.assemble(operator, space; tol=1e-4)
+```
+
+With an existing block tree, use the corresponding single-space constructor:
+
+```julia
+hmat = HMatrix(operator, space, tree; tol=1e-4)
+```
+
+Automatic assembly constructs one shared cluster tree. The explicit constructor
+uses only the supplied tree's test cluster tree for both axes. Compression,
+admissibility, and quadrature options follow general assembly.
+
+These calls assume that the operator and any custom `isnear` predicate are
+transpose-symmetric; symmetry is not checked. For complex matrices the requirement
+is `A == transpose(A)`, rather than Hermitian symmetry. The two-space calls
+`assemble(operator, space, space)` and `HMatrix(operator, space, space, tree)`
+continue to use general assembly, even when both arguments are the same object.
+
+Each unordered off-diagonal near interaction is assembled once, and each
+unordered far pair is compressed once. The opposite orientation uses the
+transpose of the stored block or factors, without conjugation. Diagonal near
+blocks are assembled and stored in full, then symmetrized by copying their upper
+triangles into their lower triangles. Off-diagonal near columns are combined per
+row cluster, and the resulting rectangular blocks are allocated at their final
+sizes and assembled directly; diagonal blocks are assembled separately.
+
+Only `PreserveSpaceOrder()` is supported for symmetric assembly.
+`PermuteSpaceInPlace()` is rejected before modifying the space because
+BlockSparseMatrices does not yet provide symmetric VBCRS storage.
+
 ### Near- and Far-Field Quadrature
 
 The `quadstrat` keyword follows the convention of `BEAST.assemble`:
@@ -186,7 +222,7 @@ strategies.
 
 The default `PreserveSpaceOrder()` leaves the test and trial spaces unchanged and
 stores their tree indices with the blocks. `PermuteSpaceInPlace()` instead reorders
-the spaces to follow the tree layout:
+the spaces to follow the tree layout in general two-space assembly:
 
 ```julia
 hmat = AdaptiveCrossApproximation.assemble(

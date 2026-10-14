@@ -211,6 +211,33 @@ The inner product first reduces $\boldsymbol x_s$ to $k_{ts}$ coefficients, and
 the outer product maps them to the row cluster. Neither the dense far-field block
 nor the complete dense matrix is formed.
 
+## Symmetric H-Matrices
+
+For a transpose-symmetric operator on one index space, the row and column cluster
+trees can be shared. A symmetric admissibility predicate gives matching near and
+far classifications for each pair of opposite blocks. Each unordered
+off-diagonal pair then needs only one stored block or set of low-rank factors:
+the opposite block is its transpose. For complex matrices, no conjugation is
+applied.
+
+A stored off-diagonal near block contributes to both row clusters:
+
+```math
+\boldsymbol y_t \mathrel{+}= \boldsymbol{\mathsf A}_{ts}\boldsymbol x_s,
+\qquad
+\boldsymbol y_s \mathrel{+}= \boldsymbol{\mathsf A}_{ts}^{\mathsf T}\boldsymbol x_t.
+```
+
+Far-field factors are shared in the same way. Diagonal near blocks remain full
+dense blocks. For an all-near matrix of order $N$, the stored numerical payload
+is $(N^2+d)/2$, where $d$ counts the entries in those diagonal blocks. Index and
+workspace storage is additional, and matrix-vector products still apply both
+orientations of every off-diagonal block.
+
+The [single-space assembly interface](@ref symmetric-hmatrix-assembly) selects
+this representation explicitly; passing the same space twice selects general
+assembly.
+
 ## Accuracy
 
 Because the leaf blocks form a disjoint partition and the near field is assembled

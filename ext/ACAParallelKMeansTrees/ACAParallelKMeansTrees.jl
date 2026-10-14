@@ -4,6 +4,28 @@ using H2Trees
 using ParallelKMeans
 using AdaptiveCrossApproximation
 
+function AdaptiveCrossApproximation._tree(
+    ::AdaptiveCrossApproximation.KMeansTreeBackend,
+    space::BEAST.Space;
+    numberofclusters::Int=2,
+    minvalues::Int=200,
+    kwargs...,
+)
+    cluster = if isdefined(H2Trees, :KMeansTreeBuilder)
+        H2Trees.KMeansTree(
+            BEAST.positions(space);
+            builder=H2Trees.KMeansTreeBuilder(;
+                numberofclusters=numberofclusters, minvalues=minvalues, kwargs...
+            ),
+        )
+    else
+        H2Trees.KMeansTree(
+            BEAST.positions(space), numberofclusters; minvalues=minvalues, kwargs...
+        )
+    end
+    return H2Trees.BlockTree(cluster, cluster)
+end
+
 """
     _tree(::KMeansTreeBackend, testspace::BEAST.Space, trialspace::BEAST.Space; kwargs...)
 
@@ -28,6 +50,15 @@ function AdaptiveCrossApproximation._tree(
     minvalues::Int=200,
     kwargs...,
 )
+    if !isdefined(H2Trees, :KMeansTreeBuilder)
+        testtree = H2Trees.KMeansTree(
+            BEAST.positions(testspace), numberofclusters; minvalues=minvalues, kwargs...
+        )
+        trialtree = H2Trees.KMeansTree(
+            BEAST.positions(trialspace), numberofclusters; minvalues=minvalues, kwargs...
+        )
+        return H2Trees.BlockTree(testtree, trialtree)
+    end
     testtree = H2Trees.KMeansTree(
         BEAST.positions(testspace);
         builder=H2Trees.KMeansTreeBuilder(;
