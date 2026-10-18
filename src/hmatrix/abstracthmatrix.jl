@@ -120,14 +120,16 @@ Tree backend interface required by [`HMatrix`](@ref) assembly and
 ACAH2Trees extension implements them for `H2Trees.TwoNTree`). `testtree`/`trialtree`
 return the row/column clustering sub-tree (for a single shared tree, this may
 return `tree` itself); `levels` returns tree levels coarsest first, visited via
-`LevelIterator`; `permutation` returns the index permutation the tree applies to
-its underlying space, used by [`PermuteSpaceInPlace`](@ref).
+`LevelIterator`; `permutation` returns, without modifying the tree, the mapping
+from tree positions to indices in the underlying space. It is used by
+[`PermuteSpaceInPlace`](@ref) and matrix-vector workspace construction.
 """
 testtree(tree) = error("Requires implementation for $(typeof(tree))")
 trialtree(tree) = error("Requires implementation for $(typeof(tree))")
 levels(tree) = error("Requires implementation for $(typeof(tree))")
 LevelIterator(tree, level) = error("Requires implementation for $(typeof(tree))")
 permutation(tree) = error("Requires implementation for $(typeof(tree))")
+_settreeorder!(tree) = error("Requires implementation for $(typeof(tree))")
 
 """
     SpaceOrderingStyle
@@ -154,34 +156,43 @@ code expects a space physically reordered to tree order; compare with the defaul
 [`PreserveSpaceOrder`](@ref).
 
 The single-space call `ordering(tree, space)` uses only `testtree(tree)` and
-permutes the space once.
-
-This ordering is currently unsupported by the single-space symmetric
-`assemble` and `HMatrix` constructors because symmetric VBCRS storage is not
-available in BlockSparseMatrices. Use [`PreserveSpaceOrder`](@ref) there.
+permutes the space once. Both general and transpose-symmetric `HMatrix`
+assembly support this ordering.
 """
 struct PermuteSpaceInPlace <: SpaceOrderingStyle end
 function (::PermuteSpaceInPlace)(tree, space)
-    permute!(space, permutation(testtree(tree)))
+    cluster = testtree(tree)
+    permute!(space, permutation(cluster))
+    _settreeorder!(cluster)
     return space
 end
 
 function (::PermuteSpaceInPlace)(tree, testspace, trialspace)
-    testperm = permutation(testtree(tree))
-    if testspace === trialspace && testtree(tree) === trialtree(tree)
+    rowtree = testtree(tree)
+    coltree = trialtree(tree)
+    if testspace === trialspace && rowtree === coltree
         # Case 1: same space and same tree → permute once
-        permute!(testspace, testperm)
+        permute!(testspace, permutation(rowtree))
+        _settreeorder!(rowtree)
         return testspace, testspace
-    elseif testspace !== trialspace && testtree(tree) !== trialtree(tree)
+    elseif testspace !== trialspace && rowtree !== coltree
         # Case 2: different spaces and different trees → permute each independently
+        testperm = permutation(rowtree)
+        trialperm = permutation(coltree)
         permute!(testspace, testperm)
-        permute!(trialspace, permutation(trialtree(tree)))
+        permute!(trialspace, trialperm)
+        _settreeorder!(rowtree)
+        _settreeorder!(coltree)
         return testspace, trialspace
     elseif testspace === trialspace
         # Case 3: same space but different trees → copy trialspace before permuting
         @warn "testspace and trialspace are the same object but testtree ≠ trialtree. Copying trialspace and permuting independently."
-        trialspace_permuted = permute(trialspace, permutation(trialtree(tree)))
+        testperm = permutation(rowtree)
+        trialperm = permutation(coltree)
+        trialspace_permuted = permute(trialspace, trialperm)
         permute!(testspace, testperm)
+        _settreeorder!(rowtree)
+        _settreeorder!(coltree)
         return testspace, trialspace_permuted
     else
         error(
@@ -219,10 +230,14 @@ function _check_symmetric_ordering(::PermuteSpaceInPlace)
     )
 end
 
+include("skeleton.jl")
+include("blockindex.jl")
 include("hmatrix.jl")
+include("treeindex.jl")
+include("matvec.jl")
 include("nearinteractions.jl")
 include("symmetricblockmatrix.jl")
-include("skeleton.jl")
+include("assembly.jl")
 include("farinteractions.jl")
 
 """
@@ -244,7 +259,7 @@ Assemble a hierarchical matrix approximation of an operator on test and trial sp
   - `spaceordering`: strategy for applying tree permutations to spaces
   - `nearmatrixdata`: optional data passed to near-field assembly
   - `farmatrixdata`: optional data passed to far-field assembly
-  - `scheduler`: thread scheduler used for assembly
+  - `ntasks`: number of parallel assembly tasks (default `Threads.nthreads()`)
   - `verbose`: enable progress output for near- and far-field assembly (default `true`)
 
 # Returns
@@ -275,38 +290,25 @@ function HMatrix(
     spaceordering::SpaceOrderingStyle=PreserveSpaceOrder(),
     nearmatrixdata=defaultmatrixdata(operator, testspace, trialspace),
     farmatrixdata=defaultfarmatrixdata(operator, testspace, trialspace),
-    scheduler=DynamicScheduler(),
+    ntasks::Integer=Threads.nthreads(),
     verbose::Bool=true,
 )
     testspace, trialspace = spaceordering(tree, testspace, trialspace)
-
-    nears = assemblenears(
+    return _assemble_hmatrix_storage(
         operator,
         testspace,
         trialspace,
         tree,
         spaceordering;
-        isnear=isnear,
-        matrixdata=nearmatrixdata,
-        scheduler=scheduler,
-        verbose=verbose,
-    )
-
-    fars = assemblefars(
-        operator,
-        testspace,
-        trialspace,
-        tree,
-        spaceordering;
-        maxrank=maxrank,
         compressor=compressor,
         isnear=isnear,
-        matrixdata=farmatrixdata,
-        scheduler=scheduler,
+        maxrank=maxrank,
+        nearmatrixdata=nearmatrixdata,
+        farmatrixdata=farmatrixdata,
+        ntasks=ntasks,
         verbose=verbose,
+        tol=tol,
     )
-
-    return HMatrix{eltype(nears)}(nears, fars, (length(testspace), length(trialspace)))
 end
 
 """
@@ -317,19 +319,13 @@ is used for both axes. The operator and any custom `isnear` predicate must
 be transpose-symmetric; this assumption is not checked. Complex symmetric
 operators use a transpose, without conjugation, for the opposite block.
 
-Off-diagonal near columns are combined per row cluster and assembled directly
-into their final-sized blocks. Diagonal near blocks are assembled separately in
-full, then made symmetric by copying their upper triangles into their lower
-triangles. Far blocks use the configured compressor once per unordered pair and
-share its factors with the transposed block.
+Each terminal near pair is stored as one dense block. Far blocks use the
+configured compressor once per unordered pair and share their factors with the
+transposed logical block. Diagonal near blocks are assembled in full, then made
+symmetric by copying their upper triangles into their lower triangles.
 
-Compression and assembly-data keywords follow the two-space constructor.
-`scheduler` controls assembly; `mvpscheduler=scheduler` controls matrix-vector
-products. For automatic tree construction, use `assemble(operator, space)`.
-
-Only `PreserveSpaceOrder()` is supported. `PermuteSpaceInPlace()` requires
-symmetric VBCRS storage in BlockSparseMatrices and is rejected before reordering
-or assembling the space.
+Compression, assembly-data and `ntasks` keywords follow the two-space
+constructor. For automatic tree construction, use `assemble(operator, space)`.
 
 # Examples
 
@@ -348,114 +344,25 @@ function HMatrix(
     spaceordering::SpaceOrderingStyle=PreserveSpaceOrder(),
     nearmatrixdata=defaultmatrixdata(operator, space, space),
     farmatrixdata=defaultfarmatrixdata(operator, space, space),
-    scheduler=DynamicScheduler(),
-    mvpscheduler=scheduler,
+    ntasks::Integer=Threads.nthreads(),
     verbose::Bool=true,
 )
-    _check_symmetric_ordering(spaceordering)
-    space = spaceordering(tree, space)
-
-    nears = assemblenears(
+    sharedtree = _symmetrictree(tree)
+    testspace, trialspace = spaceordering(sharedtree, space, space)
+    return _assemble_hmatrix_storage(
         operator,
-        space,
-        tree,
+        testspace,
+        trialspace,
+        sharedtree,
         spaceordering;
-        isnear=isnear,
-        scheduler=scheduler,
-        mvpscheduler=mvpscheduler,
-        matrixdata=nearmatrixdata,
-        verbose=verbose,
-    )
-    fars = assemblefars(
-        operator,
-        space,
-        tree,
-        spaceordering;
-        maxrank=maxrank,
         compressor=compressor,
         isnear=isnear,
-        matrixdata=farmatrixdata,
-        scheduler=scheduler,
-        mvpscheduler=mvpscheduler,
+        maxrank=maxrank,
+        nearmatrixdata=nearmatrixdata,
+        farmatrixdata=farmatrixdata,
+        ntasks=ntasks,
         verbose=verbose,
+        symmetric=true,
+        tol=tol,
     )
-    return HMatrix{eltype(nears)}(nears, fars, (length(space), length(space)))
-end
-
-"""
-    farmatrix(hmat::HMatrix)
-
-Extract the far-field (low-rank compressed) contributions from a hierarchical matrix.
-
-Returns a new `HMatrix` containing only the low-rank far-field blocks, with all
-near-field blocks removed. Useful for analyzing the rank structure or applying
-operations that exploit low-rank properties.
-
-# Arguments
-
-  - `hmat::HMatrix`: Source hierarchical matrix
-
-# Returns
-
-  - `HMatrix`: New matrix with identical far-field interactions but empty near-field
-"""
-function farmatrix(hmat::HMatrix)
-    blocks = Matrix{eltype(hmat)}[]
-    nears = BlockSparseMatrix(blocks, Vector{Int}[], Vector{Int}[], hmat.dim)
-
-    return HMatrix{eltype(hmat)}(nears, hmat.farinteractions, hmat.dim)
-end
-
-"""
-    nearmatrix(hmat::HMatrix)
-
-Extract the near-field (dense block) contributions from a hierarchical matrix.
-
-Returns only the block-sparse near-field interactions, removing all low-rank
-far-field blocks. Useful for analyzing near-field structure or applying
-operations specific to dense blocks.
-
-# Arguments
-
-  - `hmat::HMatrix`: Source hierarchical matrix
-
-# Returns
-
-  - `AbstractBlockMatrix`: Near-field interactions as a block-sparse matrix
-"""
-function nearmatrix(hmat::HMatrix)
-    return hmat.nearinteractions
-end
-
-"""
-    storage(hmat::HMatrix)
-
-Analyze and report the storage requirements of a hierarchical matrix.
-
-Prints the numerical block payload, its ratio to dense storage, and the complete
-Julia object footprint reported by `Base.summarysize`.
-
-# Arguments
-
-  - `hmat::HMatrix`: Hierarchical matrix to analyze
-
-# Returns
-
-  - `Float64`: Numerical block payload in GB
-
-# Output
-
-Prints to stdout:
-
-  - `storage`: Numerical block payload in GB
-  - `summary size`: Total memory footprint including Julia object overhead (GB)
-  - `compression ratio`: Ratio of hierarchical storage to dense storage
-"""
-function storage(hmat::HMatrix)
-    refsize = size(hmat, 1) * size(hmat, 2) * sizeof(eltype(hmat))
-    matsize = nnz(hmat)
-    println("storage: ", matsize * sizeof(eltype(hmat)) * 10^-9, " GB")
-    println("summary size: ", Base.summarysize(hmat) * 10^-9, " GB")
-    println("compression ratio: ", (matsize * sizeof(eltype(hmat))) / refsize)
-    return matsize * sizeof(eltype(hmat)) * 10^-9
 end

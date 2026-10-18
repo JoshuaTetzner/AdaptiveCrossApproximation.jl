@@ -14,7 +14,6 @@ function AdaptiveCrossApproximation.assemble_blocks(
     blocks::AbstractVector{<:AbstractMatrix{T}},
     rowidcs::AbstractVector{<:AbstractVector{Int}},
     colidcs::AbstractVector{<:AbstractVector{Int}};
-    scheduler=nothing,
     pbar=Progress(0; enabled=false),
     kwargs...,
 ) where {T}

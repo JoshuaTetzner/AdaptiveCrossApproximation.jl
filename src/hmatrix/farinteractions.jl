@@ -79,7 +79,8 @@ block-sparse matrices.
   - `isnear`: Admissibility predicate (default: `isnear()`)
   - `matrixdata`: Assembly data passed to kernel matrix (optional)
   - `maxrank = 50`: Maximum rank for compressed blocks
-  - `scheduler`: Thread scheduler (default: `SerialScheduler()`)
+  - `ntasks`: number of parallel tasks for the compression and the products of
+    the result (default `Threads.nthreads()`)
   - `verbose`: enable progress output (default `true`)
 
 # Returns
@@ -102,9 +103,10 @@ function assemblefars(
     isnear=isnear(),
     matrixdata=defaultfarmatrixdata(operator, testspace, trialspace),
     maxrank=50,
-    scheduler=SerialScheduler(),
+    ntasks::Integer=Threads.nthreads(),
     verbose::Bool=true,
 )
+    scheduler = _scheduler(ntasks)
     kernelmatrix = AbstractKernelMatrix(
         operator, testspace, trialspace; matrixdata=matrixdata
     )
@@ -204,7 +206,8 @@ a specialized storage format optimized for the reordered layout.
   - `isnear`: Admissibility predicate (default: `isnear()`)
   - `matrixdata`: Assembly data passed to kernel matrix (optional)
   - `maxrank = 50`: Maximum rank for compressed blocks
-  - `scheduler`: Thread scheduler (default: `SerialScheduler()`)
+  - `ntasks`: number of parallel tasks for the compression and the products of
+    the result (default `Threads.nthreads()`)
   - `verbose`: enable progress output (default `true`)
 
 # Returns
@@ -227,9 +230,10 @@ function assemblefars(
     isnear=isnear(),
     matrixdata=defaultfarmatrixdata(operator, testspace, trialspace),
     maxrank=50,
-    scheduler=SerialScheduler(),
+    ntasks::Integer=Threads.nthreads(),
     verbose::Bool=true,
 )
+    scheduler = _scheduler(ntasks)
     kernelmatrix = AbstractKernelMatrix(
         operator, testspace, trialspace; matrixdata=matrixdata
     )
@@ -324,11 +328,11 @@ function assemblefars(
     isnear=isnear(),
     matrixdata=defaultfarmatrixdata(operator, space, space),
     maxrank=50,
-    scheduler=SerialScheduler(),
-    mvpscheduler=scheduler,
+    ntasks::Integer=Threads.nthreads(),
     verbose::Bool=true,
 )
     _check_symmetric_ordering(spaceordering)
+    scheduler = _scheduler(ntasks)
     kernelmatrix = AbstractKernelMatrix(operator, space, space; matrixdata=matrixdata)
     values, farptr, farvalues, diagonalflags = symmetricfarinteractions(
         tree; spaceordering=spaceordering, isnear=isnear
@@ -414,10 +418,10 @@ function assemblefars(
                     diagindices,
                     diagindices,
                     size(kernelmatrix);
-                    scheduler=mvpscheduler,
+                    scheduler=scheduler,
                 ),
             )
-        elseif mvpscheduler isa SerialScheduler
+        elseif scheduler isa SerialScheduler
             push!(
                 farinteractionmatrix,
                 _serialsymmetricblockmatrix(
@@ -427,7 +431,7 @@ function assemblefars(
                     offrows,
                     offcols,
                     size(kernelmatrix),
-                    mvpscheduler,
+                    scheduler,
                 ),
             )
         else
@@ -444,7 +448,7 @@ function assemblefars(
                     offrows,
                     offcols,
                     size(kernelmatrix);
-                    scheduler=mvpscheduler,
+                    scheduler=scheduler,
                 ),
             )
         end

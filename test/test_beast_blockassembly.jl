@@ -1,7 +1,6 @@
 using AdaptiveCrossApproximation
 using BEAST
 using CompScienceMeshes
-using OhMyThreads
 using Test
 
 struct CountedBlockAssembler{A}
@@ -36,7 +35,7 @@ end
         matrix(block, r, c)
     end
 
-    for scheduler in (SerialScheduler(), DynamicScheduler())
+    for ntasks in (1, 2)
         # Assembly preserves accumulation and non-Matrix output layouts.
         blocks = AbstractMatrix{ComplexF64}[
             fill(1.0 + 2im, 2, 2),
@@ -47,7 +46,7 @@ end
         ]
         calls[] = 0
         result = AdaptiveCrossApproximation.assemble_blocks(
-            counted, blocks, rows, columns; scheduler
+            counted, blocks, rows, columns; ntasks
         )
         @test result === blocks
         @test calls[] == length(blocks)
@@ -81,9 +80,7 @@ end
         operator, space, trialspace; matrixdata=BEAST.DoubleNumQStrat(2, 2)
     )
     blocks = [zeros(ComplexF64, length(r), length(c)) for (r, c) in zip(rows, columns)]
-    AdaptiveCrossApproximation.assemble_blocks(
-        rectangular, blocks, rows, columns; scheduler=DynamicScheduler()
-    )
+    AdaptiveCrossApproximation.assemble_blocks(rectangular, blocks, rows, columns; ntasks=2)
     for (block, r, c) in zip(blocks, rows, columns)
         reference = zeros(ComplexF64, length(r), length(c))
         rectangular(reference, r, c)

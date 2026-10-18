@@ -1,62 +1,75 @@
 """
-    LowRankMatrix{K} <: LinearMaps.LinearMap{K}
+    LowRankMatrix{T}
 
-Efficient storage and evaluation of low-rank matrix blocks as U*V.
-
-Stores left and right factors separately, performing matrix-vector products as
-`(U*V)*x = U*(V*x)` to avoid forming the dense `U*V` product. Critical for
-efficient hierarchical matrix computations where blocks are stored in low-rank form.
-
-# Fields
-
-  - `U::Matrix{K}`: Left factor, size `(m, r)` where `r` is the rank
-  - `V::Matrix{K}`: Right factor, size `(r, n)`
-  - `z::Vector{K}`: Temporary buffer for intermediate products `V*x`
-
-# Type parameters
-
-  - `K`: scalar element type
-
-# Notes
-
-Create via `LowRankMatrix(U, V)` which allocates the temporary buffer automatically.
-Block dimensions are `(m, n) = (size(U, 1), size(V, 2))`.
+Low-rank numerical block represented by factors `U` and `V`. Temporary
+multiplication storage deliberately does not belong to the block.
+The block is mutable so arithmetic can replace its factors when its rank changes.
 """
-struct LowRankMatrix{K} <: LinearMaps.LinearMap{K}
-    U::Matrix{K}
-    V::Matrix{K}
-    z::Vector{K}
+mutable struct LowRankMatrix{T} <: LinearMaps.LinearMap{T}
+    U::Matrix{T}
+    V::Matrix{T}
+    function LowRankMatrix{T}(U::Matrix{T}, V::Matrix{T}) where {T}
+        @assert size(V, 1) == size(U, 2)
+        return new{T}(U, V)
+    end
 end
 
-_storedfarblockentries(block::LowRankMatrix) = length(block.U) + length(block.V)
-
-function LowRankMatrix(U::AbstractMatrix{K}, V::AbstractMatrix{K}) where {K}
+function LowRankMatrix(U::AbstractMatrix{T}, V::AbstractMatrix{T}) where {T}
     @assert size(V, 1) == size(U, 2)
-    return LowRankMatrix{K}(
-        convert(Matrix{K}, U), convert(Matrix{K}, V), zeros(K, size(U, 2))
-    )
+    return LowRankMatrix{T}(Matrix(U), Matrix(V))
 end
 
-Base.eltype(::Type{<:LowRankMatrix{K}}) where {K} = K
-Base.size(lrm::LowRankMatrix) = (size(lrm.U, 1), size(lrm.V, 2))
+Base.eltype(::Type{<:LowRankMatrix{T}}) where {T} = T
+Base.size(A::LowRankMatrix) = (size(A.U, 1), size(A.V, 2))
+Base.Matrix(A::LowRankMatrix) = A.U * A.V
 
+LinearAlgebra.rank(A::LowRankMatrix) = size(A.U, 2)
+_storedfarblockentries(A::LowRankMatrix) = length(A.U) + length(A.V)
+
+# Allocating products of single blocks; H-matrix products use MatVecWorkspace.
 function LinearAlgebra.mul!(
-    y::AbstractVecOrMat, M::LowRankMatrix{T}, x::AbstractVector
-) where {T}
-    LinearAlgebra.mul!(M.z, M.V, x)
-    return LinearAlgebra.mul!(y, M.U, M.z)
+    y::AbstractVecOrMat, A::LowRankMatrix, x::AbstractVector, alpha::Number, beta::Number
+)
+    z = A.V * x
+    return LinearAlgebra.mul!(y, A.U, z, alpha, beta)
+end
+
+function LinearAlgebra.mul!(y::AbstractVecOrMat, A::LowRankMatrix, x::AbstractVector)
+    return LinearAlgebra.mul!(y, A, x, true, false)
 end
 
 function LinearAlgebra.mul!(
-    y::AbstractVecOrMat, M::LinearMaps.TransposeMap{T,K}, x::AbstractVector
-) where {T,K<:LowRankMatrix{T}}
-    LinearAlgebra.mul!(M.lmap.z, transpose(M.lmap.U), x)
-    return LinearAlgebra.mul!(y, transpose(M.lmap.V), M.lmap.z)
+    y::AbstractVecOrMat,
+    A::LinearMaps.TransposeMap{<:Any,<:LowRankMatrix},
+    x::AbstractVector,
+    alpha::Number,
+    beta::Number,
+)
+    z = transpose(A.lmap.U) * x
+    return LinearAlgebra.mul!(y, transpose(A.lmap.V), z, alpha, beta)
 end
 
 function LinearAlgebra.mul!(
-    y::AbstractVecOrMat, M::LinearMaps.AdjointMap{T,K}, x::AbstractVector
-) where {T,K<:LowRankMatrix{T}}
-    LinearAlgebra.mul!(M.lmap.z, adjoint(M.lmap.U), x)
-    return LinearAlgebra.mul!(y, adjoint(M.lmap.V), M.lmap.z)
+    y::AbstractVecOrMat,
+    A::LinearMaps.TransposeMap{<:Any,<:LowRankMatrix},
+    x::AbstractVector,
+)
+    return LinearAlgebra.mul!(y, A, x, true, false)
+end
+
+function LinearAlgebra.mul!(
+    y::AbstractVecOrMat,
+    A::LinearMaps.AdjointMap{<:Any,<:LowRankMatrix},
+    x::AbstractVector,
+    alpha::Number,
+    beta::Number,
+)
+    z = adjoint(A.lmap.U) * x
+    return LinearAlgebra.mul!(y, adjoint(A.lmap.V), z, alpha, beta)
+end
+
+function LinearAlgebra.mul!(
+    y::AbstractVecOrMat, A::LinearMaps.AdjointMap{<:Any,<:LowRankMatrix}, x::AbstractVector
+)
+    return LinearAlgebra.mul!(y, A, x, true, false)
 end

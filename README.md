@@ -81,11 +81,12 @@ y = hmat * x
 For a transpose-symmetric operator such as the single-layer operator above, use
 `AdaptiveCrossApproximation.assemble(operator, space; tol=1e-4)` to share
 off-diagonal storage and use one cluster tree for both axes. The two-space call
-continues to use general assembly. Symmetric assembly currently supports
-`PreserveSpaceOrder()` only.
+continues to use general assembly.
 
-The result behaves as a matrix-free linear operator while retaining direct access
-to its near- and far-field representations. See the
+The result behaves as a linear operator while retaining direct access to its
+near- and far-field representations; a reusable
+`AdaptiveCrossApproximation.MatVecWorkspace(hmat)` avoids repeated planning and
+buffer allocation in products. See the
 [H-matrix manual](https://JoshuaTetzner.github.io/AdaptiveCrossApproximation.jl/dev/manual/hmatrix/)
 for configuration options and point-kernel examples.
 
@@ -94,7 +95,7 @@ for configuration options and point-kernel examples.
 - [H2Trees.jl](https://github.com/djukic14/H2Trees.jl) hierarchical tree construction for $\mathcal{H}$- and $\mathcal{H}^2$-matrices
 - [NestedCrossApproximation.jl](https://github.com/JoshuaTetzner/NestedCrossApproximation.jl) nested low-rank approximation for $\mathcal{H}^2$-matrices
 - [BlockSparseMatrices.jl](https://github.com/djukic14/BlockSparseMatrices.jl)
-  stores and applies the dense near field.
+  provides block-sparse utilities used by lower-level assembly interfaces.
 
 ## References
 

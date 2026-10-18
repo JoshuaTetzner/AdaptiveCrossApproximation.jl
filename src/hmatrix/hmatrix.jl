@@ -1,119 +1,120 @@
-
 """
-    HMatrix{K,NearInteractionType,FarInteractionType}
+    HMatrixCore{T}
 
-Hierarchical matrix that stores near-field interactions explicitly and far-field interactions
-as low-rank block data.
+Hierarchical matrix with a retained block tree, separate dense and low-rank
+storage, canonical CSR block ordering, and a CSC traversal map.
 
-# Arguments
-
-  - `nearinteractions`: block-sparse near-field contribution
-  - `farinteractions`: collection of compressed far-field interaction blocks
-  - `dim::Tuple{Int,Int}`: matrix dimensions `(m, n)`
-
-# Returns
-
-An `HMatrix` linear map that supports matrix-vector products and conversion to a dense matrix
-via `Matrix`.
-
-# Notes
-
-`HMatrix` is typically created through the high-level constructor
-`HMatrix(operator, testspace, trialspace, tree; kwargs...)` or `assemble(...)`.
-For transpose-symmetric operators, `HMatrix(operator, space, tree; kwargs...)`
-and `assemble(operator, space; kwargs...)` share off-diagonal storage between
-both orientations. The two-space constructors use general storage.
-
-# See also
-
-`HMatrix`, `assemble`, `farmatrix`, `nearmatrix`
+`tol` is the relative accuracy chosen at assembly.
 """
-struct HMatrix{K,NearInteractionType,FarInteractionType} <: LinearMaps.LinearMap{K}
-    nearinteractions::NearInteractionType
-    farinteractions::FarInteractionType
+struct HMatrixCore{T,Tree,Ordering} <: LinearMaps.LinearMap{T}
+    tree::Tree
+    near::Vector{Matrix{T}}
+    far::Vector{LowRankMatrix{T}}
+    csr::BlockCSR{Int}
+    csc::BlockCSC{Int}
+    ordering::Ordering
     dim::Tuple{Int,Int}
-    function HMatrix{K}(nearinteractions, farinteractions, dim::Tuple{Int,Int}) where {K}
-        return new{K,typeof(nearinteractions),typeof(farinteractions)}(
-            nearinteractions, farinteractions, dim
-        )
-    end
-end
-
-function Base.Matrix(A::HMatrix)
-    mat = Matrix(A.nearinteractions)
-    for farinteraction in A.farinteractions
-        mat += Matrix(farinteraction)
-    end
-    return mat
+    tol::Float64
 end
 
 """
-    nnz(A::HMatrix)
+    HMatrix
 
-Count the number of stored scalars in a hierarchical matrix.
-
-Sums the near-field block-sparse storage with the far-field low-rank factor
-storage (`length(U) + length(V)` per stored block). Symmetric blocks count their
-shared factors once; a far self block assembled as dense storage counts its
-stored entries. This does not include object or index-array overhead. See also
-[`storage`](@ref) for a GB-scale report including compression ratio.
+Compatibility alias for [`HMatrixCore`](@ref).
 """
+const HMatrix = HMatrixCore
+
+function HMatrix{T}(
+    tree,
+    near::Vector{Matrix{T}},
+    far::Vector{LowRankMatrix{T}},
+    csr::BlockCSR{Int},
+    csc::BlockCSC{Int},
+    ordering,
+    dim::Tuple{Int,Int},
+    tol::Real,
+) where {T}
+    isfinite(tol) && tol >= 0 || throw(ArgumentError("tol must be finite and nonnegative"))
+    return HMatrix{T,typeof(tree),typeof(ordering)}(
+        tree, near, far, csr, csc, ordering, dim, Float64(tol)
+    )
+end
+
+Base.size(A::HMatrix) = A.dim
+Base.size(A::HMatrix, dim::Integer) = A.dim[dim]
+
+_copylowrank(block::LowRankMatrix{T}) where {T} =
+    LowRankMatrix{T}(copy(block.U), copy(block.V))
+
+"""
+    copy(H::HMatrixCore)
+
+Copy the numerical blocks of `H`. Tree and block index are shared, so the copy
+has the same partition and can reuse workspaces built for `H`.
+"""
+function Base.copy(A::HMatrix{T}) where {T}
+    return HMatrix{T}(
+        A.tree,
+        map(copy, A.near),
+        map(_copylowrank, A.far),
+        A.csr,
+        A.csc,
+        A.ordering,
+        A.dim,
+        A.tol,
+    )
+end
+
+function _storedblock(A::HMatrix, csridx::Int)
+    if A.csr.isfar[csridx]
+        return A.far[A.csr.storageidx[csridx]]
+    end
+    return A.near[A.csr.storageidx[csridx]]
+end
+
+function _logicalblock(A::HMatrix, csridx::Int)
+    block = _storedblock(A, csridx)
+    return A.csr.transposed[csridx] ? transpose(block) : block
+end
+
+function _materialize(A::HMatrix, farfilter::Union{Nothing,Bool}=nothing)
+    matrix = zeros(eltype(A), size(A))
+    rowtree = testtree(A.tree)
+    coltree = trialtree(A.tree)
+    for rownode in 1:(length(A.csr.rowptr) - 1)
+        rows = clusterindices(rowtree, rownode, A.ordering)
+        for csridx in A.csr.rowptr[rownode]:(A.csr.rowptr[rownode + 1] - 1)
+            isnothing(farfilter) || A.csr.isfar[csridx] == farfilter || continue
+            cols = clusterindices(coltree, A.csr.colnodes[csridx], A.ordering)
+            view(matrix, rows, cols) .= Matrix(_logicalblock(A, csridx))
+        end
+    end
+    return matrix
+end
+
+Base.Matrix(A::HMatrix) = _materialize(A)
+
 function nnz(A::HMatrix)
-    farnnz = sum(_storedfarentries(f) for f in A.farinteractions; init=0)
-    return _storednearentries(A.nearinteractions) + farnnz
+    return sum(length, A.near; init=0) + sum(_storedfarblockentries, A.far; init=0)
 end
 
-_storednearentries(nears) = BlockSparseMatrices.nnz(nears)
-_storednearentries(nears::SymmetricBlockMatrix) =
-    sum(length, nears.diagonals; init=0) + sum(length, nears.offdiagonals; init=0)
-
-_storedfarblockentries(block::AbstractMatrix) = length(block)
-_storedfarentries(fars::BlockSparseMatrix) =
-    sum(_storedfarblockentries, fars.blocks; init=0)
-_storedfarentries(fars::SymmetricBlockMatrix) =
-    sum(length, fars.diagonals; init=0) +
-    sum(_storedfarblockentries, fars.offdiagonals; init=0)
-
-function Base.size(A::HMatrix, dim=nothing)
-    dim === nothing && return (A.dim[1], A.dim[2])
-    return A.dim[dim]
+struct HMatrixComponent{T,H<:HMatrix{T},Far} <: LinearMaps.LinearMap{T}
+    parent::H
 end
 
-function LinearMaps._unsafe_mul!(
-    y::AbstractVector, A::HMatrix{K}, x::AbstractVector
-) where {K}
-    fill!(y, zero(K))
+Base.size(A::HMatrixComponent) = size(A.parent)
+Base.size(A::HMatrixComponent, dim::Integer) = size(A.parent, dim)
+Base.Matrix(A::HMatrixComponent{<:Any,<:Any,Far}) where {Far} = _materialize(A.parent, Far)
 
-    y .+= A.nearinteractions * x
-    for farinteraction in A.farinteractions
-        y .+= farinteraction * x
-    end
+nearmatrix(A::HMatrix{T}) where {T} = HMatrixComponent{T,typeof(A),false}(A)
+farmatrix(A::HMatrix{T}) where {T} = HMatrixComponent{T,typeof(A),true}(A)
 
-    return y
-end
-
-function LinearMaps._unsafe_mul!(
-    y::AbstractVector, A::LinearMaps.TransposeMap{<:Any,<:HMatrix{K}}, x::AbstractVector
-) where {K}
-    fill!(y, zero(K))
-
-    y .+= transpose(A.lmap.nearinteractions) * x
-    for farinteraction in A.lmap.farinteractions
-        y .+= transpose(farinteraction) * x
-    end
-
-    return y
-end
-
-function LinearMaps._unsafe_mul!(
-    y::AbstractVector, A::LinearMaps.AdjointMap{<:Any,<:HMatrix{K}}, x::AbstractVector
-) where {K}
-    fill!(y, zero(K))
-
-    y .+= adjoint(A.lmap.nearinteractions) * x
-    for farinteraction in A.lmap.farinteractions
-        y .+= adjoint(farinteraction) * x
-    end
-
-    return y
+function storage(A::HMatrix)
+    entries = nnz(A)
+    bytes = entries * sizeof(eltype(A))
+    referencebytes = prod(size(A)) * sizeof(eltype(A))
+    println("storage: ", bytes * 1e-9, " GB")
+    println("summary size: ", Base.summarysize(A) * 1e-9, " GB")
+    println("compression ratio: ", bytes / referencebytes)
+    return bytes * 1e-9
 end

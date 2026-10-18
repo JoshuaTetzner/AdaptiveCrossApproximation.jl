@@ -185,17 +185,11 @@ is `A == transpose(A)`, rather than Hermitian symmetry. The two-space calls
 `assemble(operator, space, space)` and `HMatrix(operator, space, space, tree)`
 continue to use general assembly, even when both arguments are the same object.
 
-Each unordered off-diagonal near interaction is assembled once, and each
-unordered far pair is compressed once. The opposite orientation uses the
-transpose of the stored block or factors, without conjugation. Diagonal near
-blocks are assembled and stored in full, then symmetrized by copying their upper
-triangles into their lower triangles. Off-diagonal near columns are combined per
-row cluster, and the resulting rectangular blocks are allocated at their final
-sizes and assembled directly; diagonal blocks are assembled separately.
-
-Only `PreserveSpaceOrder()` is supported for symmetric assembly.
-`PermuteSpaceInPlace()` is rejected before modifying the space because
-BlockSparseMatrices does not yet provide symmetric VBCRS storage.
+Each unordered terminal interaction is assembled or compressed once. The
+opposite orientation references the same physical block and applies a transpose,
+without conjugation. Diagonal near blocks are assembled and stored in full, then
+symmetrized by copying their upper triangles into their lower triangles. Both
+space-ordering modes are supported.
 
 ### Near- and Far-Field Quadrature
 
@@ -234,21 +228,32 @@ hmat = AdaptiveCrossApproximation.assemble(
 ```
 
 The latter mutates the supplied spaces and should only be selected when the caller
-expects this reordered layout. Assembly uses a dynamic thread scheduler by default.
+expects this reordered layout. Assembly runs on `ntasks` parallel tasks (keyword,
+default `Threads.nthreads()`).
 Kernel backends may implement `localkernelmatrix` to create independent block-local
 assembly caches while sharing the global kernel matrix between threads.
 
 ## Working with the Result
 
-`HMatrix` follows Julia's matrix interface:
+`HMatrix` behaves like a matrix in products. For repeated products, construct a
+`MatVecWorkspace` once; it holds the matrix, a parallel schedule and all internal
+buffers, and is used in place of the matrix:
 
 ```julia
-x = ones(eltype(hmat), size(hmat, 2))
-xt = ones(eltype(hmat), size(hmat, 1))
-y = hmat * x
-yt = transpose(hmat) * xt
-yh = adjoint(hmat) * xt
+A = AdaptiveCrossApproximation.MatVecWorkspace(hmat)
+y = A * x
+mul!(y, A, x)                   # no numerical allocations once warm
+mul!(y, transpose(A), xt, α, β)
+Y = A' * X                      # several right-hand sides at once
 ```
+
+The product is distributed over `ntasks` parallel tasks (keyword, default
+`Threads.nthreads()`; `ntasks=1` runs on the calling task). One
+workspace serves one product at a time; give each concurrently working task its
+own copy, `MatVecWorkspace(A)`, which shares the schedule and the matrix. A real
+matrix also multiplies complex vectors. Products with `hmat` itself
+(`hmat * x`, `mul!(y, hmat, x)`) build a temporary workspace on every call and
+warn once.
 
 Converting to a dense matrix is useful for validation of small problems but defeats
 the storage advantage for large ones:
@@ -264,6 +269,15 @@ near = AdaptiveCrossApproximation.nearmatrix(hmat)
 far = AdaptiveCrossApproximation.farmatrix(hmat)
 stored_gigabytes = AdaptiveCrossApproximation.storage(hmat)
 ```
+
+The assembled object has concrete type [`HMatrixCore`](@ref); `HMatrix` remains
+its public compatibility name. The numerical payload is available as
+`hmat.near::Vector{Matrix{T}}` and
+`hmat.far::Vector{LowRankMatrix{T}}`. `hmat.csr` is the canonical row-cluster
+ordering of terminal blocks. `hmat.csc` stores only column-cluster traversal
+metadata and integer references back into the CSR entries; it does not duplicate
+the matrices. The retained `hmat.tree` supplies the cluster hierarchy and index
+sets, and `hmat.tol` the assembly tolerance.
 
 For block partitioning, admissibility, storage complexity, and the assembly model,
 see the [H-matrix theory](../details/hmatrix.md).
