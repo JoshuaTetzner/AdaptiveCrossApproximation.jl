@@ -122,7 +122,7 @@ return the row/column clustering sub-tree (for a single shared tree, this may
 return `tree` itself); `levels` returns tree levels coarsest first, visited via
 `LevelIterator`; `permutation` returns, without modifying the tree, the mapping
 from tree positions to indices in the underlying space. It is used by
-[`PermuteSpaceInPlace`](@ref) and matrix-vector workspace construction.
+[`PermuteSpaceInPlace`](@ref) and arithmetic workspace construction.
 """
 testtree(tree) = error("Requires implementation for $(typeof(tree))")
 trialtree(tree) = error("Requires implementation for $(typeof(tree))")
@@ -235,6 +235,21 @@ include("blockindex.jl")
 include("hmatrix.jl")
 include("treeindex.jl")
 include("matvec.jl")
+include("algebra/blockscratch.jl")
+include("algebra/taskgraph.jl")
+include("algebra/recompression.jl")
+include("algebra/multiplication.jl")
+include("algebra/addition.jl")
+include("algebra/workspace.jl")
+include("algebra/blockview.jl")
+include("algebra/hierarchicaladdition.jl")
+include("algebra/thinmultiplication.jl")
+include("algebra/hierarchicalmultiplication.jl")
+include("algebra/leaflu.jl")
+include("algebra/triangular.jl")
+include("algebra/solveplan.jl")
+include("algebra/lu.jl")
+include("algebra/operations.jl")
 include("nearinteractions.jl")
 include("symmetricblockmatrix.jl")
 include("assembly.jl")

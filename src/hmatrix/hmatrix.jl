@@ -4,7 +4,14 @@
 Hierarchical matrix with a retained block tree, separate dense and low-rank
 storage, canonical CSR block ordering, and a CSC traversal map.
 
-`tol` is the relative accuracy chosen at assembly.
+`tol` is the relative accuracy chosen at assembly. Every later recompression
+(products, sums, [`recompress!`](@ref) and `lu`) truncates each block to this
+tolerance; for operands with different tolerances the larger one is used.
+
+The struct is immutable and operations never change the blocks of their
+inputs. Only the documented in-place operations overwrite a matrix: the
+destination of `mul!(C, A, B, α, β)`, `axpy!`, `axpby!`, `rmul!` and `lmul!`, and
+the argument of `lu!` and `recompress!`.
 """
 struct HMatrixCore{T,Tree,Ordering} <: LinearMaps.LinearMap{T}
     tree::Tree

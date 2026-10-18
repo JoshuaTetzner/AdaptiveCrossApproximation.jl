@@ -111,6 +111,7 @@ end
     rowleaves = [copy(H2Trees.values(rowtree, leaf)) for leaf in H2Trees.leaves(rowtree)]
     colleaves = [copy(H2Trees.values(coltree, leaf)) for leaf in H2Trees.leaves(coltree)]
     index = AdaptiveCrossApproximation._TreeIndex(mat)
+    view = AdaptiveCrossApproximation._TreeView(mat)
     storedentries =
         sum(length, mat.near) +
         sum(length(block.U) + length(block.V) for block in mat.far; init=0)
@@ -121,6 +122,8 @@ end
     @test index.colperm == H2Trees.values(coltree, H2Trees.root(coltree))
     @test rowleaves == [H2Trees.values(rowtree, leaf) for leaf in H2Trees.leaves(rowtree)]
     @test colleaves == [H2Trees.values(coltree, leaf) for leaf in H2Trees.leaves(coltree)]
+    @test all(view.near[i] === mat.near[i] for i in eachindex(mat.near))
+    @test all(view.far[i] === mat.far[i] for i in eachindex(mat.far))
     copied = copy(mat)
     @test copied.tol == mat.tol && copied.csr === mat.csr
     @test all(copied.near[i] !== mat.near[i] for i in eachindex(mat.near))

@@ -145,7 +145,7 @@ function workspace_test_dense(workspace, rowranges, colranges; traversal=:csr)
     return matrix
 end
 
-@testset "Tree index and matrix-vector products" begin
+@testset "Tree index, tree view and matrix-vector products" begin
     ACA = AdaptiveCrossApproximation
     for symmetric in (false, true),
         ordering in (ACA.PreserveSpaceOrder(), ACA.PermuteSpaceInPlace())
@@ -212,6 +212,30 @@ end
                     B = ACA.MatVecWorkspace(A)
                     @test B.buffers !== A.buffers
                     @test B * x ≈ reference * x
+                end
+            end
+
+            @testset "Tree views" begin
+                if symmetric
+                    @test_throws ArgumentError ACA._TreeView(core)
+                else
+                    view = ACA._TreeView(core)
+                    @test view.near !== core.near
+                    @test all(view.near[i] === core.near[i] for i in eachindex(core.near))
+                    @test all(view.far[i] === core.far[i] for i in eachindex(core.far))
+                    other = copy(core)
+                    @test other.csr === core.csr
+                    @test other.tree === core.tree
+                    @test all(
+                        !Base.mightalias(other.near[i], core.near[i]) for
+                        i in eachindex(core.near)
+                    )
+                    ACA._bind!(view, other)
+                    @test all(view.near[i] === other.near[i] for i in eachindex(core.near))
+                    @test all(view.far[i] === other.far[i] for i in eachindex(core.far))
+                    @test Matrix(core) ≈ reference
+                    (; core) = arithmetic_workspace_fixture(ordering; symmetric)
+                    @test_throws ArgumentError ACA._bind!(view, core)
                 end
             end
         end
