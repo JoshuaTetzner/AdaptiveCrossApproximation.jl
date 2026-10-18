@@ -127,9 +127,9 @@ block-sparse matrix stores these near-field interactions.
   - `tree`: Hierarchical tree structure
   - `::PreserveSpaceOrder`: Space ordering strategy marker
   - `isnear`: Admissibility predicate (default: `isnear()`)
-  - `scheduler`: Thread scheduler (default: `SerialScheduler()`)
-  - `mvpscheduler`: Matrix-vector product scheduler (default: `scheduler`). A
-    `SerialScheduler()` skips near-field conflict graph construction.
+  - `ntasks`: number of parallel tasks for the assembly and the products of the
+    result (default `Threads.nthreads()`). With `ntasks=1`, no near-field
+    conflict graph is built.
   - `matrixdata`: Assembly data passed to kernel matrix (optional)
   - `verbose`: enable progress output (default `true`)
 
@@ -149,8 +149,7 @@ function assemblenears(
     tree,
     spaceordering::PreserveSpaceOrder;
     isnear=isnear(),
-    scheduler=SerialScheduler(),
-    mvpscheduler=scheduler,
+    ntasks::Integer=Threads.nthreads(),
     matrixdata=defaultmatrixdata(operator, testspace, trialspace),
     verbose::Bool=true,
 )
@@ -168,11 +167,11 @@ function assemblenears(
         i in eachindex(values)
     ]
     pbar = Progress(length(blocks); desc="Assembling near interactions: ", enabled=verbose)
-    assemble_blocks(nearmatrix, blocks, values, nearvalues; scheduler=scheduler, pbar=pbar)
+    assemble_blocks(nearmatrix, blocks, values, nearvalues; ntasks=ntasks, pbar=pbar)
     finish!(pbar)
 
     nears = BlockSparseMatrix(
-        blocks, values, nearvalues, size(nearmatrix); scheduler=mvpscheduler
+        blocks, values, nearvalues, size(nearmatrix); scheduler=_scheduler(ntasks)
     )
 
     return nears
@@ -202,7 +201,7 @@ block storage format optimized for the reordered layout.
   - `tree`: Hierarchical tree structure
   - `::PermuteSpaceInPlace`: Space ordering strategy marker
   - `isnear`: Admissibility predicate (default: `isnear()`)
-  - `scheduler`: Thread scheduler (default: `SerialScheduler()`)
+  - `ntasks`: number of parallel tasks (default `Threads.nthreads()`)
   - `matrixdata`: Assembly data passed to kernel matrix (optional)
   - `verbose`: enable progress output (default `true`)
 
@@ -223,7 +222,7 @@ function assemblenears(
     tree,
     spaceordering::PermuteSpaceInPlace;
     isnear=isnear(),
-    scheduler=SerialScheduler(),
+    ntasks::Integer=Threads.nthreads(),
     matrixdata=defaultmatrixdata(operator, testspace, trialspace),
     verbose::Bool=true,
 )
@@ -249,6 +248,7 @@ function assemblenears(
         undef, length(blocks)
     )
     pbar = Progress(length(blocks); desc="Assembling near interactions: ", enabled=verbose)
+    scheduler = _scheduler(ntasks)
     @tasks for i in eachindex(blocks)
         @set scheduler = scheduler
         nearmatrix(blocks[i], values[i], Iterators.flatten(nearvalues[i]))
@@ -286,12 +286,12 @@ function assemblenears(
     tree,
     spaceordering::SpaceOrderingStyle;
     isnear=isnear(),
-    scheduler=SerialScheduler(),
-    mvpscheduler=scheduler,
+    ntasks::Integer=Threads.nthreads(),
     matrixdata=defaultmatrixdata(operator, space, space),
     verbose::Bool=true,
 )
     _check_symmetric_ordering(spaceordering)
+    scheduler = _scheduler(ntasks)
     nearmatrix = AbstractKernelMatrix(operator, space, space; matrixdata=matrixdata)
     diagindices, rowindices, colindices = symmetricnearinteractions(
         tree; spaceordering=spaceordering, isnear=isnear
@@ -312,10 +312,10 @@ function assemblenears(
         enabled=verbose,
     )
     assemble_blocks(
-        nearmatrix, offdiagonals, rowindices, colindices; scheduler=scheduler, pbar=pbar
+        nearmatrix, offdiagonals, rowindices, colindices; ntasks=ntasks, pbar=pbar
     )
     assemble_blocks(
-        nearmatrix, diagonals, diagindices, diagindices; scheduler=scheduler, pbar=pbar
+        nearmatrix, diagonals, diagindices, diagindices; ntasks=ntasks, pbar=pbar
     )
     finish!(pbar)
     for block in diagonals
@@ -337,10 +337,10 @@ function assemblenears(
     end
     if isempty(offdiagonals)
         return BlockSparseMatrix(
-            diagonals, diagindices, diagindices, size(nearmatrix); scheduler=mvpscheduler
+            diagonals, diagindices, diagindices, size(nearmatrix); scheduler=scheduler
         )
     end
-    if mvpscheduler isa SerialScheduler
+    if scheduler isa SerialScheduler
         return _serialsymmetricblockmatrix(
             diagonals,
             diagindices,
@@ -348,7 +348,7 @@ function assemblenears(
             rowindices,
             colindices,
             size(nearmatrix),
-            mvpscheduler,
+            scheduler,
         )
     end
     # The 0.3.1 parallel constructor needs a nonempty diagonal block list to
@@ -364,6 +364,6 @@ function assemblenears(
         rowindices,
         colindices,
         size(nearmatrix);
-        scheduler=mvpscheduler,
+        scheduler=scheduler,
     )
 end

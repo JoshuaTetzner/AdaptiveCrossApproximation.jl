@@ -61,6 +61,7 @@ end
     include("test_batchedfullpivotaca.jl")
 
     include("test_hmatrix.jl")
+    include("test_treeview.jl")
     include("test_interactions.jl")
     include("test_symmetric_nearinteractions.jl")
 end

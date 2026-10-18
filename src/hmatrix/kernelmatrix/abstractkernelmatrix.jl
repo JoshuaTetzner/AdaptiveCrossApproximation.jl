@@ -72,7 +72,7 @@ types are detected.
 function beastkernelmatrix end
 
 """
-    assemble_blocks(matrix::AbstractKernelMatrix, blocks, rowidcs, colidcs; scheduler, pbar) -> blocks
+    assemble_blocks(matrix::AbstractKernelMatrix, blocks, rowidcs, colidcs; ntasks, pbar) -> blocks
 
 Fill each preallocated `blocks[i]` (sized `(length(rowidcs[i]), length(colidcs[i]))`)
 with the requested kernel entries.
@@ -92,17 +92,18 @@ lets backends override just the fill strategy — e.g. a GPU backend can force a
 serial loop, or batch everything through one combined pass — without
 duplicating the surrounding preallocation/storage-construction code.
 
-Default (any `AbstractKernelMatrix`) implementation: a plain per-block loop,
-`@tasks`-parallelizable via `scheduler`.
+Default (any `AbstractKernelMatrix`) implementation: a plain per-block loop on
+`ntasks` parallel tasks (default `Threads.nthreads()`).
 """
 function assemble_blocks(
     matrix::AbstractKernelMatrix{T},
     blocks::AbstractVector{<:AbstractMatrix{T}},
     rowidcs::AbstractVector{<:AbstractVector{Int}},
     colidcs::AbstractVector{<:AbstractVector{Int}};
-    scheduler=SerialScheduler(),
+    ntasks::Integer=Threads.nthreads(),
     pbar=Progress(0; enabled=false),
 ) where {T}
+    scheduler = _scheduler(ntasks)
     @tasks for i in eachindex(blocks)
         @set scheduler = scheduler
         matrix(blocks[i], rowidcs[i], colidcs[i])

@@ -103,3 +103,17 @@ function blockvalues(
 
     return levelvals, levelfarvals, levelidcs
 end
+
+function _checkntasks(ntasks)
+    ntasks > 0 || throw(ArgumentError("ntasks must be positive"))
+    return Int(ntasks)
+end
+
+# Scheduler of the parallel loops over independent items on `ntasks` tasks: each
+# task takes the next item as soon as it is done, which balances uneven items.
+function _scheduler(ntasks)
+    return _checkntasks(ntasks) == 1 ? SerialScheduler() : GreedyScheduler(; ntasks)
+end
+
+# Number of cost-balanced chunks of a loop over cheap items on `ntasks` tasks.
+_nchunks(ntasks) = _checkntasks(ntasks) == 1 ? 1 : 8 * ntasks

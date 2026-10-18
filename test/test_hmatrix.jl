@@ -106,17 +106,37 @@ end
     )
     near = AdaptiveCrossApproximation.nearmatrix(mat)
     far = AdaptiveCrossApproximation.farmatrix(mat)
+    rowtree = H2Trees.testtree(tree)
+    coltree = H2Trees.trialtree(tree)
+    rowleaves = [copy(H2Trees.values(rowtree, leaf)) for leaf in H2Trees.leaves(rowtree)]
+    colleaves = [copy(H2Trees.values(coltree, leaf)) for leaf in H2Trees.leaves(coltree)]
+    index = AdaptiveCrossApproximation._TreeIndex(mat)
     storedentries =
-        sum(length, mat.nearinteractions.blocks) + sum(
-            length(block.U) + length(block.V) for level in mat.farinteractions for
-            block in level.blocks;
-            init=0,
-        )
+        sum(length, mat.near) +
+        sum(length(block.U) + length(block.V) for block in mat.far; init=0)
 
+    @test mat isa AdaptiveCrossApproximation.HMatrixCore
+    @test mat.tol == 1e-4
+    @test index.rowperm == H2Trees.values(rowtree, H2Trees.root(rowtree))
+    @test index.colperm == H2Trees.values(coltree, H2Trees.root(coltree))
+    @test rowleaves == [H2Trees.values(rowtree, leaf) for leaf in H2Trees.leaves(rowtree)]
+    @test colleaves == [H2Trees.values(coltree, leaf) for leaf in H2Trees.leaves(coltree)]
+    copied = copy(mat)
+    @test copied.tol == mat.tol && copied.csr === mat.csr
+    @test all(copied.near[i] !== mat.near[i] for i in eachindex(mat.near))
+    @test all(
+        copied.far[i].U !== mat.far[i].U && copied.far[i].V !== mat.far[i].V for
+        i in eachindex(mat.far)
+    )
+    @test Matrix(copied) == Matrix(mat)
     @test Matrix(near) + Matrix(far) ≈ Matrix(mat)
     @test AdaptiveCrossApproximation.nnz(mat) == storedentries
     @test AdaptiveCrossApproximation.storage(mat) ==
         storedentries * sizeof(eltype(mat)) * 1e-9
+    @test length(mat.csr) == length(mat.near) + length(mat.far)
+    @test sort(mat.csc.csrmap) == collect(1:length(mat.csr))
+    @test count(!, mat.csr.isfar) == length(mat.near)
+    @test count(identity, mat.csr.isfar) == length(mat.far)
 end
 
 @testset "Permute shared tree and space" begin
@@ -136,6 +156,18 @@ end
         tree, points, points
     )
     @test testspace === trialspace && trialspace === points
+
+    mat = AdaptiveCrossApproximation.HMatrix(
+        fct,
+        points,
+        tree;
+        spaceordering=AdaptiveCrossApproximation.PermuteSpaceInPlace(),
+        tol=1e-4,
+        verbose=false,
+    )
+    index = AdaptiveCrossApproximation._TreeIndex(mat)
+    @test index.rowperm isa AdaptiveCrossApproximation.IdentityPermutation
+    @test index.colperm isa AdaptiveCrossApproximation.IdentityPermutation
 end
 
 using BEAST

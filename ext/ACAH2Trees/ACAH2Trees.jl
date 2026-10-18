@@ -70,14 +70,17 @@ function AdaptiveCrossApproximation._tree(
 end
 
 function AdaptiveCrossApproximation.permutation(tree::H2Trees.H2ClusterTree)
-    perm = zeros(Int, H2Trees.numberofvalues(tree))
+    return collect(H2Trees.values(tree, H2Trees.root(tree)))
+end
+
+function AdaptiveCrossApproximation._settreeorder!(tree::H2Trees.H2ClusterTree)
     n = 1
     for leaf in H2Trees.leaves(tree)
-        perm[n:(n + length(H2Trees.values(tree, leaf)) - 1)] = H2Trees.values(tree, leaf)
-        tree.nodes[leaf].data.values .= n:(n + length(H2Trees.values(tree, leaf)) - 1)
-        n += length(H2Trees.values(tree, leaf))
+        leafvalues = H2Trees.values(tree, leaf)
+        leafvalues .= n:(n + length(leafvalues) - 1)
+        n += length(leafvalues)
     end
-    return perm
+    return tree
 end
 
 function firstvalue(tree::H2Trees.H2ClusterTree, node::Int)
@@ -102,6 +105,7 @@ AdaptiveCrossApproximation.levels(tree::H2Trees.H2ClusterTree) = H2Trees.levels(
 AdaptiveCrossApproximation.LevelIterator(tree::H2Trees.H2ClusterTree, level::Int) =
     H2Trees.LevelIterator(tree, level)
 
+include("terminalinteractions.jl")
 include("nearinteractions.jl")
 include("symmetricnearinteractions.jl")
 include("farinteractions.jl")

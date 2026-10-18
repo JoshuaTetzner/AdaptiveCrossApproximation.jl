@@ -67,7 +67,7 @@ y = hmat * x  # Matrix-vector product
 
   - BEAST.jl for boundary integral operators
   - H2Trees.jl for hierarchical clustering
-  - BlockSparseMatrices.jl for sparse block storage
+  - H2Trees.jl for hierarchical block partitioning
 """
 module AdaptiveCrossApproximation
 
@@ -253,11 +253,10 @@ blocks use a transpose, without complex conjugation. Diagonal near blocks are
 assembled in full and symmetrized. Each unordered far-field pair is compressed
 once with the configured compressor.
 
-Accepts the tree, quadrature, compression, and scheduling keywords of the
-two-space overload. Only `PreserveSpaceOrder()` is supported: symmetric
-`PermuteSpaceInPlace()` assembly requires symmetric VBCRS storage in
-BlockSparseMatrices. The call `assemble(op, space, space)` uses general assembly.
-BEAST local operators such as `Identity` and `NCross` are assembled directly.
+Accepts the tree, quadrature, compression, ordering, and scheduling keywords of
+the two-space overload. The call `assemble(op, space, space)` uses general
+assembly. BEAST local operators such as `Identity` and `NCross` are assembled
+directly.
 
 # Examples
 
@@ -294,7 +293,7 @@ function assemble(
     )
 end
 
-export HMatrix
+export HMatrix, HMatrixCore
 export ACA
 export aca
 export ACAᵀ
