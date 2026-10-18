@@ -84,9 +84,10 @@ off-diagonal storage and use one cluster tree for both axes. The two-space call
 continues to use general assembly.
 
 The result behaves as a linear operator while retaining direct access to its
-near- and far-field representations; a reusable
-`AdaptiveCrossApproximation.MatVecWorkspace(hmat)` avoids repeated planning and
-buffer allocation in products. See the
+near- and far-field representations. It supports sums and products of H-matrices,
+`recompress!`, `lu` and solves with Julia's standard functions; reusable
+workspaces (for example `AdaptiveCrossApproximation.MatVecWorkspace(hmat)`)
+avoid repeated planning and buffer allocation. See the
 [H-matrix manual](https://JoshuaTetzner.github.io/AdaptiveCrossApproximation.jl/dev/manual/hmatrix/)
 for configuration options and point-kernel examples.
 

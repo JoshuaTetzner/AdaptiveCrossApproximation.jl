@@ -2,7 +2,8 @@
 
 An [`HMatrix`](@ref) stores near-field interactions as dense blocks and compresses
 admissible far-field interactions with a low-rank compressor. It supports matrix-vector
-products, transpose and adjoint products, and conversion to a dense `Matrix`.
+products, transpose and adjoint products, sums and products of H-matrices, LU
+factorization and solves, and conversion to a dense `Matrix`.
 
 ## Basic Usage
 
@@ -189,7 +190,8 @@ Each unordered terminal interaction is assembled or compressed once. The
 opposite orientation references the same physical block and applies a transpose,
 without conjugation. Diagonal near blocks are assembled and stored in full, then
 symmetrized by copying their upper triangles into their lower triangles. Both
-space-ordering modes are supported.
+space-ordering modes are supported. Such matrices support products with vectors;
+hierarchical arithmetic requires general (full) assembly.
 
 ### Near- and Far-Field Quadrature
 
@@ -278,6 +280,122 @@ ordering of terminal blocks. `hmat.csc` stores only column-cluster traversal
 metadata and integer references back into the CSR entries; it does not duplicate
 the matrices. The retained `hmat.tree` supplies the cluster hierarchy and index
 sets, and `hmat.tol` the assembly tolerance.
+
+## Hierarchical Arithmetic
+
+Sums, products, recompression and the LU factorization use Julia's standard
+functions. The tolerance `tol` chosen at assembly governs every later
+recompression; for operands with different tolerances the larger one is used.
+Truncation is in the spectral norm, relative to each block. Arithmetic requires
+full block storage: matrices from [symmetric assembly](@ref
+symmetric-hmatrix-assembly) support products with vectors only.
+
+The convenience calls below build the workspace they need. Every operation also
+accepts an explicitly constructed workspace (`AdaptiveCrossApproximation.XXXWorkspace`)
+as last argument, which avoids planning and allocating buffers again. A workspace
+analyses the partition of the matrices it was built for and can be reused for
+every matrix with the same cluster trees and block partition, for example the
+matrices of a frequency sweep on one geometry. One workspace serves one
+operation at a time.
+
+### Solving systems
+
+```julia
+F = lu(hmat)            # hmat is unchanged
+x = F \ b               # vector or matrix of right-hand sides
+ldiv!(F, b)             # in place
+ldiv!(x, F, b)
+x = transpose(F) \ b
+x = F' \ b
+```
+
+`lu!(hmat)` factorizes in place: the blocks of `hmat` are overwritten by the
+factors (with a warning, once). The factorization follows `P*A ≈ L*U`, where the
+pivoting is restricted to each dense diagonal leaf. An exactly zero pivot raises
+`LeafLUFailure`; with `check=false`, `issuccess(F)` is `false` instead.
+`F.converged`, `F.rank_limited`, `F.max_block_error` and `F.flushes` summarize
+the local recompressions, not a global error bound.
+
+```julia
+workspace = AdaptiveCrossApproximation.LUWorkspace(H₁)
+F₁ = lu!(H₁, workspace)
+F₂ = lu!(H₂, workspace)      # same partition: no new planning
+S = AdaptiveCrossApproximation.SolveWorkspace(F₁)
+ldiv!(S, b)                  # S acts like F₁, without temporary buffers
+```
+
+The `LUWorkspace` holds the elimination schedule, every triangular-solve and
+Schur-update plan and their buffers. Factorizations do not depend on the
+workspace after `lu!` returns. A factorization is read-only during solves: tasks
+solving concurrently with one factorization each use their own `SolveWorkspace`.
+The factorization runs in parallel, see [Threading](@ref hmatrix-threading).
+
+`example/pointcloudlu_benchmark.jl` compares this LU with HMatrices.jl on
+identical partitions.
+
+### Sums and products
+
+```julia
+C = A + B
+C = A - 2B
+axpy!(α, A, C)          # C = α*A + C
+axpby!(α, A, β, C)      # C = α*A + β*C
+rmul!(C, α)
+
+C = A * B
+mul!(C, A, B, α, β)     # C = α*A*B + β*C
+```
+
+Sums require the same cluster trees and block partition; products require
+matching cluster trees on all axes, while the block partitions may differ. In-place
+operations overwrite only their destination, which must not be one of the
+factors of a product.
+
+Products avoid one update per terminal pair. Low-rank terminals multiply whole
+hierarchical panels; a low-rank terminal above several destinations is formed
+and recompressed once on a virtual node above them; cheap far destinations are
+recompressed directly from the implicit operator `C + α*A*B`; remaining updates
+are collected in batches and recompressed together, or summed into a dense core
+when that is cheaper. Wide recompressions use a randomized range finder with a
+posterior error bound followed by a small SVD.
+
+### Recompression
+
+```julia
+recompress!(hmat)
+```
+
+ACA does not produce optimal ranks. `recompress!` truncates every low-rank block
+to the smallest rank meeting `hmat.tol`, in parallel over the blocks, without
+changing the partition. It overwrites `hmat` (with a warning, once).
+
+### [Threading](@id hmatrix-threading)
+
+Every parallel operation takes the number of tasks as the keyword `ntasks`,
+with default `Threads.nthreads()`; `ntasks=1` runs on the calling task. The
+scheduling itself is chosen internally for each operation:
+
+```julia
+hmat = HMatrix(operator, testspace, trialspace, tree; ntasks=8)
+A = AdaptiveCrossApproximation.MatVecWorkspace(hmat; ntasks=8)
+AdaptiveCrossApproximation.RecompressionWorkspace(hmat; ntasks=8)
+AdaptiveCrossApproximation.LUWorkspace(hmat; ntasks=8)
+AdaptiveCrossApproximation.ProductWorkspace(C, A, B; ntasks=8)
+AdaptiveCrossApproximation.AdditionWorkspace(C, A; ntasks=8)
+```
+
+Assembly, matrix-vector products and recompression consist of independent
+pieces of uneven cost; each task takes the next piece as soon as it is done.
+The block operations of the LU factorization and of products depend on each
+other. Their workspace records once which blocks every operation reads and
+writes; the tasks then take the earliest operation whose inputs are final. The
+factors and products are identical for every `ntasks`. The forms without a
+workspace (`hmat * x`, `lu(hmat)`, `A + B`, `A * B`, `recompress!(hmat)`) use
+`Threads.nthreads()` tasks.
+
+Start Julia with several threads and use a single BLAS thread
+(`BLAS.set_num_threads(1)`): the block operations are small, and threaded BLAS
+calls slow them down.
 
 For block partitioning, admissibility, storage complexity, and the assembly model,
 see the [H-matrix theory](../details/hmatrix.md).

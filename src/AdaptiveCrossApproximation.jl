@@ -73,6 +73,7 @@ module AdaptiveCrossApproximation
 
 using LinearAlgebra
 using Polynomials
+using Random: Random
 using ProgressMeter
 using StaticArrays
 
@@ -294,6 +295,8 @@ function assemble(
 end
 
 export HMatrix, HMatrixCore
+export recompress!
+export HMatrixLU, LeafLUFailure
 export ACA
 export aca
 export ACAᵀ

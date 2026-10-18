@@ -62,6 +62,14 @@ end
 
     include("test_hmatrix.jl")
     include("test_treeview.jl")
+    include("test_recompression.jl")
+    include("test_lowrankaddition.jl")
+    include("test_hierarchicalarithmetic.jl")
+    include("test_hierarchicalmultiplication.jl")
+    include("test_leaflu.jl")
+    include("test_hierarchicaltriangular.jl")
+    include("test_hierarchicalrhs.jl")
+    include("test_hierarchicallu.jl")
     include("test_interactions.jl")
     include("test_symmetric_nearinteractions.jl")
 end
