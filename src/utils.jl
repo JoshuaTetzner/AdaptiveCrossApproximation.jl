@@ -1,107 +1,16 @@
-function collectassigned(v::Vector{B}) where {B}
-    nassigned = 0
-    @inbounds for i in eachindex(v)
-        nassigned += isassigned(v, i)
-    end
-
-    compact = Vector{B}(undef, nassigned)
-    k = 0
-    @inbounds for i in eachindex(v)
-        if isassigned(v, i)
-            k += 1
-            compact[k] = v[i]
-        end
-    end
-
-    return compact
-end
-
-function collectnears(vals::B, nearvals::Vector{B}, assigned::Vector{Bool}) where {B}
-    nassigned = 0
-    @inbounds for ass in assigned
-        ass && (nassigned += 1)
-    end
-
-    compactvals = B(undef, nassigned)
-    compactnearvals = Vector{B}(undef, nassigned)
-    k = 0
-    @inbounds for i in eachindex(vals)
-        if assigned[i]
-            k += 1
-            compactvals[k] = vals[i]
-            compactnearvals[k] = nearvals[i]
-        end
-    end
-
-    return compactvals, compactnearvals
-end
-
-function linearizestorage(v::Vector{Vector{T}}) where {T}
-    ptr = Vector{Int}(undef, length(v) + 1)
+# Concatenate the per-node lists `nested` into `(ptr, nodes)`: the entries of
+# node `τ` are `nodes[ptr[τ]:(ptr[τ + 1] - 1)]`.
+function linearizestorage(nested::Vector{Vector{Int}})
+    ptr = Vector{Int}(undef, length(nested) + 1)
     ptr[1] = 1
-
-    @inbounds for i in eachindex(v)
-        ptr[i + 1] = ptr[i] + length(v[i])
+    for (τ, entries) in enumerate(nested)
+        ptr[τ + 1] = ptr[τ] + length(entries)
     end
-
-    data = Vector{T}(undef, ptr[end] - 1)
-
-    @inbounds for i in eachindex(v)
-        vi = v[i]
-        copyto!(data, ptr[i], vi, 1, length(vi))
+    nodes = Vector{Int}(undef, ptr[end] - 1)
+    for (τ, entries) in enumerate(nested)
+        copyto!(nodes, ptr[τ], entries, 1, length(entries))
     end
-
-    return ptr, data
-end
-
-function buffersize(
-    vals::Vector{T}, ptr::Vector{Int}, farvals::Vector{T}, nodes::Vector{Int}
-) where {T}
-    blen = 0
-    fblen = 0
-    @inbounds for node in nodes
-        start = ptr[node]
-        stop  = ptr[node + 1] - 1
-        start > stop && continue
-        len = length(vals[node])
-        blen < len && (blen = len)
-        for faridx in start:stop
-            len = length(farvals[faridx])
-            if len > fblen
-                fblen = len
-            end
-        end
-    end
-    return blen, fblen
-end
-
-# required for blocksparse format
-function blockvalues(
-    values::Vector{Vector{Int}},
-    farptr::Vector{Int},
-    farvalues::Vector{Vector{Int}},
-    levelnodes::Vector{Int},
-)
-    nblocks = 0
-    @inbounds for node in levelnodes
-        nblocks += farptr[node + 1] - farptr[node]
-    end
-    levelvals = Vector{Vector{Int}}(undef, nblocks)
-    levelfarvals = Vector{Vector{Int}}(undef, nblocks)
-    levelidcs = Vector{Int}(undef, nblocks)
-    i = 1
-    for node in levelnodes
-        farptr[node + 1] == farptr[node] && continue
-        r = values[node]
-        for j in farptr[node]:(farptr[node + 1] - 1)
-            levelidcs[i] = j
-            levelfarvals[i] = farvalues[j]
-            levelvals[i] = r
-            i += 1
-        end
-    end
-
-    return levelvals, levelfarvals, levelidcs
+    return ptr, nodes
 end
 
 function _checkntasks(ntasks)
@@ -109,11 +18,24 @@ function _checkntasks(ntasks)
     return Int(ntasks)
 end
 
-# Scheduler of the parallel loops over independent items on `ntasks` tasks: each
-# task takes the next item as soon as it is done, which balances uneven items.
+"""
+    _scheduler(ntasks)
+
+Scheduler of the parallel loops over independent items (assembly, matrix-vector
+products, recompression) on `ntasks` tasks: a `GreedyScheduler`, where each task
+takes the next item as soon as it is done, which balances items of uneven cost.
+`ntasks = 1` runs serially on the calling task. The public functions only take
+`ntasks`; operations with dependencies use a task graph instead.
+"""
 function _scheduler(ntasks)
     return _checkntasks(ntasks) == 1 ? SerialScheduler() : GreedyScheduler(; ntasks)
 end
 
-# Number of cost-balanced chunks of a loop over cheap items on `ntasks` tasks.
+"""
+    _nchunks(ntasks)
+
+Number of cost-balanced chunks of a loop over many cheap items on `ntasks`
+tasks: eight per task, so that the greedy scheduler can balance the remaining
+cost differences, and one for a single task.
+"""
 _nchunks(ntasks) = _checkntasks(ntasks) == 1 ? 1 : 8 * ntasks

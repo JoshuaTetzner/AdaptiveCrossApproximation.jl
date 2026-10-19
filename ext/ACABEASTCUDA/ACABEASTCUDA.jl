@@ -2,7 +2,6 @@ module ACABEASTCUDA
 
 using AdaptiveCrossApproximation
 using BEAST
-using BlockSparseMatrices
 using CUDA
 
 # BEAST's GPU block assembly lives in its BEASTCUDAExt, which released BEAST

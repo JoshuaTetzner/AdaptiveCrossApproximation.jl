@@ -5,10 +5,10 @@ using ProgressMeter: Progress, update!
 # `gpu_batched_blockassemble!` (integrate + project directly into dense
 # per-block output, no global sparse matrix). The target `blocks` may live on
 # host (near/coupling `Vector{Matrix}`) or on device (compression level
-# buffer views) - BEAST's device-aware scatter handles both. Reached both via
-# `assemblenears` and directly by NestedCrossApproximation's far-field
-# batched-bottom-up/coupling-matrix code, which calls `assemble_blocks` on a
-# GPU-capable `farmatrix` without going through `assemblenears` at all.
+# buffer views) - BEAST's device-aware scatter handles both. Reached by the
+# HMatrix near-field assembly and directly by NestedCrossApproximation's near
+# field and far-field batched-bottom-up/coupling-matrix code, which call
+# `assemble_blocks` on a GPU-capable kernel matrix.
 function AdaptiveCrossApproximation.assemble_blocks(
     matrix::AdaptiveCrossApproximation.GPUBEASTKernelMatrix{T},
     blocks::AbstractVector{<:AbstractMatrix{T}},
@@ -31,19 +31,4 @@ function AdaptiveCrossApproximation.assemble_blocks(
 
     update!(pbar, length(blocks))
     return blocks
-end
-
-# No GPUBEASTKernelMatrix-specific `assemblenears` override for
-# PreserveSpaceOrder: the generic `AbstractKernelMatrix` method (in
-# AdaptiveCrossApproximation's nearinteractions.jl) already delegates block
-# filling to `assemble_blocks` above.
-function AdaptiveCrossApproximation.assemblenears(
-    ::AdaptiveCrossApproximation.GPUBEASTKernelMatrix,
-    tree,
-    ::AdaptiveCrossApproximation.PermuteSpaceInPlace;
-    kwargs...,
-)
-    return throw(
-        ArgumentError("GPU near assembly currently supports PreserveSpaceOrder only")
-    )
 end

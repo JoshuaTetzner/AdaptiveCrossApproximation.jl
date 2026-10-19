@@ -80,14 +80,14 @@ The built-in kernel backends accumulate into the supplied blocks, so callers sho
 normally provide zero-initialized storage.
 
 `rowidcs`/`colidcs` need not describe disjoint or contiguous index ranges —
-this is the same shape of input as [`nearinteractions`](@ref) (dense near
-blocks of a fast method) but also fits scattered pivot-index blocks (e.g. the
+they can be the cluster indices of near-field blocks (see
+[`interactions`](@ref)) but also scattered pivot-index blocks (e.g. the
 far-field coupling blocks of a nested cross approximation), since both are
 just lists of (row-index-list, column-index-list) requests against the same
 underlying kernel.
 
 Taking `blocks` as an argument (rather than allocating and returning it) lets
-callers own the storage layout (e.g. a `BlockSparseMatrix`'s block vector) and
+callers own the storage layout (e.g. the near blocks of an [`HMatrix`](@ref)) and
 lets backends override just the fill strategy — e.g. a GPU backend can force a
 serial loop, or batch everything through one combined pass — without
 duplicating the surrounding preallocation/storage-construction code.

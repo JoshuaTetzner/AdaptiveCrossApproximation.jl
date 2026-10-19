@@ -150,16 +150,6 @@ end
     return n
 end
 
-# The package expects the `tree` object to implement these functions. Adaptors
-# for concrete tree types should provide implementations in user code (the
-# ACAH2Trees extension implements them for H2Trees.TwoNTree).
-center(tree::T, node::Int) where {T} = error("Not implemented for type $T")
-values(tree::T, node::Union{Int,Vector{Int}}) where {T} =
-    error("Not implemented for type $T")
-children(tree::T, node::Int) where {T} = error("Not implemented for type $T")
-parent(tree::T, node::Int) where {T} = error("Not implemented for type $T")
-firstchild(tree::T, node::Int) where {T} = error("Not implemented for type $T")
-
 # --- empty-cluster bookkeeping ---------------------------------------------
 @inline function _emptycluster(pivstrat::TreeMimicryPivotingFunctor, node::Int)
     @inbounds for i in 1:(pivstrat.nempty)
