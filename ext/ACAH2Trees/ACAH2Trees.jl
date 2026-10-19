@@ -1,14 +1,9 @@
 module ACAH2Trees
 using H2Trees
-import H2Trees:
-    isleaf, testtree, trialtree, root, children, firstchild, data, numberofvalues
+import H2Trees: isleaf, testtree, trialtree, root, children
 using LinearAlgebra
 using AdaptiveCrossApproximation
-using AdaptiveCrossApproximation:
-    IsNearFunctor, SpaceOrderingStyle, PreserveSpaceOrder, PermuteSpaceInPlace
-
-include("treemimicrypivoting.jl")
-function AdaptiveCrossApproximation._tree(
+function AdaptiveCrossApproximation.buildtree(
     ::AdaptiveCrossApproximation.H2Tree,
     space;
     minhalfsize=1 / 2^10,
@@ -36,7 +31,7 @@ function AdaptiveCrossApproximation._tree(
     return H2Trees.BlockTree(cluster, cluster)
 end
 
-function AdaptiveCrossApproximation._tree(
+function AdaptiveCrossApproximation.buildtree(
     ::AdaptiveCrossApproximation.H2Tree,
     testspace,
     trialspace;
@@ -69,46 +64,8 @@ function AdaptiveCrossApproximation._tree(
     )
 end
 
-function AdaptiveCrossApproximation.permutation(tree::H2Trees.H2ClusterTree)
-    return collect(H2Trees.values(tree, H2Trees.root(tree)))
-end
-
-function AdaptiveCrossApproximation._settreeorder!(tree::H2Trees.H2ClusterTree)
-    n = 1
-    for leaf in H2Trees.leaves(tree)
-        leafvalues = H2Trees.values(tree, leaf)
-        leafvalues .= n:(n + length(leafvalues) - 1)
-        n += length(leafvalues)
-    end
-    return tree
-end
-
-function firstvalue(tree::H2Trees.H2ClusterTree, node::Int)
-    iszero(firstchild(tree, node)) && (return data(tree, node).values[1])
-    return firstvalue(tree, firstchild(tree, node))
-end
-
-function range(tree::H2Trees.H2ClusterTree, node::Int)
-    return UnitRange(
-        firstvalue(tree, node), (firstvalue(tree, node) + numberofvalues(tree, node) .- 1)
-    )
-end
-
-_interactionindices(tree, node, ::PreserveSpaceOrder) = H2Trees.values(tree, node)
-_interactionindices(tree, node, ::PermuteSpaceInPlace) = collect(range(tree, node))
-
-AdaptiveCrossApproximation.testtree(tree::H2Trees.BlockTree) = testtree(tree)
-AdaptiveCrossApproximation.trialtree(tree::H2Trees.BlockTree) = trialtree(tree)
-AdaptiveCrossApproximation.values(tree::H2Trees.H2ClusterTree, node::Int) =
-    H2Trees.values(tree, node)
-AdaptiveCrossApproximation.levels(tree::H2Trees.H2ClusterTree) = H2Trees.levels(tree)
-AdaptiveCrossApproximation.LevelIterator(tree::H2Trees.H2ClusterTree, level::Int) =
-    H2Trees.LevelIterator(tree, level)
-
-include("terminalinteractions.jl")
-include("nearinteractions.jl")
-include("symmetricnearinteractions.jl")
-include("farinteractions.jl")
-include("symmetricfarinteractions.jl")
+include("clusters.jl")
+include("interactions.jl")
+include("symmetricinteractions.jl")
 
 end

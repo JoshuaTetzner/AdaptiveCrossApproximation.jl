@@ -50,9 +50,6 @@ end
 Base.size(A::HMatrix) = A.dim
 Base.size(A::HMatrix, dim::Integer) = A.dim[dim]
 
-_copylowrank(block::LowRankMatrix{T}) where {T} =
-    LowRankMatrix{T}(copy(block.U), copy(block.V))
-
 """
     copy(H::HMatrixCore)
 
@@ -63,7 +60,7 @@ function Base.copy(A::HMatrix{T}) where {T}
     return HMatrix{T}(
         A.tree,
         map(copy, A.near),
-        map(_copylowrank, A.far),
+        [LowRankMatrix{T}(copy(R.U), copy(R.V)) for R in A.far],
         A.csr,
         A.csc,
         A.ordering,
@@ -72,28 +69,18 @@ function Base.copy(A::HMatrix{T}) where {T}
     )
 end
 
-function _storedblock(A::HMatrix, csridx::Int)
-    if A.csr.isfar[csridx]
-        return A.far[A.csr.storageidx[csridx]]
-    end
-    return A.near[A.csr.storageidx[csridx]]
-end
-
-function _logicalblock(A::HMatrix, csridx::Int)
-    block = _storedblock(A, csridx)
-    return A.csr.transposed[csridx] ? transpose(block) : block
-end
-
 function _materialize(A::HMatrix, farfilter::Union{Nothing,Bool}=nothing)
     matrix = zeros(eltype(A), size(A))
     rowtree = testtree(A.tree)
     coltree = trialtree(A.tree)
     for rownode in 1:(length(A.csr.rowptr) - 1)
-        rows = clusterindices(rowtree, rownode, A.ordering)
+        rows = values(rowtree, rownode)
         for csridx in A.csr.rowptr[rownode]:(A.csr.rowptr[rownode + 1] - 1)
             isnothing(farfilter) || A.csr.isfar[csridx] == farfilter || continue
-            cols = clusterindices(coltree, A.csr.colnodes[csridx], A.ordering)
-            view(matrix, rows, cols) .= Matrix(_logicalblock(A, csridx))
+            cols = values(coltree, A.csr.colnodes[csridx])
+            k = A.csr.storageidx[csridx]
+            block = Matrix(A.csr.isfar[csridx] ? A.far[k] : A.near[k])
+            view(matrix, rows, cols) .= A.csr.transposed[csridx] ? transpose(block) : block
         end
     end
     return matrix
@@ -101,10 +88,26 @@ end
 
 Base.Matrix(A::HMatrix) = _materialize(A)
 
+"""
+    nnz(H::HMatrixCore)
+
+Number of stored scalars of `H`: the entries of the dense blocks plus
+`length(U) + length(V)` for every low-rank block. Blocks shared by both
+orientations of a symmetric matrix count once. Index arrays and object overhead
+are not included. See also [`storage`](@ref).
+"""
 function nnz(A::HMatrix)
     return sum(length, A.near; init=0) + sum(_storedfarblockentries, A.far; init=0)
 end
 
+"""
+    HMatrixComponent{T,H,Far}
+
+Lazy near-field (`Far = false`) or far-field (`Far = true`) part of an
+H-matrix, returned by [`nearmatrix`](@ref) and [`farmatrix`](@ref). It shares
+the blocks of its parent and supports `Matrix` and products, also through a
+[`MatVecWorkspace`](@ref).
+"""
 struct HMatrixComponent{T,H<:HMatrix{T},Far} <: LinearMaps.LinearMap{T}
     parent::H
 end
@@ -113,9 +116,35 @@ Base.size(A::HMatrixComponent) = size(A.parent)
 Base.size(A::HMatrixComponent, dim::Integer) = size(A.parent, dim)
 Base.Matrix(A::HMatrixComponent{<:Any,<:Any,Far}) where {Far} = _materialize(A.parent, Far)
 
+"""
+    nearmatrix(H::HMatrixCore)
+
+Near-field part of `H`: the dense blocks only, as a lazy linear map sharing the
+blocks of `H` (see [`HMatrixComponent`](@ref)). Useful to analyse the near-field
+structure or to apply it separately.
+"""
 nearmatrix(A::HMatrix{T}) where {T} = HMatrixComponent{T,typeof(A),false}(A)
+
+"""
+    farmatrix(H::HMatrixCore)
+
+Far-field part of `H`: the low-rank blocks only, as a lazy linear map sharing the
+blocks of `H` (see [`HMatrixComponent`](@ref)). Useful to analyse the rank
+structure or to apply it separately.
+"""
 farmatrix(A::HMatrix{T}) where {T} = HMatrixComponent{T,typeof(A),true}(A)
 
+"""
+    storage(H::HMatrixCore)
+
+Report the storage of `H`. Prints the numerical block payload ([`nnz`](@ref)
+scalars) in GB, the complete Julia object footprint reported by
+`Base.summarysize` in GB, and the ratio of the payload to dense storage.
+
+# Returns
+
+  - `Float64`: numerical block payload in GB
+"""
 function storage(A::HMatrix)
     entries = nnz(A)
     bytes = entries * sizeof(eltype(A))

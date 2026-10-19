@@ -1,4 +1,3 @@
-using BlockSparseMatrices
 using LinearAlgebra
 using LinearMaps
 using OhMyThreads
@@ -11,7 +10,6 @@ during hierarchical assembly. The fallback returns `nothing`; extensions may ret
 quadrature rules or other reusable assembly data.
 """
 defaultmatrixdata(operator, testspace, trialspace) = nothing
-_treepositions(space) = space
 
 """
     tofarquadstrat(quadstrat)
@@ -54,6 +52,7 @@ permute(space, perm) = permute!(copy(space), perm)
 
 # tree code
 abstract type AbstractTree end
+_treepositions(space) = space
 
 """
     H2Tree <: AbstractTree
@@ -71,7 +70,7 @@ by the `ACAParallelKMeansTrees` extension.
 """
 struct KMeansTreeBackend <: AbstractTree end
 
-function _tree(::AbstractTree, args...; kwargs...)
+function buildtree(::AbstractTree, args...; kwargs...)
     return error("Please load H2Trees.jl or your custom tree implementation.")
 end
 
@@ -111,25 +110,63 @@ end
 """
     testtree(tree)
     trialtree(tree)
+    BlockTree(testtree, trialtree)
+    root(tree)
+    children(tree, node)
+    parent(tree, node)
+    firstchild(tree, node)
+    isleaf(tree, node)
+    leaves(tree)
+    center(tree, node)
+    values(tree, node)
+    numberofnodes(tree)
+    numberofvalues(tree, node)
     levels(tree)
     LevelIterator(tree, level)
-    permutation(tree)
 
 Tree backend interface required by [`HMatrix`](@ref) assembly and
-[`TreeMimicryPivoting`](@ref); implement these for a custom tree type (the
-ACAH2Trees extension implements them for `H2Trees.TwoNTree`). `testtree`/`trialtree`
-return the row/column clustering sub-tree (for a single shared tree, this may
-return `tree` itself); `levels` returns tree levels coarsest first, visited via
-`LevelIterator`; `permutation` returns, without modifying the tree, the mapping
-from tree positions to indices in the underlying space. It is used by
-[`PermuteSpaceInPlace`](@ref) and arithmetic workspace construction.
+[`TreeMimicryPivoting`](@ref). Names and semantics match H2Trees; the ACAH2Trees
+extension forwards these methods to that backend. `testtree`/`trialtree` return
+the row/column cluster trees, and `BlockTree` combines them. `values(tree, node)`
+returns the indices in a node's subtree in traversal order; at the root these
+give the tree-to-space permutation. `levels` lists levels coarsest first,
+visited via `LevelIterator`.
 """
 testtree(tree) = error("Requires implementation for $(typeof(tree))")
 trialtree(tree) = error("Requires implementation for $(typeof(tree))")
+BlockTree(testtree, trialtree) =
+    error("Requires implementation for $(typeof(testtree)), $(typeof(trialtree))")
+root(tree) = error("Requires implementation for $(typeof(tree))")
+children(tree, node::Int) = error("Requires implementation for $(typeof(tree))")
+parent(tree, node::Int) = error("Requires implementation for $(typeof(tree))")
+firstchild(tree, node::Int) = error("Requires implementation for $(typeof(tree))")
+isleaf(tree, node::Int) = error("Requires implementation for $(typeof(tree))")
+leaves(tree) = error("Requires implementation for $(typeof(tree))")
+center(tree, node::Int) = error("Requires implementation for $(typeof(tree))")
+values(tree, node::Union{Int,Vector{Int}}) =
+    error("Requires implementation for $(typeof(tree))")
+numberofnodes(tree) = error("Requires implementation for $(typeof(tree))")
+numberofvalues(tree, node::Int) = error("Requires implementation for $(typeof(tree))")
 levels(tree) = error("Requires implementation for $(typeof(tree))")
 LevelIterator(tree, level) = error("Requires implementation for $(typeof(tree))")
-permutation(tree) = error("Requires implementation for $(typeof(tree))")
-_settreeorder!(tree) = error("Requires implementation for $(typeof(tree))")
+
+interactions(tree, isnear) =
+    error("Interactions are not implemented for $(typeof(tree)), $(typeof(isnear))")
+symmetricinteractions(tree, isnear) = error(
+    "Symmetric interactions are not implemented for $(typeof(tree)), $(typeof(isnear))"
+)
+
+# ACA-specific mutation after physically permuting a space. H2Trees has no
+# equivalent operation; only the leaf value vectors are modified, not topology.
+function _settreeorder!(tree)
+    start = 1
+    for leaf in leaves(tree)
+        leafvalues = values(tree, leaf)
+        leafvalues .= start:(start + length(leafvalues) - 1)
+        start += length(leafvalues)
+    end
+    return tree
+end
 
 """
     SpaceOrderingStyle
@@ -162,7 +199,7 @@ assembly support this ordering.
 struct PermuteSpaceInPlace <: SpaceOrderingStyle end
 function (::PermuteSpaceInPlace)(tree, space)
     cluster = testtree(tree)
-    permute!(space, permutation(cluster))
+    permute!(space, collect(values(cluster, root(cluster))))
     _settreeorder!(cluster)
     return space
 end
@@ -172,13 +209,13 @@ function (::PermuteSpaceInPlace)(tree, testspace, trialspace)
     coltree = trialtree(tree)
     if testspace === trialspace && rowtree === coltree
         # Case 1: same space and same tree → permute once
-        permute!(testspace, permutation(rowtree))
+        permute!(testspace, collect(values(rowtree, root(rowtree))))
         _settreeorder!(rowtree)
         return testspace, testspace
     elseif testspace !== trialspace && rowtree !== coltree
         # Case 2: different spaces and different trees → permute each independently
-        testperm = permutation(rowtree)
-        trialperm = permutation(coltree)
+        testperm = collect(values(rowtree, root(rowtree)))
+        trialperm = collect(values(coltree, root(coltree)))
         permute!(testspace, testperm)
         permute!(trialspace, trialperm)
         _settreeorder!(rowtree)
@@ -187,8 +224,8 @@ function (::PermuteSpaceInPlace)(tree, testspace, trialspace)
     elseif testspace === trialspace
         # Case 3: same space but different trees → copy trialspace before permuting
         @warn "testspace and trialspace are the same object but testtree ≠ trialtree. Copying trialspace and permuting independently."
-        testperm = permutation(rowtree)
-        trialperm = permutation(coltree)
+        testperm = collect(values(rowtree, root(rowtree)))
+        trialperm = collect(values(coltree, root(coltree)))
         trialspace_permuted = permute(trialspace, trialperm)
         permute!(testspace, testperm)
         _settreeorder!(rowtree)
@@ -219,41 +256,29 @@ function (::PreserveSpaceOrder)(tree, testspace, trialspace)
     return testspace, trialspace
 end
 
-_check_symmetric_ordering(::SpaceOrderingStyle) = nothing
-function _check_symmetric_ordering(::PermuteSpaceInPlace)
-    return throw(
-        ArgumentError(
-            "Symmetric H-matrix assembly does not support PermuteSpaceInPlace: " *
-            "symmetric VBCRS storage is not available in BlockSparseMatrices. " *
-            "Use PreserveSpaceOrder() instead.",
-        ),
-    )
-end
-
 include("skeleton.jl")
-include("blockindex.jl")
+include("blockstorage.jl")
 include("hmatrix.jl")
 include("treeindex.jl")
-include("matvec.jl")
-include("algebra/blockscratch.jl")
-include("algebra/taskgraph.jl")
-include("algebra/recompression.jl")
-include("algebra/multiplication.jl")
-include("algebra/addition.jl")
-include("algebra/workspace.jl")
-include("algebra/blockview.jl")
-include("algebra/hierarchicaladdition.jl")
-include("algebra/thinmultiplication.jl")
-include("algebra/hierarchicalmultiplication.jl")
-include("algebra/leaflu.jl")
-include("algebra/triangular.jl")
-include("algebra/solveplan.jl")
-include("algebra/lu.jl")
-include("algebra/operations.jl")
-include("nearinteractions.jl")
-include("symmetricblockmatrix.jl")
-include("assembly.jl")
-include("farinteractions.jl")
+include("arithmetic/utils.jl")
+include("arithmetic/matvec.jl")
+include("arithmetic/blockscratch.jl")
+include("arithmetic/taskgraph.jl")
+include("arithmetic/recompression.jl")
+include("arithmetic/workspace.jl")
+include("arithmetic/blockview.jl")
+include("arithmetic/hierarchicaladdition.jl")
+include("arithmetic/thinmultiplication.jl")
+include("arithmetic/hierarchicalmultiplication.jl")
+include("arithmetic/leaflu.jl")
+include("arithmetic/triangular.jl")
+include("arithmetic/solveplan.jl")
+include("arithmetic/lu.jl")
+include("arithmetic/solve.jl")
+include("arithmetic/operations.jl")
+include("interactions.jl")
+include("nearassembly.jl")
+include("farassembly.jl")
 
 """
     HMatrix(operator, testspace, trialspace, tree; kwargs...)
@@ -266,7 +291,8 @@ Assemble a hierarchical matrix approximation of an operator on test and trial sp
   - `testspace`: test space used for row indexing
   - `trialspace`: trial space used for column indexing
   - `tree`: hierarchical clustering/tree structure controlling block partitioning
-  - `tol`: compression tolerance (default `1e-4`)
+  - `tol`: compression tolerance (default `1e-4`). It is stored with the matrix
+    and governs every later recompression of the hierarchical arithmetic.
   - `compressor`: ACA-style compressor. Defaults to
     `defaultcompressor(operator, testspace, trialspace; tol)`.
   - `isnear`: near-field predicate controlling admissibility
@@ -309,21 +335,32 @@ function HMatrix(
     verbose::Bool=true,
 )
     testspace, trialspace = spaceordering(tree, testspace, trialspace)
-    return _assemble_hmatrix_storage(
+    partition = interactions(tree, isnear)
+    near = assemblenears(
         operator,
         testspace,
         trialspace,
         tree,
-        spaceordering;
-        compressor=compressor,
-        isnear=isnear,
-        maxrank=maxrank,
-        nearmatrixdata=nearmatrixdata,
-        farmatrixdata=farmatrixdata,
+        partition;
+        matrixdata=nearmatrixdata,
         ntasks=ntasks,
         verbose=verbose,
-        tol=tol,
     )
+    far = assemblefars(
+        operator,
+        testspace,
+        trialspace,
+        tree,
+        partition;
+        compressor=compressor,
+        maxrank=maxrank,
+        matrixdata=farmatrixdata,
+        ntasks=ntasks,
+        verbose=verbose,
+    )
+    csr, csc = blockindices(tree, partition)
+    dim = (length(testspace), length(trialspace))
+    return HMatrix{eltype(eltype(near))}(tree, near, far, csr, csc, spaceordering, dim, tol)
 end
 
 """
@@ -362,22 +399,34 @@ function HMatrix(
     ntasks::Integer=Threads.nthreads(),
     verbose::Bool=true,
 )
-    sharedtree = _symmetrictree(tree)
-    testspace, trialspace = spaceordering(sharedtree, space, space)
-    return _assemble_hmatrix_storage(
+    cluster = testtree(tree)
+    sharedtree = BlockTree(cluster, cluster)
+    space = spaceordering(sharedtree, space)
+    partition = symmetricinteractions(sharedtree, isnear)
+    near = assemblenears(
         operator,
-        testspace,
-        trialspace,
+        space,
         sharedtree,
-        spaceordering;
-        compressor=compressor,
-        isnear=isnear,
-        maxrank=maxrank,
-        nearmatrixdata=nearmatrixdata,
-        farmatrixdata=farmatrixdata,
+        partition;
+        matrixdata=nearmatrixdata,
         ntasks=ntasks,
         verbose=verbose,
-        symmetric=true,
-        tol=tol,
+    )
+    far = assemblefars(
+        operator,
+        space,
+        space,
+        sharedtree,
+        partition;
+        compressor=compressor,
+        maxrank=maxrank,
+        matrixdata=farmatrixdata,
+        ntasks=ntasks,
+        verbose=verbose,
+    )
+    csr, csc = symmetricblockindices(sharedtree, partition)
+    dim = (length(space), length(space))
+    return HMatrix{eltype(eltype(near))}(
+        sharedtree, near, far, csr, csc, spaceordering, dim, tol
     )
 end

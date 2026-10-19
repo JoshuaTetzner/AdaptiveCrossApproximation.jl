@@ -177,17 +177,19 @@ This is the recommended entry point for most applications.
 
   - `kwargs...`: Additional parameters passed to [`HMatrix`](@ref):
 
-      + `tol`: Convergence tolerance (default `1e-4`)
+      + `tol`: Convergence tolerance (default `1e-4`); also governs every later
+        recompression of the hierarchical arithmetic
       + `maxrank`: Maximum rank for compression (default `40`)
       + `compressor`: ACA-style compressor. The default is selected by
         `defaultcompressor(op, testspace, trialspace; tol)` and is usually `ACA`.
       + `isnear`: Admissibility predicate (default `isnear()`)
       + `spaceordering`: Space ordering strategy (default `PreserveSpaceOrder()`)
+      + `ntasks`: Number of parallel assembly tasks (default `Threads.nthreads()`)
       + `verbose`: Enable progress output (default `true`)
 
 # Returns
 
-  - `HMatrix`: Assembled hierarchical matrix ready for matrix-vector products
+  - `HMatrix`: Assembled hierarchical matrix
 
 # Notes
 
@@ -218,7 +220,7 @@ function assemble(
     testspace,
     trialspace;
     treekwargs=(;),
-    tree=_tree(
+    tree=buildtree(
         defaulttreebackend(testspace, trialspace), testspace, trialspace; treekwargs...
     ),
     quadstrat=defaultmatrixdata(op, testspace, trialspace),
@@ -254,7 +256,7 @@ blocks use a transpose, without complex conjugation. Diagonal near blocks are
 assembled in full and symmetrized. Each unordered far-field pair is compressed
 once with the configured compressor.
 
-Accepts the tree, quadrature, compression, ordering, and scheduling keywords of
+Accepts the tree, quadrature, compression, ordering, and `ntasks` keywords of
 the two-space overload. The call `assemble(op, space, space)` uses general
 assembly. BEAST local operators such as `Identity` and `NCross` are assembled
 directly.
@@ -274,7 +276,7 @@ function assemble(
     op,
     space;
     treekwargs=(;),
-    tree=_tree(defaulttreebackend(space, space), space; treekwargs...),
+    tree=buildtree(defaulttreebackend(space, space), space; treekwargs...),
     quadstrat=defaultmatrixdata(op, space, space),
     nearquadstrat=quadstrat,
     farquadstrat=tofarquadstrat(quadstrat),

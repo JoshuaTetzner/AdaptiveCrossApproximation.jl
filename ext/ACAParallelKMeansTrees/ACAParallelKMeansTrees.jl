@@ -4,7 +4,7 @@ using H2Trees
 using ParallelKMeans
 using AdaptiveCrossApproximation
 
-function AdaptiveCrossApproximation._tree(
+function AdaptiveCrossApproximation.buildtree(
     ::AdaptiveCrossApproximation.KMeansTreeBackend,
     space::BEAST.Space;
     numberofclusters::Int=2,
@@ -27,7 +27,7 @@ function AdaptiveCrossApproximation._tree(
 end
 
 """
-    _tree(::KMeansTreeBackend, testspace::BEAST.Space, trialspace::BEAST.Space; kwargs...)
+    buildtree(::KMeansTreeBackend, testspace::BEAST.Space, trialspace::BEAST.Space; kwargs...)
 
 Build a k-means clustered [`H2Trees.BlockTree`](@ref) from BEAST spaces.
 
@@ -42,7 +42,7 @@ trigger). Selected automatically by [`defaulttreebackend`](@ref) over the plain
     both `testspace` and `trialspace` (default `200`)
   - `kwargs...`: Forwarded to `H2Trees.KMeansTree`
 """
-function AdaptiveCrossApproximation._tree(
+function AdaptiveCrossApproximation.buildtree(
     ::AdaptiveCrossApproximation.KMeansTreeBackend,
     testspace::BEAST.Space,
     trialspace::BEAST.Space;
