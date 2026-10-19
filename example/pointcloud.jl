@@ -29,7 +29,6 @@ cluster = KMeansTree(points; builder)
 tree = BlockTree(cluster, cluster)
 
 H = ACA.HMatrix(kernel, points, points, tree; tol=1e-8, maxrank=100)
-ACA.storage(H)
 
 b = randn(npoints)
 x = H \ b

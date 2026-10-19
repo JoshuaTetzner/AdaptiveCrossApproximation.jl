@@ -28,7 +28,6 @@ T = ACA.assemble(t, X, X; tree=tree, tol=1e-5, maxrank=100)
 e = assemble((n × E) × n, X)
 
 u = T \ e
-ACA.storage(T)
 
 # Normalized bistatic RCS in the plane φ=0 for unit-amplitude incidence
 Θ = range(0; stop=π, length=181)

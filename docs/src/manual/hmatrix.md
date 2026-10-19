@@ -237,25 +237,18 @@ assembly caches while sharing the global kernel matrix between threads.
 
 ## Working with the Result
 
-`HMatrix` behaves like a matrix in products. For repeated products, construct a
-`MatVecWorkspace` once; it holds the matrix, a parallel schedule and all internal
-buffers, and is used in place of the matrix:
+`HMatrix` behaves like a matrix in products with vectors and matrices:
 
 ```julia
-A = AdaptiveCrossApproximation.MatVecWorkspace(hmat)
-y = A * x
-mul!(y, A, x)                   # no numerical allocations once warm
-mul!(y, transpose(A), xt, α, β)
-Y = A' * X                      # several right-hand sides at once
+y = hmat * x
+mul!(y, hmat, x)
+mul!(y, transpose(hmat), xt, α, β)      # y = α*transpose(hmat)*xt + β*y
+Y = hmat' * X                           # several right-hand sides at once
 ```
 
-The product is distributed over `ntasks` parallel tasks (keyword, default
-`Threads.nthreads()`; `ntasks=1` runs on the calling task). One
-workspace serves one product at a time; give each concurrently working task its
-own copy, `MatVecWorkspace(A)`, which shares the schedule and the matrix. A real
-matrix also multiplies complex vectors. Products with `hmat` itself
-(`hmat * x`, `mul!(y, hmat, x)`) build a temporary workspace on every call and
-warn once.
+A real matrix also multiplies complex vectors. Products run on
+`Threads.nthreads()` parallel tasks. For repeated products, see
+[Workspaces](@ref hmatrix-workspaces).
 
 Converting to a dense matrix is useful for validation of small problems but defeats
 the storage advantage for large ones:
@@ -280,6 +273,89 @@ ordering of terminal blocks. `hmat.csc` stores only column-cluster traversal
 metadata and integer references back into the CSR entries; it does not duplicate
 the matrices. The retained `hmat.tree` supplies the cluster hierarchy and index
 sets, and `hmat.tol` the assembly tolerance.
+
+## [Workspaces](@id hmatrix-workspaces)
+
+An assembled `HMatrix` holds data only: the cluster tree, the block partition
+(`csr`, `csc`), the dense and low-rank blocks and the tolerance. The struct is
+immutable, and its tree and partition never change. Operations read the matrix.
+Only the in-place operations overwrite its blocks, and they keep the tree and the
+partition: the argument of `lu!` and `recompress!`, and the destination of `mul!`,
+`axpy!`, `axpby!`, `rmul!` and `lmul!`. The matrix holds no buffers or other
+state of an operation, so any number of tasks can read it at the same time.
+
+Everything else an operation needs is in a *workspace*. Its constructor does the
+work that depends only on the structure of the matrices:
+
+- it analyses the trees and the block partition;
+- it plans the block operations and the order in which they may run;
+- it distributes them over `ntasks` parallel tasks;
+- it allocates the buffers.
+
+The operation itself then only computes.
+
+The plain forms `hmat * x`, `hmat \ b`, `lu(hmat)`, `F \ b`, `A + B`, `A * B`
+and `recompress!(hmat)` build the workspace they need, use it once and discard
+it. For a single operation, this is all you need. Construct a workspace yourself
+in the following cases:
+
+- **The same operation repeats.** An iterative solver multiplies with the same
+  matrix in every iteration, and a simulation may solve with one factorization
+  for many right-hand sides. With a workspace, the planning and the allocation
+  happen once instead of in every call.
+- **Several matrices share one structure.** The matrices of a frequency sweep
+  on one geometry have the same trees and partition and differ only in their
+  ranks. One workspace for the LU or a product serves all of them.
+- **Several tasks work at the same time.** A workspace serves one operation at
+  a time. Give every concurrent task its own workspace; the matrix is shared.
+- **The number of tasks matters.** `ntasks` is a keyword of the workspace
+  constructors; the plain forms use `Threads.nthreads()`.
+
+There are two kinds of workspaces:
+
+- **Bound workspaces.** [`MatVecWorkspace(H)`](@ref
+  AdaptiveCrossApproximation.MatVecWorkspace) and
+  [`SolveWorkspace(F)`](@ref AdaptiveCrossApproximation.SolveWorkspace) hold
+  their matrix or factorization and are used in place of it. A copy for another
+  task, `MatVecWorkspace(A)` or `SolveWorkspace(S)`, shares the matrix and the
+  plan and has its own buffers.
+
+  ```julia
+  A = AdaptiveCrossApproximation.MatVecWorkspace(hmat; ntasks=8)
+  y = A * x
+  mul!(y, A, x)                   # no numerical allocations once warm
+  Y = A' * X
+  ```
+
+  Products with `hmat` itself build a temporary `MatVecWorkspace` on every call
+  and warn once.
+- **Structural workspaces.** The workspaces of the LU, products, sums and
+  recompression are built from the matrices of an operation and passed as its
+  last argument. The operation binds the workspace to its arguments. They need
+  the same cluster trees and block partition as the matrices the workspace was
+  built for; otherwise the operation throws.
+
+| Operation | Workspace |
+|:--|:--|
+| `A * x`, `mul!(y, A, x)` | `A = MatVecWorkspace(H)`, used in place of `H` |
+| `S \ b`, `ldiv!(S, b)` | `S = SolveWorkspace(F)`, used in place of `F` |
+| `lu!(H, ws)`, `lu(H, ws)` | `LUWorkspace(H)` |
+| `mul!(C, A, B, α, β, ws)` | `ProductWorkspace(C, A, B)` |
+| `axpy!(α, A, C, ws)`, `axpby!(α, A, β, C, ws)` | `AdditionWorkspace(C, A)` |
+| `recompress!(H, ws)` | `RecompressionWorkspace(H)` |
+
+All workspace types live in the `AdaptiveCrossApproximation` namespace. For a
+frequency sweep, for example:
+
+```julia
+ws = AdaptiveCrossApproximation.LUWorkspace(H₁)
+F₁ = lu!(H₁, ws)
+F₂ = lu!(H₂, ws)        # same partition: no new planning
+```
+
+The `LUWorkspace` holds the elimination schedule, every triangular-solve and
+Schur-update plan and their buffers. Factorizations do not depend on the
+workspace after `lu!` returns.
 
 ## Hierarchical Arithmetic
 
@@ -325,10 +401,8 @@ kernel = RegularizedKernel(0.01)
 
 hmat = HMatrix(kernel, points, points, tree; tol=1e-8, maxrank=100)
 
-F = lu(hmat)                                         # hmat is unchanged
-S = AdaptiveCrossApproximation.SolveWorkspace(F)
 b = rand(length(points))
-x = S \ b
+x = hmat \ b                                         # hmat is unchanged
 
 dense = [kernel(x, y) for x in points, y in points]
 norm(dense * x - b) / norm(b)                        # ≈ 6e-10
@@ -337,15 +411,15 @@ norm(dense * x - b) / norm(b)                        # ≈ 6e-10
 ### Solving Systems
 
 ```julia
-F = lu(hmat)            # factorize a copy; hmat is unchanged
-lu!(hmat)               # factorize in place: hmat holds the factors afterwards
+x = hmat \ b            # factorize a copy of hmat and solve
 
-S = AdaptiveCrossApproximation.SolveWorkspace(F)
-x = S \ b               # vector or matrix of right-hand sides
-ldiv!(S, b)             # in place
-ldiv!(x, S, b)
-x = transpose(S) \ b
-x = S' \ b
+F = lu(hmat)            # keep the factorization for several solves; hmat is unchanged
+x = F \ b               # vector or matrix of right-hand sides
+ldiv!(F, b)             # in place
+x = transpose(F) \ b
+x = F' \ b
+
+lu!(hmat)               # factorize in place: hmat holds the factors afterwards
 ```
 
 The factorization follows `P*A ≈ L*U`, where `P` permutes rows only inside each
@@ -353,13 +427,10 @@ dense diagonal leaf. `lu!` overwrites the blocks of the matrix with the factors
 and warns once. An exactly zero pivot in a leaf raises a
 [`LeafLUFailure`](@ref); with `check=false`, `issuccess(F)` is `false` instead.
 
-`hmat \ b` factorizes a copy of `hmat` and solves in one step. To solve several
-times with the same matrix, keep `F = lu(hmat)` and solve with `F \ b`.
-
-A [`SolveWorkspace`](@ref AdaptiveCrossApproximation.SolveWorkspace) holds the
-buffers of the solves and acts like the factorization. Solving with `F`
-directly (`F \ b`, `ldiv!(F, b)`) builds a temporary workspace on every call.
-The factorization is read-only during solves: tasks solving
+Each solve with `F` allocates its buffers. A
+[`SolveWorkspace`](@ref AdaptiveCrossApproximation.SolveWorkspace) keeps them
+and acts like the factorization: `S = SolveWorkspace(F)`, then `S \ b` or
+`ldiv!(x, S, b)`. The factorization is read-only during solves: tasks solving
 concurrently with one factorization each use their own workspace,
 `SolveWorkspace(S)`.
 
@@ -382,37 +453,6 @@ x, stats = Krylov.gmres(A, b; M=P, ldiv=true, rtol=1e-8)
 For the example above, this reduces the GMRES iterations from 58 to 4. The
 preconditioner needs the same row and column count as `hmat`, but not the same
 partition.
-
-### Reusing Workspaces
-
-The convenience calls build the workspace they need. Every operation also
-accepts an explicitly constructed workspace as its last argument, which avoids
-planning and allocating buffers again:
-
-| Operation | Workspace |
-|:--|:--|
-| `M * x`, `mul!(y, M, x)` | `MatVecWorkspace(H)`, used in place of `H` |
-| `lu!(H, ws)`, `lu(H, ws)` | `LUWorkspace(H)` |
-| `S \ b`, `ldiv!(S, b)` | `SolveWorkspace(F)`, used in place of `F` |
-| `mul!(C, A, B, α, β, ws)` | `ProductWorkspace(C, A, B)` |
-| `axpy!(α, A, C, ws)`, `axpby!(α, A, β, C, ws)` | `AdditionWorkspace(C, A)` |
-| `recompress!(H, ws)` | `RecompressionWorkspace(H)` |
-
-All workspace types live in the `AdaptiveCrossApproximation` namespace. A
-workspace analyses the partition of the matrices it was built for. Except for
-the matrix-vector and solve workspaces, which hold their matrix, it can be
-reused for every matrix with the same cluster trees and block partition. Ranks
-may differ, for example for the matrices of a frequency sweep on one geometry:
-
-```julia
-ws = AdaptiveCrossApproximation.LUWorkspace(H₁)
-F₁ = lu!(H₁, ws)
-F₂ = lu!(H₂, ws)        # same partition: no new planning
-```
-
-The `LUWorkspace` holds the elimination schedule, every triangular-solve and
-Schur-update plan and their buffers. Factorizations do not depend on the
-workspace after `lu!` returns. One workspace serves one operation at a time.
 
 ### Sums and Products
 
@@ -488,7 +528,7 @@ Start Julia with several threads and use a single BLAS thread
 calls slow them down.
 
 `example/pointcloud.jl` constructs and directly solves a Coulomb-kernel H-matrix
-on a point cloud, including a small dense-reference check.
+on a point cloud with 10,000 points.
 
 For block partitioning, admissibility, storage complexity, and the assembly model,
 see the [H-matrix theory](../details/hmatrix.md).

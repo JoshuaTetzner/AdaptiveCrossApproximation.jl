@@ -29,10 +29,12 @@ Add documentation for any changes or new features following the style of the exi
 ---
 ## Documentation plots
 
-The interactive plots on the [Application Examples](@ref) page are pre-rendered HTML
-files stored in `docs/src/assets/examples/` and committed to the repository; the docs
-build only serves these static files, it does not re-run the examples. After changing
-`example/efie.jl` or `example/mfie.jl`, regenerate them from the package root:
+The interactive plots of the [EFIE](examples/efie.md), [MFIE](examples/mfie.md) and
+[PMCHWT](examples/pmchwt.md) examples are pre-rendered HTML files stored in
+`docs/src/assets/examples/` and committed to the repository; the docs build only
+serves these static files, it does not re-run the examples. After changing
+`example/efie.jl`, `example/mfie.jl` or `example/pmchwt.jl`, regenerate them from the
+package root:
 
 ```sh
 julia --project=docs docs/render_examples.jl

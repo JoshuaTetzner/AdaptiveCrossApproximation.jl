@@ -20,7 +20,12 @@ makedocs(;
             "Adaptive Cross Approximation" => "./manual/aca.md",
             "Incomplete Adaptive Cross Approximation" => "./manual/iaca.md",
             "Hierarchical Matrices" => "./manual/hmatrix.md",
-            "Application Examples" => "./manual/examples.md",
+        ],
+        "Application Examples" => Any[
+            "EFIE" => "./examples/efie.md",
+            "MFIE" => "./examples/mfie.md",
+            "PMCHWT" => "./examples/pmchwt.md",
+            "Point Cloud" => "./examples/pointcloud.md",
         ],
         "Theory" => Any[
             "Adaptive Cross Approximation" => "./details/aca.md",

@@ -38,8 +38,9 @@ The following capabilities are implemented (✔) and planned (⌛):
 - ✔ Clustering based on H2Trees.jl with geometry-adapted k-means clustering
 - ✔ Multithreaded near-field assembly and ACA-compressed far-field assembly
 - ✔ Matrix-vector, transpose, and adjoint products through the Julia matrix interface
+- ✔ $\mathcal H$-matrix arithmetic: sums, products, recompression, and hierarchical LU
+  for direct solves and preconditioning
 - ⌛ GPU support for hierarchical assembly and matrix operations
-- ⌛ $\mathcal H$-matrix algebra, enabling hierarchical direct solvers
 
 ## Installation
 
