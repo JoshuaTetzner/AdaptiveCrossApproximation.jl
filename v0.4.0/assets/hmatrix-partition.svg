@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="500" viewBox="0 0 920 500" role="img" aria-labelledby="title desc">
+  <title id="title">Recursive near- and far-field partition of an H-matrix</title>
+  <desc id="desc">A recursively partitioned matrix with dense near-field blocks near the diagonal and low-rank far-field blocks away from it.</desc>
+  <rect width="920" height="500" rx="12" fill="#ffffff"/>
+
+  <text x="245" y="35" text-anchor="middle" font-family="sans-serif" font-size="22" font-weight="600" fill="#000000">hierarchical block partition</text>
+
+  <g transform="translate(45 55)">
+    <rect x="0" y="0" width="390" height="390" fill="#ffffff" stroke="#9558B2" stroke-width="2"/>
+
+    <rect x="195" y="0" width="195" height="195" fill="#4063D8" fill-opacity=".58"/>
+    <rect x="0" y="195" width="195" height="195" fill="#4063D8" fill-opacity=".58"/>
+
+    <rect x="97.5" y="0" width="97.5" height="97.5" fill="#4063D8" fill-opacity=".45"/>
+    <rect x="0" y="97.5" width="97.5" height="97.5" fill="#4063D8" fill-opacity=".45"/>
+    <rect x="292.5" y="195" width="97.5" height="97.5" fill="#4063D8" fill-opacity=".45"/>
+    <rect x="195" y="292.5" width="97.5" height="97.5" fill="#4063D8" fill-opacity=".45"/>
+
+    <rect x="48.75" y="0" width="48.75" height="48.75" fill="#4063D8" fill-opacity=".32"/>
+    <rect x="0" y="48.75" width="48.75" height="48.75" fill="#4063D8" fill-opacity=".32"/>
+    <rect x="146.25" y="97.5" width="48.75" height="48.75" fill="#4063D8" fill-opacity=".32"/>
+    <rect x="97.5" y="146.25" width="48.75" height="48.75" fill="#4063D8" fill-opacity=".32"/>
+    <rect x="243.75" y="195" width="48.75" height="48.75" fill="#4063D8" fill-opacity=".32"/>
+    <rect x="195" y="243.75" width="48.75" height="48.75" fill="#4063D8" fill-opacity=".32"/>
+    <rect x="341.25" y="292.5" width="48.75" height="48.75" fill="#4063D8" fill-opacity=".32"/>
+    <rect x="292.5" y="341.25" width="48.75" height="48.75" fill="#4063D8" fill-opacity=".32"/>
+
+    <rect x="0" y="0" width="48.75" height="48.75" fill="#CB3C33" fill-opacity=".55"/>
+    <rect x="48.75" y="48.75" width="48.75" height="48.75" fill="#CB3C33" fill-opacity=".55"/>
+    <rect x="97.5" y="97.5" width="48.75" height="48.75" fill="#CB3C33" fill-opacity=".55"/>
+    <rect x="146.25" y="146.25" width="48.75" height="48.75" fill="#CB3C33" fill-opacity=".55"/>
+    <rect x="195" y="195" width="48.75" height="48.75" fill="#CB3C33" fill-opacity=".55"/>
+    <rect x="243.75" y="243.75" width="48.75" height="48.75" fill="#CB3C33" fill-opacity=".55"/>
+    <rect x="292.5" y="292.5" width="48.75" height="48.75" fill="#CB3C33" fill-opacity=".55"/>
+    <rect x="341.25" y="341.25" width="48.75" height="48.75" fill="#CB3C33" fill-opacity=".55"/>
+
+    <g stroke="#ffffff" stroke-width="1" opacity="0.8">
+      <path d="M48.75 0V97.5 M0 48.75H97.5 M146.25 97.5V195 M97.5 146.25H195"/>
+      <path d="M243.75 195V292.5 M195 243.75H292.5 M341.25 292.5V390 M292.5 341.25H390"/>
+    </g>
+    <g fill="none" stroke="#9558B2">
+      <path d="M195 0V390 M0 195H390" stroke-width="2.5"/>
+      <path d="M97.5 0V195 M0 97.5H195 M292.5 195V390 M195 292.5H390" stroke-width="1.8"/>
+      <path d="M48.75 0V97.5 M0 48.75H97.5 M146.25 97.5V195 M97.5 146.25H195" stroke-width="1.2"/>
+      <path d="M243.75 195V292.5 M195 243.75H292.5 M341.25 292.5V390 M292.5 341.25H390" stroke-width="1.2"/>
+    </g>
+
+    <text x="292.5" y="91" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#000000">UₜₛVₜₛ</text>
+    <text x="97.5" y="286" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#000000">UₜₛVₜₛ</text>
+  </g>
+
+  <g transform="translate(500 105)" font-family="sans-serif" fill="#000000">
+    <rect x="0" y="0" width="42" height="42" fill="#CB3C33" fill-opacity=".55" stroke="#CB3C33"/>
+    <text x="62" y="18" font-size="18" font-weight="600">near field</text>
+    <text x="62" y="40" font-size="16">terminal, non-admissible blocks</text>
+    <text x="62" y="62" font-size="16">stored densely as Aₜₛ</text>
+
+    <rect x="0" y="115" width="42" height="42" fill="#4063D8" fill-opacity=".58" stroke="#4063D8"/>
+    <text x="62" y="133" font-size="18" font-weight="600">far field</text>
+    <text x="62" y="155" font-size="16">admissible blocks</text>
+    <text x="62" y="177" font-size="16">stored as UₜₛVₜₛ</text>
+
+    <path d="M21 225V278" stroke="#9558B2" stroke-width="2"/>
+    <path d="M13 269L21 280L29 269" fill="none" stroke="#9558B2" stroke-width="2"/>
+    <text x="62" y="246" font-size="16">recursive refinement continues</text>
+    <text x="62" y="268" font-size="16">only where admissibility fails</text>
+  </g>
+</svg>
