@@ -11,7 +11,6 @@ using BEAST
 using ParallelKMeans
 using H2Trees
 using AdaptiveCrossApproximation
-using Krylov
 using PlotlyBase
 
 outdir = joinpath(@__DIR__, "src", "assets", "examples")
