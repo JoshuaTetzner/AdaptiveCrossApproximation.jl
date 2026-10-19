@@ -308,6 +308,6 @@ export MaximumValue, FullPivoting, Leja2, FillDistance
 export MimicryPivoting, TreeMimicryPivoting
 export PivotingFilter, NoFilter, EFIEDirectionalFilter
 export reset!
-export AbstractKernelMatrix, GPUMatrixData
+export AbstractKernelMatrix
 export assemble_blocks
 end

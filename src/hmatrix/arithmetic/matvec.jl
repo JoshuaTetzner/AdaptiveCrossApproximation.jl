@@ -293,12 +293,7 @@ end
 _matvecop(A::MatVecWorkspace) = (A, Val(:N), false)
 _matvecop(A::LinearMaps.TransposeMap) = (first(_matvecop(A.lmap)), Val(:T), false)
 _matvecop(A::LinearMaps.AdjointMap) = (first(_matvecop(A.lmap)), Val(:T), true)
-function _matvecop(A::Union{HMatrixCore,HMatrixComponent})
-    @warn "Multiplying with an HMatrix builds a temporary MatVecWorkspace on every " *
-        "call. Construct `AdaptiveCrossApproximation.MatVecWorkspace(H)` once and " *
-        "multiply with it instead." maxlog = 1
-    return (MatVecWorkspace(A), Val(:N), false)
-end
+_matvecop(A::Union{HMatrixCore,HMatrixComponent}) = (MatVecWorkspace(A), Val(:N), false)
 
 const _MatVecMap = Union{MatVecWorkspace,HMatrixCore,HMatrixComponent}
 const _MatVecOperator = Union{

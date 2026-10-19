@@ -327,8 +327,7 @@ There are two kinds of workspaces:
   Y = A' * X
   ```
 
-  Products with `hmat` itself build a temporary `MatVecWorkspace` on every call
-  and warn once.
+  Products with `hmat` itself build a temporary `MatVecWorkspace` on every call.
 - **Structural workspaces.** The workspaces of the LU, products, sums and
   recompression are built from the matrices of an operation and passed as its
   last argument. The operation binds the workspace to its arguments. They need
