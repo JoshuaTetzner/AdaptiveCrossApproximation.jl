@@ -8,6 +8,6 @@ authors:
     email: "joshua.tetzner@uni-rostock.de"
 repository-code: "https://github.com/JoshuaTetzner/AdaptiveCrossApproximation.jl"
 license: MIT
-version: 0.2.1
+version: 0.4.0
 # doi: 10.5281/zenodo.XXXXXXX  # filled in automatically by the GitHub-Zenodo
 # integration once the repository is registered there and a release is cut.
