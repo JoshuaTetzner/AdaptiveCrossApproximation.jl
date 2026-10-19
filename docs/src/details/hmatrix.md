@@ -300,5 +300,243 @@ The stated bounds rely on bounded ranks and regular tree geometry. High-frequenc
 problems, strongly nonuniform meshes, or unsuitable admissibility parameters can
 make the ranks or the number of blocks grow and must be analyzed separately.
 
+## Hierarchical Arithmetic
+
+The set $\mathcal H(\mathcal P,k)$ is not closed under the matrix operations. A
+sum of two rank-$k$ blocks has rank up to $2k$, and a product accumulates
+contributions from every inner cluster. Hierarchical arithmetic therefore
+works with *truncated* operations: every result block is projected back to low
+rank by a truncation operator $\mathcal T_\varepsilon$, and the partition of the
+result is fixed in advance [[8, 9]](@ref refs). With this approximation in
+every step, sums, products and the LU factorization cost almost linear time
+and storage.
+
+All arithmetic in this package truncates to the tolerance $\varepsilon$ chosen
+at assembly. It is stored with the matrix, and an operation on matrices with
+different tolerances uses the largest one. Sums require the same cluster trees
+and partitions. Products require matching cluster trees, but the partitions of
+the operands may differ.
+
+### Truncation
+
+Let $\boldsymbol{\mathsf R}=\boldsymbol{\mathsf U}\boldsymbol{\mathsf V}$ be a
+block of size $m\times n$ given by factors of rank $r$, for example the
+stacked factors of a sum. A reduced QR decomposition of the left factor and an
+LQ decomposition of the right factor,
+
+```math
+\boldsymbol{\mathsf U}=\boldsymbol{\mathsf Q}_U\boldsymbol{\mathsf R}_U,
+\qquad
+\boldsymbol{\mathsf V}=\boldsymbol{\mathsf L}_V\boldsymbol{\mathsf Q}_V,
+```
+
+reduce the singular value decomposition of $\boldsymbol{\mathsf R}$ to that of
+the small core
+$\boldsymbol{\mathsf R}_U\boldsymbol{\mathsf L}_V
+=\widehat{\boldsymbol{\mathsf U}}\boldsymbol\Sigma\widehat{\boldsymbol{\mathsf V}}^{\mathsf H}
+\in\mathbb K^{r\times r}$. The truncated rank is the smallest $k$ with
+
+```math
+\sigma_{k+1}\leq\varepsilon\,\sigma_1,
+```
+
+and the new factors are
+$\boldsymbol{\mathsf Q}_U\widehat{\boldsymbol{\mathsf U}}_k\boldsymbol\Sigma_k$ and
+$\widehat{\boldsymbol{\mathsf V}}_k^{\mathsf H}\boldsymbol{\mathsf Q}_V$. By the
+Eckart--Young theorem, this is the best rank-$k$ approximation, with spectral
+error $\sigma_{k+1}$. The error is therefore controlled blockwise, relative to
+the spectral norm $\sigma_1$ of each block. The cost is
+$\mathcal O(r^2(m+n)+r^3)$.
+
+ACA stops on an estimate and does not produce optimal ranks. Truncating every
+far-field block of an assembled matrix (`recompress!`) usually lowers the ranks
+and the cost of all later operations.
+
+### Addition
+
+For matrices with the same partition, dense blocks are added exactly. A sum of
+low-rank blocks is formed by stacking the factors,
+
+```math
+\boldsymbol{\mathsf U}_C\boldsymbol{\mathsf V}_C
++\alpha\,\boldsymbol{\mathsf U}_A\boldsymbol{\mathsf V}_A
+=
+\begin{bmatrix}\boldsymbol{\mathsf U}_C & \alpha\boldsymbol{\mathsf U}_A\end{bmatrix}
+\begin{bmatrix}\boldsymbol{\mathsf V}_C\\ \boldsymbol{\mathsf V}_A\end{bmatrix},
+```
+
+which has rank at most $r_C+r_A$ and is truncated once. All blocks are
+independent.
+
+### Multiplication
+
+The product $\boldsymbol{\mathsf C}\leftarrow\boldsymbol{\mathsf C}
++\alpha\boldsymbol{\mathsf A}\boldsymbol{\mathsf B}$ requires that the column
+cluster tree of $\boldsymbol{\mathsf A}$ is the row cluster tree of
+$\boldsymbol{\mathsf B}$. A terminal block $t\times s$ of $\boldsymbol{\mathsf C}$
+receives
+
+```math
+\boldsymbol{\mathsf C}_{ts}\leftarrow\boldsymbol{\mathsf C}_{ts}
++\alpha\sum_{\rho}\boldsymbol{\mathsf A}[t,\rho]\,\boldsymbol{\mathsf B}[\rho,s],
+```
+
+where $\rho$ runs over the inner clusters of the terminal blocks of
+$\boldsymbol{\mathsf A}$ and $\boldsymbol{\mathsf B}$ that meet $t$ and $s$. The
+classical algorithm descends the three block trees recursively and truncates
+after every contribution [[8, 9]](@ref refs). This package keeps the recursive
+structure, but organizes the work per destination block and reduces the number
+of truncations:
+
+- **Low-rank terms.** If $\boldsymbol{\mathsf A}[t,\rho]=\boldsymbol{\mathsf U}
+  \boldsymbol{\mathsf V}$ is low rank, its contribution
+  $\boldsymbol{\mathsf U}\,(\boldsymbol{\mathsf V}\boldsymbol{\mathsf B}[\rho,s])$
+  needs one product of the whole hierarchical panel
+  $\boldsymbol{\mathsf B}[\rho,s]$ with $r$ vectors, whatever its partition.
+  The cost is $r$ times the storage of the panel, and the term has rank $r$. A
+  low-rank block of $\boldsymbol{\mathsf B}$ is treated in the same way.
+- **Dense terms.** A product of two dense blocks with inner dimension $|\rho|$
+  enters as an exact term of rank $|\rho|$. Once the dense terms of an
+  $m\times n$ destination reach a total rank of $mn/(m+n)$, they are summed
+  into a dense $m\times n$ core instead, which then requires less storage.
+- **Accumulated updates.** The terms of a destination are collected as stacked
+  factors and truncated together with the destination: once, or in batches of
+  a bounded number of columns. This replaces one truncation per contribution
+  by a single one.
+- **Shared terms.** A low-rank block of $\boldsymbol{\mathsf A}$ on a coarse row
+  cluster $\tau\supsetneq t$ contributes to every destination below $\tau$. Its
+  product is formed and truncated once on a virtual block above these
+  destinations, and each destination receives its slice.
+- **Implicit products.** For a far-field destination with many contributions,
+  it can be cheaper to truncate the operator
+  $\boldsymbol{\mathsf C}_{ts}+\alpha\boldsymbol{\mathsf A}[t,:]\,
+  \boldsymbol{\mathsf B}[:,s]$ directly from its products with vectors,
+  without forming the terms. A cost model chooses this when the plan is built.
+
+Wide accumulated sums and implicit products are truncated with the adaptive
+randomized range finder [[11]](@ref refs). Products with Gaussian vectors
+$\boldsymbol\omega_i$ build an orthonormal basis $\boldsymbol{\mathsf Q}$ of the
+range of the operator $\boldsymbol{\mathsf S}$. Blocks of $p$ further samples
+certify the a posteriori bound
+
+```math
+\left\lVert(\boldsymbol{\mathsf I}-\boldsymbol{\mathsf Q}\boldsymbol{\mathsf Q}^{\mathsf H})
+\boldsymbol{\mathsf S}\right\rVert_2
+\leq 10\sqrt{2/\pi}\,\max_{i=1,\ldots,p}
+\left\lVert(\boldsymbol{\mathsf I}-\boldsymbol{\mathsf Q}\boldsymbol{\mathsf Q}^{\mathsf H})
+\boldsymbol{\mathsf S}\boldsymbol\omega_i\right\rVert_2
+```
+
+with probability at least $1-10^{-p}$; here $p=8$. Samples that fail the test
+extend the basis. Once the bound is below a tenth of the tolerance, the small
+matrix $\boldsymbol{\mathsf Q}^{\mathsf H}\boldsymbol{\mathsf S}$ is truncated
+by an SVD, and the range-finder error is charged against the tolerance. The cost
+grows with the rank of the result instead of the number of stacked columns. The
+random numbers have a fixed seed, so results are reproducible.
+
+### LU Factorization
+
+The LU factorization follows the cluster tree [[8, 10]](@ref refs). For a
+cluster with children $\tau_1,\tau_2$, write
+
+```math
+\boldsymbol{\mathsf A}=
+\begin{bmatrix}
+\boldsymbol{\mathsf A}_{11} & \boldsymbol{\mathsf A}_{12}\\
+\boldsymbol{\mathsf A}_{21} & \boldsymbol{\mathsf A}_{22}
+\end{bmatrix}
+=
+\begin{bmatrix}
+\boldsymbol{\mathsf L}_{11} & \\
+\boldsymbol{\mathsf L}_{21} & \boldsymbol{\mathsf L}_{22}
+\end{bmatrix}
+\begin{bmatrix}
+\boldsymbol{\mathsf U}_{11} & \boldsymbol{\mathsf U}_{12}\\
+ & \boldsymbol{\mathsf U}_{22}
+\end{bmatrix}.
+```
+
+The factorization proceeds in four steps:
+
+1. Factorize $\boldsymbol{\mathsf A}_{11}=\boldsymbol{\mathsf L}_{11}
+   \boldsymbol{\mathsf U}_{11}$ recursively.
+2. Solve $\boldsymbol{\mathsf U}_{12}=\boldsymbol{\mathsf L}_{11}^{-1}
+   \boldsymbol{\mathsf A}_{12}$ and
+   $\boldsymbol{\mathsf L}_{21}=\boldsymbol{\mathsf A}_{21}
+   \boldsymbol{\mathsf U}_{11}^{-1}$.
+3. Update the Schur complement $\boldsymbol{\mathsf A}_{22}\leftarrow
+   \boldsymbol{\mathsf A}_{22}-\boldsymbol{\mathsf L}_{21}\boldsymbol{\mathsf U}_{12}$
+   with a truncated product.
+4. Factorize the updated $\boldsymbol{\mathsf A}_{22}$ recursively.
+
+A cluster with more children eliminates them one after another. The diagonal
+leaves are dense and are factorized by LAPACK with partial pivoting. Pivoting
+is restricted to each leaf, so the result is
+
+```math
+\boldsymbol{\mathsf P}\boldsymbol{\mathsf A}\approx
+\boldsymbol{\mathsf L}\boldsymbol{\mathsf U},
+```
+
+with a block-diagonal permutation $\boldsymbol{\mathsf P}$ of the leaf
+permutations. Rows of other leaves cannot be used as pivots, so a leaf that is
+singular on its own cannot be factorized. The factors overwrite the blocks of
+the matrix and have its partition.
+
+The triangular solves in step 2 have hierarchical right-hand sides. They are
+block forward or backward substitutions over the terminal blocks of
+$\boldsymbol{\mathsf A}_{12}$ (or $\boldsymbol{\mathsf A}_{21}$). Each block
+first subtracts its products with the blocks solved before it, which is a
+truncated product, then solves with the diagonal factor of its cluster. For a
+low-rank block, only one factor changes:
+
+```math
+\boldsymbol{\mathsf L}^{-1}(\boldsymbol{\mathsf U}\boldsymbol{\mathsf V})
+=(\boldsymbol{\mathsf L}^{-1}\boldsymbol{\mathsf U})\boldsymbol{\mathsf V},
+\qquad
+(\boldsymbol{\mathsf U}\boldsymbol{\mathsf V})\,\boldsymbol{\mathsf U}_{11}^{-1}
+=\boldsymbol{\mathsf U}(\boldsymbol{\mathsf V}\boldsymbol{\mathsf U}_{11}^{-1}),
+```
+
+so the solve itself needs no truncation.
+
+A solve with dense right-hand sides applies the leaf permutations and then a
+forward and a backward substitution. Their leaves use dense triangular solves,
+and the off-diagonal blocks are applied as matrix products. The cost is
+proportional to the storage of the factors times the number of right-hand
+sides. Transposed systems use
+$\boldsymbol{\mathsf A}^{\mathsf T}=\boldsymbol{\mathsf U}^{\mathsf T}
+\boldsymbol{\mathsf L}^{\mathsf T}\boldsymbol{\mathsf P}$, and adjoint systems
+the conjugated transposed solve.
+
+### Accuracy and Complexity
+
+Every truncation commits a blockwise relative error of at most $\varepsilon$ in
+the spectral norm, but the errors of the many truncations of a product or a
+factorization accumulate. The requested tolerance is therefore no a priori
+bound for the error of the result. With a small $\varepsilon$, the LU
+factorization serves as a direct solver. With a coarse one, it is a cheap and
+often effective preconditioner for an iterative solver.
+
+For balanced cluster trees, a uniformly sparse block tree and bounded ranks
+$k$, the truncated sum costs $\mathcal O(k^2N\log N)$, and the product and the
+LU factorization $\mathcal O(k^2N\log^2N)$ [[9]](@ref refs). As for assembly,
+the ranks needed for a fixed tolerance grow with the frequency of oscillatory
+kernels.
+
+### Parallel Execution
+
+The operations decompose into block operations: leaf factorizations, triangular
+solve steps, the products of virtual blocks and the updates of destination
+blocks. Each block operation declares the blocks it reads and writes. In
+serial program order, an operation depends on the last earlier writer of every
+block it uses and on the earlier readers of every block it writes. Any execution
+order that respects these dependencies computes exactly the serial result.
+Tasks therefore run block operations as soon as their inputs are final, in the
+spirit of the task-based $\mathcal H$-LU of [[12]](@ref refs), and the results
+are identical for every number of tasks. Sums, recompression and matrix-vector
+products consist of independent pieces; they are split into chunks of balanced
+cost.
+
 For constructors, point-kernel examples, tree backends, and matrix operations, see
 [Using Hierarchical Matrices](../manual/hmatrix.md).

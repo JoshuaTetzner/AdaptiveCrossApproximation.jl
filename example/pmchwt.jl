@@ -7,15 +7,29 @@ using AdaptiveCrossApproximation
 using PlotlyBase
 
 const ACA = AdaptiveCrossApproximation
+BLAS.set_num_threads(1)
+isdefined(@__MODULE__, :BEMHMatrixExample) ||
+    include(joinpath(@__DIR__, "beast_hmatrix.jl"))
+using .BEMHMatrixExample
 
 # Geometry and function space: dielectric sphere (exterior/interior contrast)
 Γ = meshsphere(1.0, 0.08)
 X = raviartthomas(Γ)
 @show 2 * numfunctions(X)
 
-builder = KMeansTreeBuilder(; numberofclusters=2, minvalues=200)
-cluster = KMeansTree(X; builder=builder)
+builder = KMeansTreeBuilder(; numberofclusters=2, minvalues=100)
+# Cluster both currents geometrically in one tree. This allows dense-leaf
+# pivoting to couple the colocated electric and magnetic unknowns.
+dofpositions = vcat(BEAST.positions(X), BEAST.positions(X))
+cluster = KMeansTree(dofpositions; builder=builder)
 tree = BlockTree(cluster, cluster)
+# Colocated components can create zero-radius leaves. Keep coincident cluster
+# pairs dense (including the LU diagonal); use the default criterion elsewhere.
+lu_admissibility = let geometric = ACA.isnear()
+    (rowtree, coltree, row, col) ->
+        H2Trees.center(rowtree, row) == H2Trees.center(coltree, col) ||
+        geometric(rowtree, coltree, row, col)
+end
 
 # Problem setup: PMCHWT for a dielectric sphere illuminated by a plane wave.
 # Exterior wavenumber/impedance κ, η; interior κ′, η′.
@@ -33,45 +47,45 @@ H = -1 / (im * κ * η) * curl(E)
 e = (n × E) × n
 h = (n × H) × n
 
-# Routes every operator block through ACA's compressed H-matrix assembly (all of
-# T, T′, K, K′ are integral operators here); `ACA.assemble` dispatches any local
-# operator straight to BEAST's own dense assembly instead, without a manual check.
-materialize(op, testspace, trialspace; kwargs...) =
-    ACA.assemble(op, testspace, trialspace; tree=tree, tol=1e-3, maxrank=60, kwargs...)
-
-@hilbertspace j m
-@hilbertspace k l
-
 α, α′ = 1 / η, 1 / η′
-a = (
-    η * T[k, j] + η′ * T′[k, j] - K[k, m] - K′[k, m] +
-    K[l, j] +
-    K′[l, j] +
-    α * T[l, m] +
-    α′ * T′[l, m]
+# Cache each integral assembler once, including its near/far quadrature data.
+t, t′ = GalerkinTerm(T, X, X), GalerkinTerm(T′, X, X)
+k, k′ = GalerkinTerm(K, X, X), GalerkinTerm(K′, X, X)
+blocks = (
+    (((η, t), (η′, t′)), ((-1.0, k), (-1.0, k′))),
+    (((1.0, k), (1.0, k′)), ((α, t), (α′, t′))),
 )
-rhs = -e[k] - h[l]
-
+kernel = GalerkinOperator(blocks, numfunctions(X))
 𝕏 = X × X
+A = ACA.HMatrix(
+    kernel,
+    𝕏,
+    𝕏,
+    tree;
+    tol=1e-5,
+    maxrank=100,
+    nearmatrixdata=:near,
+    farmatrixdata=:far,
+    isnear=lu_admissibility,
+)
+b = -vcat(assemble(e, X), assemble(h, X))
 
-A = assemble(a, 𝕏, 𝕏; materialize=materialize)
-b = assemble(rhs, 𝕏)
-
-A⁻¹ = BEAST.GMRESSolver(A; reltol=1e-4, maxiter=1000)
-u = A⁻¹ * b
+u = A \ b
+# The solution is in the original ordering: electric current first, magnetic second.
+uj, um = view(u, 1:numfunctions(X)), view(u, (numfunctions(X) + 1):length(u))
 
 # Bistatic RCS in the plane φ=0. The far field contains contributions from both
 # equivalent currents.
 Θ = range(0; stop=π, length=181)
 pts = [point(sin(θ), 0, cos(θ)) for θ in Θ]
-ffj = potential(MWFarField3D(; wavenumber=κ), pts, u[j], X)
-ffm = potential(MWFarField3D(; wavenumber=κ), pts, u[m], X)
+ffj = potential(MWFarField3D(; wavenumber=κ), pts, uj, X)
+ffm = potential(MWFarField3D(; wavenumber=κ), pts, um, X)
 ff = -im * κ / (4π) * (-η * ffj + cross.(pts, ffm))
 λ = 2π / κ
 rcs_dB = 10 .* log10.(4π .* norm.(ff) .^ 2 ./ λ^2)
 
-fcr_j, geo = facecurrents(u[j], X)
-fcr_m, _ = facecurrents(u[m], X)
+fcr_j, geo = facecurrents(uj, X)
+fcr_m, _ = facecurrents(um, X)
 
 plt = Plot(
     Layout(

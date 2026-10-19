@@ -7,16 +7,24 @@ using AdaptiveCrossApproximation
 using PlotlyBase
 
 const ACA = AdaptiveCrossApproximation
+BLAS.set_num_threads(1)
+isdefined(@__MODULE__, :BEMHMatrixExample) ||
+    include(joinpath(@__DIR__, "beast_hmatrix.jl"))
+using .BEMHMatrixExample
 # Geometry and function spaces: PEC sphere, primal (RWG) and dual (BC) meshes
 Γ = meshsphere(1.0, 0.06)
-X = raviartthomas(Γ)
-Y = buffachristiansen(Γ)
+# Use the same explicit edge ordering for the primal and dual bases.
+edges = skeleton(Γ, 1; sort=:spacefillingcurve)
+X = raviartthomas(Γ, edges)
+Y = buffachristiansen(Γ; edges)
 @show numfunctions(X)
 
-builder = KMeansTreeBuilder(; numberofclusters=2, minvalues=200)
-testtree = KMeansTree(Y; builder=builder)
-trialtree = KMeansTree(X; builder=builder)
-tree = BlockTree(testtree, trialtree)
+builder = KMeansTreeBuilder(; numberofclusters=2, minvalues=100)
+# RWG and BC functions are associated with the same primal edges. LU needs
+# one shared cluster tree for their coefficient indices. BC positions are
+# the primal-edge midpoints; RWG's stored positions use adjacent face centers.
+cluster = KMeansTree(BEAST.positions(Y); builder=builder)
+tree = BlockTree(cluster, cluster)
 
 # Problem setup: MFIE for a PEC sphere illuminated by a plane wave
 ϵ, μ, ω = 1.0, 1.0, 1.0
@@ -28,20 +36,16 @@ E = Maxwell3D.planewave(; direction=ẑ, polarization=x̂, wavenumber=κ)
 H = -1 / (im * μ * ω) * curl(E)
 h = (n × H) × n
 
-@hilbertspace j
-@hilbertspace m
+# Compress K + 0.5N as one HMatrix, not as a sum of matrix-vector maps. The
+# adapter caches integral quadrature and assembles the local N only once.
+terms = ((1.0, GalerkinTerm(K, Y, X)), (0.5, GalerkinTerm(N, Y, X)))
+kernel = GalerkinOperator(((terms,),), numfunctions(X))
+A = ACA.HMatrix(
+    kernel, Y, X, tree; tol=1e-5, maxrank=100, nearmatrixdata=:near, farmatrixdata=:far
+)
+b = assemble(h, Y)
 
-a = K[m, j] + 0.5 * N[m, j]
-l = h[m]
-
-materialize(op, testspace, trialspace; kwargs...) =
-    ACA.assemble(op, testspace, trialspace; tree=tree, tol=1e-3, maxrank=60, kwargs...)
-
-A = assemble(a, ∏(Y), ∏(X); materialize=materialize)
-b = assemble(l, ∏(Y))
-
-A⁻¹ = BEAST.GMRESSolver(A; reltol=1e-4, maxiter=1000)
-u = A⁻¹ * b
+u = A \ b
 
 # Normalized bistatic RCS in the plane φ=0 for unit-amplitude incidence
 Θ = range(0; stop=π, length=181)

@@ -4,16 +4,17 @@ using BEAST
 using ParallelKMeans
 using H2Trees
 using AdaptiveCrossApproximation
-using Krylov
 using PlotlyBase
 
 const ACA = AdaptiveCrossApproximation
+# Run Julia with multiple threads; keep the small block BLAS calls single-threaded.
+BLAS.set_num_threads(1)
 # Geometry and function space: PEC sphere
 Γ = meshsphere(1.0, 0.06)
 X = raviartthomas(Γ)
 @show numfunctions(X)
 
-builder = KMeansTreeBuilder(; numberofclusters=2, minvalues=200)
+builder = KMeansTreeBuilder(; numberofclusters=2, minvalues=100)
 cluster = KMeansTree(X; builder=builder)
 tree = BlockTree(cluster, cluster)
 
@@ -23,11 +24,10 @@ t = Maxwell3D.singlelayer(; wavenumber=κ)
 E = Maxwell3D.planewave(; direction=ẑ, polarization=x̂, wavenumber=κ)
 
 # Assemble the compressed EFIE operator using the shared block tree.
-T = ACA.assemble(t, X, X; tree=tree, tol=1e-3, maxrank=60)
+T = ACA.assemble(t, X, X; tree=tree, tol=1e-5, maxrank=100)
 e = assemble((n × E) × n, X)
 
-u, stats = Krylov.gmres(T, e; rtol=1e-4)
-@assert stats.solved "GMRES failed to converge"
+u = T \ e
 ACA.storage(T)
 
 # Normalized bistatic RCS in the plane φ=0 for unit-amplitude incidence
