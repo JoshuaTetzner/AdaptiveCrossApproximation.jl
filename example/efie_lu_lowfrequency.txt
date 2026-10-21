@@ -1,0 +1,2 @@
+N ntasks tassembly tws_lu tlu tws_solve tsolve tassembly_dense tlu_dense tsolve_dense
+20280 8 26.195047454 6.452105075 23.123434311 0.029434713 0.920296873 17.758566216 28.445955104 0.20841838
