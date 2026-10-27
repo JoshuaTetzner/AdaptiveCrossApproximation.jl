@@ -36,9 +36,11 @@ jobs:
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         with:
-          # CompatHelper PRs otherwise force JET 0.13 on Julia 1.10, although
-          # JET >= 0.12.2 requires the Libdl shipped with Julia >= 1.11.
-          force_latest_compatible_version: ${{ matrix.version == '1.10' && 'false' || 'auto' }}
+          # Forcing every test dependency to its latest individually can create
+          # an unsatisfiable environment. In particular, registered BEAST 2.10
+          # requires CompScienceMeshes <= 0.12, while this package also supports
+          # CompScienceMeshes 0.13, and JET >= 0.12.2 requires Julia >= 1.11.
+          force_latest_compatible_version: false
       - uses: julia-actions/julia-processcoverage@v1
       - uses: codecov/codecov-action@v7
         with:
