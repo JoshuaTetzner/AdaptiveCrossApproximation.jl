@@ -22,7 +22,7 @@ function _select_free_devices(n::Int)
     return free[1:n]
 end
 
-function AdaptiveCrossApproximation.beastkernelmatrix(
+function HFactory.beastkernelmatrix(
     operator::BEAST.IntegralOperator,
     testspace::BEAST.Space,
     trialspace::BEAST.Space,

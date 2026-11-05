@@ -71,6 +71,8 @@ y = hmat * x  # Matrix-vector product
 """
 module AdaptiveCrossApproximation
 
+using HFactory:
+    HFactory, AbstractKernelMatrix, BEASTKernelMatrix, PointMatrix, localkernelmatrix
 using LinearAlgebra
 using Polynomials
 using Random: Random
@@ -82,7 +84,6 @@ include("utils.jl")
 include("hmatrix/kernelmatrix/abstractkernelmatrix.jl")
 include("hmatrix/kernelmatrix/beastkernelmatrix.jl")
 include("hmatrix/kernelmatrix/gpubeastkernelmatrix.jl")
-include("hmatrix/kernelmatrix/pointmatrix.jl")
 
 include("pivoting/abstractpivoting.jl")
 include("convergence/abstractconvergence.jl")
@@ -118,14 +119,15 @@ example, a single row is written into a `1 × length(j)` buffer.
 
 Interface method used by [`ACA`](@ref), [`ACAᵀ`](@ref) and [`IACA`](@ref) to pull the
 row/column samples they pivot on, so `A` need not materialize as a dense matrix.
-The fallback here covers any `AbstractArray`; kernel-matrix backends
-([`AbstractKernelMatrix`](@ref) subtypes such as `BEASTKernelMatrix` or
-[`PointMatrix`](@ref)) provide their own methods that evaluate entries on demand.
+The fallbacks cover any `AbstractArray` and any [`AbstractKernelMatrix`](@ref), whose
+block interface `A(buf, i, j)` evaluates entries on demand into the zeroed `buf`;
+kernel-matrix backends may add more specific methods.
 """
 nextrc!(buf, A::AbstractArray, i, j) = (buf .= view(A, i, j))
 nextrc!(buf, A::AbstractArray, i::Integer, j) = (buf .= view(A, i:i, j))
 nextrc!(buf, A::AbstractArray, i, j::Integer) = (buf .= view(A, i, j:j))
 nextrc!(buf, A::AbstractArray, i::Integer, j::Integer) = (buf .= view(A, i:i, j:j))
+nextrc!(buf, A::AbstractKernelMatrix, i, j) = A(buf, i, j)
 
 include("aca.jl")
 include("fullpivotedaca.jl")
@@ -137,6 +139,7 @@ if !isdefined(Base, :get_extension) # for julia version < 1.9
 end
 
 include("hmatrix/abstracthmatrix.jl")
+include("hfactory/hfactory.jl")
 
 """
     assemble(op, testspace, trialspace; tree=..., quadstrat=..., kwargs...)
@@ -300,6 +303,7 @@ export HMatrix, HMatrixCore
 export recompress!
 export HMatrixLU, LeafLUFailure
 export ACA
+export LowRankCompression
 export aca
 export ACAᵀ
 export IACA

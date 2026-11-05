@@ -1,6 +1,7 @@
 using AdaptiveCrossApproximation
 using BEAST
 using CompScienceMeshes
+using HFactory: HFactory
 using LinearAlgebra
 using Random
 using Test
@@ -113,7 +114,7 @@ end
         rows = collect(1:3)
         columns = collect(4:8)
         localmatrix = AdaptiveCrossApproximation.localkernelmatrix(matrix, rows, columns)
-        extension_module = Base.get_extension(AdaptiveCrossApproximation, :ACABEAST)
+        extension_module = Base.get_extension(HFactory, :HFactoryBEAST)
         fallbackmatrix = AdaptiveCrossApproximation.AbstractKernelMatrix(
             operator, space, space
         )
@@ -225,7 +226,7 @@ end
         line = meshsegment(1.0, 0.05)
         testspace = lagrangec0d1(line)
         trialspace = lagrangec0d1(translate(line, [0.0, 2.0]))
-        extension_module = Base.get_extension(AdaptiveCrossApproximation, :ACABEAST)
+        extension_module = Base.get_extension(HFactory, :HFactoryBEAST)
         rows = collect(2:6)
         columns = collect(8:15)
 

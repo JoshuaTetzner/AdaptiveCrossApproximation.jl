@@ -1,77 +1,6 @@
 using OhMyThreads
 
 """
-    AbstractKernelMatrix{T}
-
-Abstract matrix-like interface for kernel-based entry evaluation used by ACA-style compressors.
-
-# Arguments
-
-  - `T`: scalar element type returned by kernel evaluations
-
-# Returns
-
-A subtype that supports lazy matrix entry access through the kernel matrix interface.
-
-# Notes
-
-Implement this type when matrix entries are computed on demand from
-geometric/operator data. A concrete backend should implement `size(matrix)` and
-`matrix(block, rows, columns)`; [`nextrc!`](@ref) uses that callable interface to
-sample rows and columns without materializing the full matrix.
-
-# See also
-
-`AbstractKernelMatrix(operator, testspace, trialspace; args...)`
-"""
-abstract type AbstractKernelMatrix{T} end
-
-"""
-    AbstractKernelMatrix(operator, testspace, trialspace; args...)
-
-Construct a concrete kernel matrix wrapper from operator and space data.
-
-# Arguments
-
-  - `operator`: operator or kernel definition
-  - `testspace`: space for row evaluation points or basis data
-  - `trialspace`: space for column evaluation points or basis data
-  - `args...`: backend-specific keyword arguments
-
-# Returns
-
-A concrete subtype of `AbstractKernelMatrix` provided by method dispatch.
-
-# Notes
-
-This declaration defines the interface entry point. Concrete backends provide
-specialized methods for specific operator/space types.
-
-# See also
-
-`AbstractKernelMatrix`, `nextrc!`
-"""
-function AbstractKernelMatrix(operator, testspace, trialspace; args...)
-    return error(
-        "AbstractKernelMatrix is not implemented for operator::$(typeof(operator)), " *
-        "testspace::$(typeof(testspace)), trialspace::$(typeof(trialspace)).",
-    )
-end
-
-"""
-    beastkernelmatrix(operator, testspace, trialspace, matrixdata)
-
-Build a BEAST-backed kernel matrix (e.g. [`BEASTKernelMatrix`](@ref)) from a
-BEAST operator, spaces, and `matrixdata` (a quadrature strategy).
-
-No default method is provided here; it is implemented by the `ACABEAST`
-package extension and dispatched to from
-`AbstractKernelMatrix(operator, testspace, trialspace; matrixdata=...)` when BEAST
-types are detected.
-"""
-function beastkernelmatrix end
-
-"""
     assemble_blocks(matrix::AbstractKernelMatrix, blocks, rowidcs, colidcs; ntasks, pbar) -> blocks
 
 Fill each preallocated `blocks[i]` (sized `(length(rowidcs[i]), length(colidcs[i]))`)
@@ -110,38 +39,4 @@ function assemble_blocks(
         next!(pbar)
     end
     return blocks
-end
-
-function (M::AbstractKernelMatrix)(_, _, _)
-    return throw(ArgumentError("callable is not implemented for $(typeof(M))."))
-end
-
-Base.eltype(::AbstractKernelMatrix{T}) where {T} = T
-
-"""
-    localkernelmatrix(matrix::AbstractKernelMatrix, rows, columns)
-
-Prepare a matrix-like object for repeated row and column sampling of one block.
-
-The fallback returns `matrix` unchanged. A backend may return a lightweight local
-wrapper that precomputes block-dependent assembly data. The returned object must
-accept the original global indices through the same `nextrc!` interface and report
-the same global `size` and `eltype` as `matrix`.
-
-Rows are sampled against exactly `columns` and columns against exactly `rows`, in the
-given order. If only one kind is sampled, the other index set may be `nothing`:
-`localkernelmatrix(matrix, rows, nothing)` prepares only column sampling and
-`localkernelmatrix(matrix, nothing, columns)` only row sampling, which avoids preparing
-data for a side that is never used as an index list.
-
-This hook is called once per far-field block before ACA compression, so any cached
-state belongs to that block and must not be shared concurrently between blocks.
-"""
-localkernelmatrix(matrix::AbstractKernelMatrix, rows, columns) = matrix
-
-function _kernelmatrix_size(ntest::Int, ntrial::Int, dim)
-    dim === nothing && return (ntest, ntrial)
-    dim == 1 && return ntest
-    dim == 2 && return ntrial
-    return error("dim must be either 1 or 2")
 end

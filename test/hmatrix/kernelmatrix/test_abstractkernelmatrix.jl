@@ -21,7 +21,7 @@ using Test
         @test eltype(A) == eltype(P) == scalartype(op) == Float64
         @test size(P, 1) == length(x)
         @test size(P, 2) == length(y)
-        @test_throws ErrorException size(P, 3)
+        @test_throws BoundsError size(P, 3)
         @test_throws ErrorException AdaptiveCrossApproximation.AbstractKernelMatrix(
             nothing, nothing, nothing
         )

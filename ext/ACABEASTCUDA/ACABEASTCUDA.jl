@@ -3,6 +3,7 @@ module ACABEASTCUDA
 using AdaptiveCrossApproximation
 using BEAST
 using CUDA
+using HFactory: HFactory
 
 # BEAST's GPU block assembly lives in its BEASTCUDAExt, which released BEAST
 # versions do not provide yet. Look it up at call time and fail clearly.

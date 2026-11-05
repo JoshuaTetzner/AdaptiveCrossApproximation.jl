@@ -40,6 +40,7 @@ Random.seed!(1234)
     include("hmatrix/test_hmatrix.jl")
     include("hmatrix/test_abstracthmatrix.jl")
     include("hmatrix/test_treeindex.jl")
+    include("hfactory/test_hfactory.jl")
 
     # Test the H2Trees default before loading ParallelKMeans below.
     include("hmatrix/test_assembly.jl")
@@ -93,8 +94,10 @@ end
 @testitem "Explicit imports (ExplicitImports.jl)" begin
     using ExplicitImports
     using AdaptiveCrossApproximation
-    @test ExplicitImports.check_no_stale_explicit_imports(AdaptiveCrossApproximation) ===
-        nothing
+    # PointMatrix is imported from HFactory to keep the ACA name available.
+    @test ExplicitImports.check_no_stale_explicit_imports(
+        AdaptiveCrossApproximation; ignore=(:PointMatrix,)
+    ) === nothing
     @test ExplicitImports.check_all_explicit_imports_via_owners(
         AdaptiveCrossApproximation
     ) === nothing

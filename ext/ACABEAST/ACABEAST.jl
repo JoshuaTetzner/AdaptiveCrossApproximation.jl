@@ -7,7 +7,6 @@ using AdaptiveCrossApproximation
 
 AdaptiveCrossApproximation._treepositions(space::BEAST.Space) = BEAST.positions(space)
 
-include("kernelmatrix.jl")
 include("rwgorientations.jl")
 
 function AdaptiveCrossApproximation.tofarquadstrat(qs::BEAST.DoubleNumWiltonSauterQStrat)

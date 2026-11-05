@@ -4,6 +4,7 @@ version = "0.4.0"
 authors = ["JoshuaTetzner <joshua.tetzner@uni-rostock.de>"]
 
 [deps]
+HFactory = "6f9b9747-5f75-4f54-a18d-46af096ca96c"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LinearMaps = "7a12625a-238d-50fd-b39a-03d52299707e"
 OhMyThreads = "67456a42-1dca-4109-a031-0a68de7e3ad5"
@@ -17,6 +18,9 @@ BEAST = "bb4162c7-ba94-5a20-af32-d8ec4428bdd1"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 H2Trees = "9db26ae3-82ff-4374-85e9-9ed87405fd16"
 ParallelKMeans = "42b8e9d4-006b-409a-8472-7f34b3fb58af"
+
+[sources]
+HFactory = {path = "../HFactory"}
 
 [extensions]
 ACABEAST = ["BEAST"]
@@ -32,6 +36,7 @@ CUDA = "5, 6"
 CompScienceMeshes = "0.9, 0.10, 0.11, 0.12, 0.13"
 ExplicitImports = "1"
 H2Trees = "0.4"
+HFactory = "0.1"
 JET = "0.9, 0.10, 0.11, 0.12, 0.13"
 JuliaFormatter = "2"
 LinearAlgebra = "1"

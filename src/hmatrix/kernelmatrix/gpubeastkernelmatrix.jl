@@ -13,7 +13,7 @@ versions do not provide yet. Without it, building the kernel matrix throws an
 
 Physical device selection is automatic: unless `devices` is given explicitly, the
 extension picks `ndevices` currently-idle GPUs (no active compute processes) at
-[`AdaptiveCrossApproximation.beastkernelmatrix`](@ref) build time. Devices are
+`HFactory.beastkernelmatrix` build time. Devices are
 dispatched via `OhMyThreads.@tasks` (`ntasks == ndevices`), so `ndevices` is not
 tied to `Threads.nthreads()` - CPU-side code is free to use more threads than
 there are devices; with fewer Julia threads than `ndevices`, devices simply lose
@@ -56,7 +56,7 @@ end
 GPU-accelerated kernel matrix wrapper for BEAST operator assembly.
 
 Analogous to [`BEASTKernelMatrix`](@ref), but backed by a GPU near-field block
-assembler. Built automatically by `AdaptiveCrossApproximation.beastkernelmatrix` when
+assembler. Built automatically by `HFactory.beastkernelmatrix` when
 [`GPUMatrixData`](@ref) is passed as `matrixdata`; requires the ACABEASTCUDA package
 extension to be loaded.
 
@@ -84,19 +84,10 @@ struct GPUBEASTKernelMatrix{T,NearBlockAssemblerType,FunctorsType} <:
     end
 end
 
-function Base.size(matrix::GPUBEASTKernelMatrix, dim=nothing)
-    if dim === nothing
-        return (
-            length(matrix.nearassembler.test_space),
-            length(matrix.nearassembler.trial_space),
-        )
-    elseif dim == 1
-        return length(matrix.nearassembler.test_space)
-    elseif dim == 2
-        return length(matrix.nearassembler.trial_space)
-    else
-        error("dim must be either 1 or 2")
-    end
+function Base.size(matrix::GPUBEASTKernelMatrix)
+    return (
+        length(matrix.nearassembler.test_space), length(matrix.nearassembler.trial_space)
+    )
 end
 
 function nextrc!(buffer, matrix::GPUBEASTKernelMatrix, rows, columns)
