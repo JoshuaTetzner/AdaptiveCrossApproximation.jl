@@ -39,13 +39,13 @@ using Test
                         original = copy(B)
                         expected = side === :left ? triangle \ B : B / triangle
                         @test triangular_test_solve!(B, opH, scratch, side) === B
-                        @test B ≈ expected rtol=tol atol=tol*max(norm(expected), 1)
+                        @test B ≈ expected rtol = tol atol = tol * max(norm(expected), 1)
                         residual = if side === :left
                             triangle * B - original
                         else
                             B * triangle - original
                         end
-                        @test norm(residual) <= tol*max(norm(triangle)*norm(B), 1)
+                        @test norm(residual) <= tol * max(norm(triangle) * norm(B), 1)
                     end
                     # Padded RHS views, and stable warmed capacity across calls.
                     parent = fill(T(29), 35, 35)
@@ -54,7 +54,7 @@ using Test
                     copyto!(B, original)
                     expected = side === :left ? triangle \ original : original / triangle
                     triangular_test_solve!(B, opH, scratch, side)
-                    @test B ≈ expected rtol=tol atol=tol*max(norm(expected), 1)
+                    @test B ≈ expected rtol = tol atol = tol * max(norm(expected), 1)
                     @test all(==(T(29)), view(parent, 1:1, :))
                     pointerbefore = pointer(scratch.small)
                     bytes = triangular_test_bytes(B, opH, scratch, side)
@@ -93,7 +93,7 @@ using Test
                 ACA.BlockScratch{T}(),
                 :left,
             )
-            @test A * B ≈ original rtol=tol atol=tol*norm(A)*norm(B)
+            @test A * B ≈ original rtol = tol atol = tol * norm(A) * norm(B)
         end
 
         @testset "Validation and changing ranks" begin
@@ -149,7 +149,7 @@ using Test
                 B = randn(rng, ComplexF64, side === :left ? (49, 7) : (7, 49))
                 expected = side === :left ? opA \ B : B / opA
                 triangular_test_solve!(B, opH, ACA.BlockScratch{ComplexF64}(), side)
-                @test B ≈ expected rtol=1e-10
+                @test B ≈ expected rtol = 1e-10
             end
             H = ACA.HMatrixTriangular(W, leaves)
             B = randn(rng, ComplexF64, 49, 3)
@@ -235,7 +235,7 @@ using Test
                         expected = side === :left ? opA \ B : B / opA
                         scratch = ACA.BlockScratch{ComplexF64}()
                         triangular_test_solve!(B, opH, scratch, side)
-                        @test B ≈ expected rtol=1e-10
+                        @test B ≈ expected rtol = 1e-10
                         triangular_test_bytes(B, opH, scratch, side)
                         @test triangular_test_bytes(B, opH, scratch, side) == 0
                     end

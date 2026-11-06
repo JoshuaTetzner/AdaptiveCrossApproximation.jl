@@ -69,12 +69,12 @@ end
                     @test size(R.V) == (k, n)
                     @test result.rank_limited == limited
                     @test result.converged == !limited
-                    @test result.error ≈ err atol=roundoff
-                    @test result.tolerance ≈ tol atol=roundoff
+                    @test result.error ≈ err atol = roundoff
+                    @test result.tolerance ≈ tol atol = roundoff
                     difference = Matrix(R) - A
-                    @test opnorm(difference) ≈ err atol=roundoff
+                    @test opnorm(difference) ≈ err atol = roundoff
                     reference = F.U[:, 1:k] * Diagonal(F.S[1:k]) * F.Vt[1:k, :]
-                    @test Matrix(R) ≈ reference atol=roundoff
+                    @test Matrix(R) ≈ reference atol = roundoff
                     @test originalU == Ubefore
                     @test originalV == Vbefore
                     @test R.U !== originalU

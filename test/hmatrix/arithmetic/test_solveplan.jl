@@ -236,14 +236,14 @@ end
                             actual = solve_test_dense(B)
                             @test info.converged
                             @test !info.rank_limited
-                            @test actual ≈ expected rtol=tolerance atol=tolerance
+                            @test actual ≈ expected rtol = tolerance atol = tolerance
                             residual = if side === :left
                                 dense * actual - original
                             else
                                 actual * dense - original
                             end
                             @test norm(residual) <=
-                                tolerance * (norm(dense)*norm(actual) + norm(original))
+                                tolerance * (norm(dense) * norm(actual) + norm(original))
                             @test solve_test_snapshot(W) == factorcopy
                         end
                         # Explicit permutations roundtrip without changing rank;
@@ -254,9 +254,9 @@ end
                         ACA._pivot!(permutation, H)
                         ranks = rank.(B.far)
                         @test ACA._pivot!(P) === P.rhs
-                        @test solve_test_dense(B) ≈ permutation * original rtol=tolerance
+                        @test solve_test_dense(B) ≈ permutation * original rtol = tolerance
                         ACA._pivot!(P; inverse=true)
-                        @test solve_test_dense(B) ≈ original rtol=tolerance
+                        @test solve_test_dense(B) ≈ original rtol = tolerance
                         @test rank.(B.far) == ranks
                     end
                 end
@@ -283,7 +283,7 @@ end
                     @test rank(R) == 2
                     @test R.U === before[1] && R.V === before[2]
                     expected = side === :left ? dense \ original : original / dense
-                    @test solve_test_dense(B) ≈ expected rtol=1e-11
+                    @test solve_test_dense(B) ≈ expected rtol = 1e-11
                     # The factor not participating in the solve retains its values.
                     activeleft = side === :left
                     untouched = copy(activeleft ? R.V : R.U)

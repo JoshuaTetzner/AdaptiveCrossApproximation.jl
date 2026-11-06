@@ -34,12 +34,13 @@ using Test
                     info = product_test_addmul!(P, alpha, scratch; rtol=10eps(real(T)))
                     @test info.converged && !info.rank_limited
                     expected = dc + alpha * da * db
-                    @test product_test_dense(C) ≈ expected rtol=tolerance
+                    @test product_test_dense(C) ≈ expected rtol = tolerance
                     @test product_test_dense(A) == acopy
                     @test product_test_dense(B) == bcopy
                     pointers = pointer.(product_test_arrays(scratch))
                     product_test_addmul!(P, alpha, scratch; rtol=10eps(real(T)))
-                    @test product_test_dense(C) ≈ expected + alpha * da * db rtol=tolerance
+                    @test product_test_dense(C) ≈ expected + alpha * da * db rtol =
+                        tolerance
                     @test pointer.(product_test_arrays(scratch)) == pointers
                     # Ranks are deliberately changed after structural planning.
                     for R in A.far
@@ -48,7 +49,8 @@ using Test
                     before = product_test_dense(C)
                     changed = product_test_dense(A)
                     product_test_addmul!(P, alpha, scratch; rtol=10eps(real(T)))
-                    @test product_test_dense(C) ≈ before + alpha * changed * db rtol=tolerance
+                    @test product_test_dense(C) ≈ before + alpha * changed * db rtol =
+                        tolerance
                 end
             end
             @testset "$T restricted views and dense/dense to far" begin
@@ -74,7 +76,7 @@ using Test
                     )
                     expected = copy(dc)
                     expected[cr, cc] += alpha * da[cr, innerpart] * db[innerpart, cc]
-                    @test product_test_dense(C) ≈ expected rtol=tolerance
+                    @test product_test_dense(C) ≈ expected rtol = tolerance
                     # The far destination is recompressed once, whatever the batch rank.
                     @test info.flushes == 1
                 end
@@ -111,7 +113,7 @@ using Test
                 @test product_test_addmul!(P, alpha, shared; rtol=10eps(real(T))).flushes ==
                     1
                 @test P.groups[1].capacity == 2
-                @test product_test_dense(C) ≈ dc + alpha * da * db rtol=tolerance
+                @test product_test_dense(C) ≈ dc + alpha * da * db rtol = tolerance
                 # Oversized factors must not invalidate the plan or rank policy.
                 A.far[1].U = randn(rng, T, 16, 20)
                 A.far[1].V = randn(rng, T, 20, 12)
@@ -119,14 +121,15 @@ using Test
                 before = product_test_dense(C)
                 product_test_addmul!(P, alpha, ACA.BlockScratch{T}(); rtol=10eps(real(T)))
                 @test P.groups[1].capacity == 2
-                @test product_test_dense(C) ≈ before + alpha * changed * db rtol=tolerance
+                @test product_test_dense(C) ≈ before + alpha * changed * db rtol = tolerance
                 B.far[1].U = randn(rng, T, 12, 15)
                 B.far[1].V = randn(rng, T, 15, 12)
                 changedb = product_test_dense(B)
                 before = product_test_dense(C)
                 product_test_addmul!(P, alpha, ACA.BlockScratch{T}(); rtol=10eps(real(T)))
                 @test P.groups[1].capacity == 15
-                @test product_test_dense(C) ≈ before + alpha * changed * changedb rtol=tolerance
+                @test product_test_dense(C) ≈ before + alpha * changed * changedb rtol =
+                    tolerance
                 # Plans executed with one scratch leave each other's blocks alone.
                 other, originalother = product_test_fixture(rng, T, rowtree, inner)
                 Q = product_test_plan(other, A, B)
@@ -134,7 +137,8 @@ using Test
                 originalC = product_test_dense(C)
                 originalother = product_test_dense(other)
                 product_test_addmul!(Q, alpha, shared; rtol=10eps(real(T)))
-                @test product_test_dense(other) ≈ originalother + alpha * changed * changedb rtol=tolerance
+                @test product_test_dense(other) ≈ originalother + alpha * changed * changedb rtol =
+                    tolerance
                 @test product_test_dense(C) == originalC
             end
         end
@@ -174,7 +178,7 @@ using Test
                 rtol=1e-14,
             )
             @test info.converged
-            @test product_test_dense(W) ≈ expected rtol=1e-12
+            @test product_test_dense(W) ≈ expected rtol = 1e-12
         end
     end
 end

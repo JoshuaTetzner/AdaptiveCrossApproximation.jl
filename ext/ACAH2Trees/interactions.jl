@@ -22,7 +22,7 @@ function (isnear::AdaptiveCrossApproximation.IsNearFunctor{F})(
     # 2*maxhs <= η*sep as 0 <= 0, so they get classified as admissible (far)
     # rather than near.
     if iszero(maxhs) && iszero(sep)
-        @warn("Zero-radius node pair at zero separation classified as far.", maxlog = 1)
+        @warn("Zero-radius node pair at zero separation classified as far.", maxlog=1)
     end
 
     (2 * maxhs <= isnear.η * sep) ? (return false) : (return true)

@@ -55,12 +55,13 @@ end
                     @test rank(C) == info.rank == k
                     @test info.rank_limited == (cap < required)
                     @test info.converged == (cap >= required)
-                    @test info.tolerance ≈ tolerance rtol=roundoff
-                    @test info.error ≈ tail(k) atol=roundoff * norm(expected)
+                    @test info.tolerance ≈ tolerance rtol = roundoff
+                    @test info.error ≈ tail(k) atol = roundoff * norm(expected)
                     difference = Matrix(C) - expected
-                    @test opnorm(difference) ≈ tail(k) atol=roundoff * norm(expected)
+                    @test opnorm(difference) ≈ tail(k) atol = roundoff * norm(expected)
                     reference = F.U[:, 1:k] * Diagonal(F.S[1:k]) * F.Vt[1:k, :]
-                    @test Matrix(C) ≈ reference rtol=roundoff atol=roundoff * norm(expected)
+                    @test Matrix(C) ≈ reference rtol = roundoff atol =
+                        roundoff * norm(expected)
                     @test (oldU, oldV, sourceU, sourceV) == snapshots
                     @test A.U === sourceU
                     @test A.V === sourceV
@@ -127,7 +128,7 @@ end
                     A = addition_fixture(rng, T, m, n, ra)
                     expected = Matrix(C) + alpha * Matrix(A)
                     info = ACA._addlowrank!(C, A, alpha, ACA.BlockScratch{T}())
-                    @test Matrix(C) ≈ expected atol=roundoff * max(1, norm(expected))
+                    @test Matrix(C) ≈ expected atol = roundoff * max(1, norm(expected))
                     @test info.converged
                 end
                 for coefficient in (zero(T), -one(T)), cap in (0, 2)
@@ -226,7 +227,7 @@ end
                     )
                     @test info.converged && !info.rank_limited
                     actual = workspace_test_dense(C, C.rowranges, C.colranges)
-                    @test actual ≈ original + alpha * aoriginal rtol=tolerance
+                    @test actual ≈ original + alpha * aoriginal rtol = tolerance
                     if !self
                         @test A.near == nearbefore
                         @test [(R.U, R.V) for R in A.far] == farbefore
