@@ -66,9 +66,8 @@ using Test
                                 expected = alpha * X * ref + beta * Y
                                 @test ACA._thinright!(Y, X, H, alpha, beta, scratch) === Y
                             end
-                            @test Y ≈ expected rtol=tolerance atol=tolerance * max(
-                                norm(expected), one(real(T))
-                            )
+                            @test Y ≈ expected rtol = tolerance atol =
+                                tolerance * max(norm(expected), one(real(T)))
                             @test X == xsnapshot
                         end
                         # Transposed application, as used by transposed triangular solves.
@@ -78,7 +77,8 @@ using Test
                         ACA._thinexecute!(
                             Y, X, H, alpha, scratch.small, Val(:T), Val(:left)
                         )
-                        @test Y ≈ alpha * transpose(ref) * X rtol=tolerance atol=tolerance
+                        @test Y ≈ alpha * transpose(ref) * X rtol = tolerance atol =
+                            tolerance
                     end
                     @test W.near == nearbefore
                     @test [(R.U, R.V) for R in W.far] == farbefore
@@ -121,7 +121,7 @@ using Test
                 updated = workspace_test_dense(W, W.rowranges, W.colranges)[H.rows, H.cols]
                 X, Y = randn(rng, T, size(H, 2), 3), zeros(T, size(H, 1), 3)
                 ACA._thinleft!(Y, H, X, 1, 0, ACA.BlockScratch{T}())
-                @test Y ≈ updated * X rtol=1e-11
+                @test Y ≈ updated * X rtol = 1e-11
                 @test H.entries === entries
             end
         end

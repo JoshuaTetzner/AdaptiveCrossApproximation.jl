@@ -107,7 +107,7 @@ end
             @test rp == collect(1:rank)
             @test cp == collect(1:rank)
             residual = A - A[:, cp] * (A[rp, cp] \ A[rp, :])
-            estimated_error = norm(residual) / norm(A) * sqrt(3 / (3-rank))
+            estimated_error = norm(residual) / norm(A) * sqrt(3 / (3 - rank))
             @test estimated_error <= tol
             # Applying s/(s-r) to the norm instead of its square is too strict:
             # this sample must stop at rank 1 with the square-root norm correction.

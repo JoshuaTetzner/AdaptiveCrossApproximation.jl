@@ -34,18 +34,18 @@ end
                     @test size(F) == size(A)
                     @test size(F, 2) == n
                     @test F.ipiv == reference.ipiv
-                    @test F.factors ≈ reference.factors rtol=tol
+                    @test F.factors ≈ reference.factors rtol = tol
                     L, U = UnitLowerTriangular(F.factors), UpperTriangular(F.factors)
                     PA = copy(A)
                     ACA._leafpivots!(PA, F.ipiv, false)
-                    @test PA ≈ L * U rtol=tol
+                    @test PA ≈ L * U rtol = tol
                     pivots = F.ipiv
                     pivotptr = pointer(pivots)
                     copyto!(F.factors, A)
                     @test ACA.leaflu!(F) === F
                     @test F.ipiv === pivots
                     @test pointer(F.ipiv) == pivotptr
-                    @test F.factors ≈ reference.factors rtol=tol
+                    @test F.factors ≈ reference.factors rtol = tol
                 end
 
                 @testset "Pivot direction and inversion" begin
@@ -78,7 +78,7 @@ end
                     copyto!(leaf, A)
                     F = ACA.leaflu!(leaf)
                     @test F.factors === leaf
-                    @test F.factors ≈ lu(A).factors rtol=tol
+                    @test F.factors ≈ lu(A).factors rtol = tol
                     @test all(==(T(23)), view(parent, 1:2, :))
                     @test all(==(T(23)), view(parent, :, 1))
                 end

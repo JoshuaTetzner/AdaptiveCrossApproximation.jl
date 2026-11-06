@@ -348,7 +348,7 @@ function triangular_test_fixture(
         else
             D = randn(rng, T, length(rr), length(cc))
             if diagonal
-                D += 10length(rr)*I
+                D += 10length(rr) * I
                 D = D[circshift(collect(1:length(rr)), 1), :]
             end
             push!(near, D)

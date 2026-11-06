@@ -14,7 +14,7 @@ using Test
                 estimator = extrapolate ? functor.estimator : functor
                 estimator.normUV = F(scale)
                 # Meaningful residuals below sqrt(eps) must still count as pivots.
-                residual = Complex{T}[T(scale*relative)]
+                residual = Complex{T}[T(scale * relative)]
                 npivot, keepgoing = functor(residual, 2)
                 @test npivot == 2
                 @test keepgoing
