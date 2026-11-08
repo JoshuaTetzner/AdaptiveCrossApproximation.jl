@@ -465,4 +465,61 @@ end
             @test block ≈ reference
         end
     end
+
+    @testset "_fillrest! (random samples)" begin
+        extension_module = Base.get_extension(AdaptiveCrossApproximation, :ACABEAST)
+        line = meshsegment(1.0, 0.05)
+        rectangle = meshrectangle(1.0, 1.0, 0.25)
+        problems = [
+            # 2D, one line: coincident, adjacent and distant segments
+            (
+                Helmholtz2D.doublelayer_transposed(; wavenumber=k),
+                lagrangec0d1(line),
+                lagrangec0d1(line),
+            ),
+            # 2D, two lines
+            (
+                Helmholtz2D.singlelayer(; wavenumber=k),
+                lagrangec0d1(line),
+                lagrangec0d1(translate(line, [0.0, 0.5])),
+            ),
+            # 3D, Raviart-Thomas functions with two shapes each
+            (
+                Maxwell3D.singlelayer(; wavenumber=k),
+                raviartthomas(rectangle),
+                raviartthomas(rectangle),
+            ),
+            # 3D, test functions on the barycentric refinement of the trial mesh
+            (
+                Maxwell3D.doublelayer(; wavenumber=k),
+                buffachristiansen(rectangle),
+                raviartthomas(rectangle),
+            ),
+        ]
+        for (operator, testspace, trialspace) in problems
+            quadstrat = BEAST.defaultquadstrat(operator, testspace, trialspace)
+            matrix = AdaptiveCrossApproximation.AbstractKernelMatrix(
+                operator, testspace, trialspace; matrixdata=quadstrat
+            )
+            rowidcs = collect(1:2:numfunctions(testspace))
+            colidcs = collect(numfunctions(trialspace):-3:1)
+            block = zeros(eltype(matrix), length(rowidcs), length(colidcs))
+            matrix(block, rowidcs, colidcs)
+
+            # Every entry of the block as a sample, into a rest vector that has to grow
+            indices = vec([(r, c) for r in eachindex(rowidcs), c in eachindex(colidcs)])
+            rest = eltype(matrix)[]
+            AdaptiveCrossApproximation._fillrest!(
+                rest, indices, matrix, rowidcs, colidcs, length(indices)
+            )
+            @test isapprox(rest, [block[r, c] for (r, c) in indices]; rtol=1e-12)
+
+            # With the scratch pool of BEAST 2.11, the samples bypass the block assembler.
+            if pkgversion(BEAST) >= v"2.11"
+                argtypes = typeof.((rest, indices, matrix, rowidcs, colidcs, 1))
+                method = which(AdaptiveCrossApproximation._fillrest!, argtypes)
+                @test parentmodule(method) === extension_module
+            end
+        end
+    end
 end
