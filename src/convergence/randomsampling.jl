@@ -38,6 +38,8 @@ mutable struct RandomSamplingFunctor{F<:Real,K,M,T} <: ConvCritFunctor
     normUV::F
     indices::Vector{Tuple{Int,Int}}
     rest::Vector{K}
+    # Samples drawn so far in `reset!`, reused for all blocks to detect duplicates
+    seen::Set{Tuple{Int,Int}}
 end
 
 tolerance(cc::RandomSamplingFunctor) = cc.convergence.tol
@@ -57,20 +59,22 @@ function _sampleindices(rowlen::Int, collen::Int, nsamples::Int)
 end
 
 function _sampleindices!(
-    indices::Vector{Tuple{Int,Int}}, rowlen::Int, collen::Int, nsamples::Int
+    indices::Vector{Tuple{Int,Int}},
+    rowlen::Int,
+    collen::Int,
+    nsamples::Int,
+    seen::Set{Tuple{Int,Int}}=Set{Tuple{Int,Int}}(),
 )
     length(indices) < nsamples && resize!(indices, nsamples)
+    # A set instead of comparing every sample with all previous ones: that is quadratic
+    # in the number of samples, i.e. in the block size, and dominates for large blocks.
+    empty!(seen)
+    sizehint!(seen, nsamples)
     @inbounds for i in 1:nsamples
         while true
             rc = (rand(1:rowlen), rand(1:collen))
-            duplicate = false
-            for j in 1:(i - 1)
-                if indices[j] == rc
-                    duplicate = true
-                    break
-                end
-            end
-            duplicate && continue
+            rc in seen && continue
+            push!(seen, rc)
             indices[i] = rc
             break
         end
@@ -120,7 +124,9 @@ function (cc::RandomSampling)(
     indices = _sampleindices(rowlen, collen, nsamples)
     rest = zeros(eltype(K), nsamples)
     _fillrest!(rest, indices, K, rowidcs, colidcs, nsamples)
-    return RandomSamplingFunctor(cc, K, nsamples, zero(cc.tol), indices, rest)
+    return RandomSamplingFunctor(
+        cc, K, nsamples, zero(cc.tol), indices, rest, Set{Tuple{Int,Int}}()
+    )
 end
 
 function (cc::RandomSampling)(
@@ -129,7 +135,9 @@ function (cc::RandomSampling)(
     nsamples = _samplecount(cc, rowlen, collen)
     indices = Vector{Tuple{Int,Int}}(undef, nsamples)
     rest = zeros(eltype(K), nsamples)
-    return RandomSamplingFunctor(cc, K, nsamples, zero(cc.tol), indices, rest)
+    return RandomSamplingFunctor(
+        cc, K, nsamples, zero(cc.tol), indices, rest, Set{Tuple{Int,Int}}()
+    )
 end
 
 _buildconvcrit(cc::RandomSampling, K, rowidcs, colidcs, maxrank) = cc(K, rowidcs, colidcs)
@@ -142,7 +150,7 @@ function reset!(
     rowlen = length(rowidcs)
     collen = length(colidcs)
     nsamples = _samplecount(convcrit.convergence, rowlen, collen)
-    _sampleindices!(convcrit.indices, rowlen, collen, nsamples)
+    _sampleindices!(convcrit.indices, rowlen, collen, nsamples, convcrit.seen)
     _fillrest!(convcrit.rest, convcrit.indices, convcrit.mat, rowidcs, colidcs, nsamples)
     convcrit.nactive = nsamples
     convcrit.normUV = zero(convcrit.normUV)
