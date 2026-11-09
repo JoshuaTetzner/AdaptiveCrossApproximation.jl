@@ -60,20 +60,9 @@ function _sampleindices!(
     indices::Vector{Tuple{Int,Int}}, rowlen::Int, collen::Int, nsamples::Int
 )
     length(indices) < nsamples && resize!(indices, nsamples)
+    # Drawn with replacement: duplicates are rare and leave the estimate unbiased
     @inbounds for i in 1:nsamples
-        while true
-            rc = (rand(1:rowlen), rand(1:collen))
-            duplicate = false
-            for j in 1:(i - 1)
-                if indices[j] == rc
-                    duplicate = true
-                    break
-                end
-            end
-            duplicate && continue
-            indices[i] = rc
-            break
-        end
+        indices[i] = (rand(1:rowlen), rand(1:collen))
     end
     return indices
 end

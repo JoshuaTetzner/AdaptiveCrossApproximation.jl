@@ -53,5 +53,5 @@ function (pivstrat::RandomSamplingPivotingFunctor{F,K,M})(
     nactive = pivstrat.convcrit.nactive
     rest = view(pivstrat.convcrit.rest, 1:nactive)
     indices = view(pivstrat.convcrit.indices, 1:nactive)
-    return indices[argmax(abs.(rest))][pivstrat.rc]
+    return indices[last(findmax(abs, rest))][pivstrat.rc]
 end

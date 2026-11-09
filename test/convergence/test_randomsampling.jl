@@ -14,7 +14,6 @@ using Test
         functor = cc(K, rowidcs, colidcs)
 
         @test length(functor.indices) == 5
-        @test length(unique(functor.indices)) == 5
         @test all(
             1 <= rc[1] <= length(rowidcs) && 1 <= rc[2] <= length(colidcs) for
             rc in functor.indices
@@ -54,7 +53,6 @@ using Test
         @test length(functor.indices) >= 4
         @test length(functor.rest) >= 4
         @test functor.nactive == 4
-        @test length(unique(view(functor.indices, 1:(functor.nactive)))) == 4
         @test all(
             1 <= rc[1] <= length(rowidcs2) && 1 <= rc[2] <= length(colidcs2) for
             rc in view(functor.indices, 1:(functor.nactive))
