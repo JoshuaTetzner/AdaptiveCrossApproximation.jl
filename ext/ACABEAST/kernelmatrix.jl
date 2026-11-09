@@ -34,68 +34,6 @@ function (blk::AdaptiveCrossApproximation.BEASTKernelMatrix)(matrixblock, tdata,
     return nothing
 end
 
-# The random samples of the convergence check are single entries. Through the block
-# assembler above, every entry reduces the assembly data to its elements, allocates and,
-# with the scratch pool of BEAST 2.11, takes the lock of the pool, which all tasks share.
-# Here all samples of a block share one scratch bundle of the pool, and every entry sums
-# the element integrals of the shapes of its test and trial function. BEAST versions
-# without the scratch pool keep the generic path.
-if isdefined(BEAST, :acquirescratch) && isdefined(BEAST, :ApplyIntegrate)
-    function AdaptiveCrossApproximation._fillrest!(
-        rest::AbstractVector,
-        indices::Vector{Tuple{Int,Int}},
-        K::AdaptiveCrossApproximation.BEASTKernelMatrix{T,A},
-        rowidcs::AbstractArray{Int},
-        colidcs::AbstractArray{Int},
-        nactive::Int,
-    ) where {T,A<:BEAST.AssembleblockbodyFunctor}
-        length(rest) < nactive && resize!(rest, nactive)
-        assembler = K.nearassembler
-        scratch = BEAST.acquirescratch(assembler.scratchpool)
-        try
-            _fillentries!(rest, indices, assembler, scratch, rowidcs, colidcs, nactive)
-        finally
-            BEAST.releasescratch!(assembler.scratchpool, scratch)
-        end
-        return nothing
-    end
-
-    function _fillentries!(rest, indices, assembler, scratch, rowidcs, colidcs, nactive)
-        testspace, trialspace = assembler.tfs, assembler.bfs
-        testshapes, trialshapes = BEAST.refspace(testspace), BEAST.refspace(trialspace)
-        zlocal = scratch.zlocal
-        action = BEAST.ApplyIntegrate(scratch.qbuffer)
-        @inbounds for i in 1:nactive
-            r, c = indices[i]
-            value = zero(eltype(rest))
-            for s in testspace.fns[rowidcs[r]], t in trialspace.fns[colidcs[c]]
-                P, Q = s.cellid, t.cellid
-                fill!(zlocal, 0)
-                BEAST.integrate!(
-                    assembler.biop,
-                    testshapes,
-                    trialshapes,
-                    P,
-                    assembler.testelements[P],
-                    Q,
-                    assembler.trialelements[Q],
-                    assembler.quadraturedata,
-                    assembler.quadstrat,
-                    zlocal,
-                    testspace,
-                    P,
-                    trialspace,
-                    Q;
-                    action=action,
-                )
-                value += s.coeff * zlocal[s.refid, t.refid] * t.coeff
-            end
-            rest[i] = value
-        end
-        return rest
-    end
-end
-
 struct LocalBEASTKernelMatrix{T,M,R,C} <: AdaptiveCrossApproximation.AbstractKernelMatrix{T}
     matrix::M
     rowdata::R

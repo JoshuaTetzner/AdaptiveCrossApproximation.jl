@@ -53,6 +53,5 @@ function (pivstrat::RandomSamplingPivotingFunctor{F,K,M})(
     nactive = pivstrat.convcrit.nactive
     rest = view(pivstrat.convcrit.rest, 1:nactive)
     indices = view(pivstrat.convcrit.indices, 1:nactive)
-    # findmax(abs, rest) instead of argmax(abs.(rest)): same index, no temporary array
     return indices[last(findmax(abs, rest))][pivstrat.rc]
 end

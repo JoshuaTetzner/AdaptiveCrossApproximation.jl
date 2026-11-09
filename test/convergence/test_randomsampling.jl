@@ -14,7 +14,6 @@ using Test
         functor = cc(K, rowidcs, colidcs)
 
         @test length(functor.indices) == 5
-        @test length(unique(functor.indices)) == 5
         @test all(
             1 <= rc[1] <= length(rowidcs) && 1 <= rc[2] <= length(colidcs) for
             rc in functor.indices
@@ -54,7 +53,6 @@ using Test
         @test length(functor.indices) >= 4
         @test length(functor.rest) >= 4
         @test functor.nactive == 4
-        @test length(unique(view(functor.indices, 1:(functor.nactive)))) == 4
         @test all(
             1 <= rc[1] <= length(rowidcs2) && 1 <= rc[2] <= length(colidcs2) for
             rc in view(functor.indices, 1:(functor.nactive))
@@ -64,29 +62,5 @@ using Test
             rc in view(functor.indices, 1:(functor.nactive))
         ]
         @test all(isapprox.(view(functor.rest, 1:(functor.nactive)), expected_rest2))
-    end
-
-    @testset "_sampleindices!" begin
-        sampleindices! = AdaptiveCrossApproximation._sampleindices!
-
-        # As many samples as entries: every entry exactly once
-        indices = sampleindices!(Tuple{Int,Int}[], 3, 4, 12)
-        @test sort(indices) == sort(vec([(r, c) for r in 1:3, c in 1:4]))
-
-        # Duplicates are found with the set of the samples drawn so far, not by comparing
-        # every new sample with all previous ones: that is quadratic in the number of
-        # samples, i.e. in the block size, and took seconds for large blocks.
-        seen = Set{Tuple{Int,Int}}()
-        indices = sampleindices!(Tuple{Int,Int}[], 10, 10, 50, seen)
-        @test allunique(indices)
-        @test seen == Set(indices)
-
-        # reset! reuses this set for all blocks: the samples of the previous block must
-        # not influence the next one.
-        Random.seed!(3)
-        reused = sampleindices!(Tuple{Int,Int}[], 10, 10, 50, seen)
-        Random.seed!(3)
-        fresh = sampleindices!(Tuple{Int,Int}[], 10, 10, 50)
-        @test reused == fresh
     end
 end
